@@ -1,0 +1,190 @@
+# =============================================
+# WinDock .gitignore
+# =============================================
+
+# Build & Binary outputs
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
+*.zip
+*.zip.*
+*.patch
+*.old
+*.cache
+*.exe.config
+*.nupkg
+dotnet-install.ps1
+
+# Heavy tooling directories (not part of the project)
+dotnet/
+.store/
+ImmutablePkg/
+ilspy/
+ilspy7/
+ilspy.zip
+ilspy7.zip
+
+# Installer packaging content
+PackageContent/
+app_payload.zip
+
+# Team/flag assets (large runtime assets)
+Team Logos/
+flags/
+
+# F1 Android sub-project
+F1DashboardAndroid/
+
+# AI knowledge base and related directories
+knowledge_repos/
+openf1/
+
+# Agent/IDE directories
+.agents/
+.system_generated/
+.tempmediaStorage/
+.vs/
+.vscode/
+
+# =============================================
+# Dev/Scratch Python Scripts (root level)
+# =============================================
+check*.py
+fix*.py
+view*.py
+scrape*.py
+test*.py
+get*.py
+patch*.py
+add*.py
+set*.py
+extract*.py
+update*.py
+do_revert*.py
+clean*.py
+remove*.py
+inject*.py
+generate*.py
+search*.py
+find*.py
+list*.py
+ddg_search.py
+debug_json.py
+restore*.py
+check.py
+fix.py
+patch_ai.py
+patch_forecast.py
+patch_icon.py
+ai_debug_log.txt
+
+# Dev scripts that shouldn't be public
+scripts/update_config.ps1
+scripts/build_knowledge.ps1
+
+# =============================================
+# Scratch directory
+# =============================================
+scratch/
+
+# =============================================
+# Log, Dump & Temporary files
+# =============================================
+*.log
+*.txt
+*.jsonStream
+*.json
+crash.txt
+openf1_token.txt
+openf1_test.json
+sportsdb_test.json
+intents.json
+screenshot.png
+diff.txt
+diff_utf8.patch
+changes_to_revert.txt
+commands_history.txt
+build_out.txt
+build_output*.txt
+flag_error.txt
+lyrics_debug.txt
+lyrics_error.txt
+speech_manager_chunks.txt
+MacSettings.txt
+DashboardCode.txt
+knowledge.txt
+ai_debug_log.txt
+setup.txt
+dock_console_run.txt
+test_stdin.txt
+test_auth_output.txt
+test_recording_output.txt
+temp.jsonStream
+practice.txt
+quali.txt
+
+# =============================================
+# Old/Legacy binaries and resources
+# =============================================
+MacDock*.exe
+MacDock*.pdb
+MacDock.ico
+MacDock.exe.config
+macdock.ico
+macdock_logo.png
+MacDock_Release.zip
+MacDock_Source.zip
+MacDock_Installer.exe
+System.Collections.Immutable.zip
+Decompile.exe
+Decompile7.exe
+test.exe
+test_exec.exe
+test_intents.exe
+
+# Dev tools
+replace.ps1
+fix_mojibake.ps1
+
+# =============================================
+# Image assets not part of the project
+# =============================================
+F1 Dashboard.png
+f1_logo.png
+f1_logo_black.png
+f1_logo_cropped.png
+f1_logo_white.png
+fifa_logo.png
+fifa_logo_black.png
+dolby_logo.png
+recycle_bin.png
+test_flag.png
+screenshot.png
+weather_cloudy.png
+weather_rain.png
+weather_sunny.png
+weather_thunderstorm.png
+spotify_logo.png
+
+# =============================================
+# Artifact / Planning files (not for repo)
+# =============================================
+task.md
+walkthrough.md
+implementation_plan.md
+
+# =============================================
+# ALWAYS KEEP these project files
+# =============================================
+!config.json
+!config.example.json
+!LICENSE
+!README.md
+!WinDock.csproj
+!windock.ico
+!windock_logo.png
+!scripts/compile.ps1
+!scripts/restart_dock.bat
+!scripts/toggle_radio.ps1
