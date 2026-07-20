@@ -14,7 +14,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="windock_logo.png" />
-    <Resource Include="macdock_logo.png" />
     <Resource Include="fifa_logo.png" />
     <Resource Include="fifa_logo_black.png" />
     <Resource Include="weather_sunny.png" />
@@ -28,9 +27,6 @@
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Management" />
     <Reference Include="Microsoft.CSharp" />
-    <None Include="MacSettings.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="f1_logo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -47,12 +43,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="windock_logo.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="macdock.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="macdock_logo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="recycle_bin.png">

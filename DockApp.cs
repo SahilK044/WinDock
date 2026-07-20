@@ -32549,7 +32549,7 @@ namespace MacStyleDock
 
 			if (!string.IsNullOrEmpty (text2)) {
 
-				string text3 = System.IO.Path.Combine ("C:\\Users\\sahil\\Downloads\\F1 Resources\\Team Logos", text2);
+				string text3 = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Team Logos", text2);
 
 				if (File.Exists (text3)) {
 
@@ -32641,7 +32641,7 @@ namespace MacStyleDock
 
 			if (!string.IsNullOrEmpty (text2)) {
 
-				string text3 = System.IO.Path.Combine ("C:\\Users\\sahil\\Downloads\\F1 Resources\\F1 Cars", text2);
+				string text3 = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "F1 Cars", text2);
 
 				if (File.Exists (text3)) {
 
@@ -32703,7 +32703,7 @@ namespace MacStyleDock
 
 			string path = givenName + " " + familyName + ".png";
 
-			string text = System.IO.Path.Combine ("C:\\Users\\sahil\\Downloads\\F1 Resources\\Drivers", path);
+			string text = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Drivers", path);
 
 			if (File.Exists (text)) {
 
@@ -32759,7 +32759,7 @@ namespace MacStyleDock
 
 			}
 
-			string fullPath = System.IO.Path.Combine (@"C:\Users\sahil\Downloads\F1 Resources\Headshots", givenName + " " + familyName + ".png");
+			string fullPath = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Headshots", givenName + " " + familyName + ".png");
 
 			return File.Exists (fullPath) ? fullPath : "";
 
@@ -32777,7 +32777,7 @@ namespace MacStyleDock
 
 			}
 
-			string fullPath = System.IO.Path.Combine (@"C:\Users\sahil\Downloads\F1 Resources\Driver Number", fullName + " Number.png");
+			string fullPath = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Driver Number", fullName + " Number.png");
 
 			return File.Exists (fullPath) ? fullPath : "";
 
@@ -32851,7 +32851,7 @@ namespace MacStyleDock
 
 			}
 
-			string fullPath = System.IO.Path.Combine (@"C:\Users\sahil\Downloads\F1 Resources\Team Logos", logoFile);
+			string fullPath = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Team Logos", logoFile);
 
 			return File.Exists (fullPath) ? fullPath : "";
 
@@ -34555,7 +34555,7 @@ namespace MacStyleDock
 
 			}
 
-			string text = "C:\\Users\\sahil\\Downloads\\F1 Resources\\Track";
+			string text = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Track");
 
 			if (!Directory.Exists (text)) {
 
@@ -44506,7 +44506,7 @@ namespace MacStyleDock
 
 			}
 
-			AppendChat ("AI", $"{arg} Sahil, how can I help you?");
+			AppendChat ("Assistant", $"{arg}, how can I help you?");
 
 		}
 
@@ -44586,7 +44586,7 @@ namespace MacStyleDock
 
 			switch (sender) {
 
-			case "Sahil":
+			case "User":
 
 				border.Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (110, 60, 60, 65));
 
@@ -44666,7 +44666,7 @@ namespace MacStyleDock
 
 			SetSiriState ("thinking");
 
-			AppendChat ("Sahil", prompt);
+			AppendChat ("User", prompt);
 
 			string intentName;
 
@@ -46178,7 +46178,7 @@ namespace MacStyleDock
 
 					}
 
-					_dockWindow.aiAssistantOverlay.AppendChat ("AI", "Yes Sahil? I am listening...");
+					_dockWindow.aiAssistantOverlay.AppendChat ("Assistant", "Yes? I am listening...");
 
 					_dockWindow.aiAssistantOverlay.SetSiriState ("thinking");
 
@@ -47986,7 +47986,7 @@ namespace MacStyleDock
 				.Replace ("P\u00e9rez", "Perez")
 				.Replace ("Alexander Albon", "Alex Albon");
 
-			string path = System.IO.Path.Combine (@"C:\Users\sahil\Downloads\F1 Resources\Headshots", n + ".png");
+			string path = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Headshots", n + ".png");
 
 			return System.IO.File.Exists (path) ? path : "";
 
@@ -48006,7 +48006,7 @@ namespace MacStyleDock
 				.Replace ("P\u00e9rez", "Sergio Perez")
 				.Replace ("Alexander Albon", "Alex Albon");
 
-			string path = System.IO.Path.Combine (@"C:\Users\sahil\Downloads\F1 Resources\Driver Number", n + " Number.png");
+			string path = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Driver Number", n + " Number.png");
 
 			return System.IO.File.Exists (path) ? path : "";
 
@@ -48038,7 +48038,7 @@ namespace MacStyleDock
 
 			if (string.IsNullOrEmpty (logoFile)) return "";
 
-			string path = System.IO.Path.Combine (@"C:\Users\sahil\Downloads\F1 Resources\Team Logos", logoFile);
+			string path = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Team Logos", logoFile);
 
 			return System.IO.File.Exists (path) ? path : "";
 
@@ -49742,7 +49742,7 @@ namespace MacStyleDock
 
 			}
 
-			string text = "C:\\Users\\sahil\\Downloads\\F1 Resources\\Drivers";
+			string text = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Drivers");
 
 			if (!Directory.Exists (text)) {
 

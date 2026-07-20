@@ -1,10 +1,10 @@
 @echo off
-echo Closing existing MacDock...
-taskkill /F /IM MacDock.exe /T 2>nul
-taskkill /F /IM MacDockConsole.exe /T 2>nul
+echo Closing existing WinDock...
+taskkill /F /IM WinDock.exe /T 2>nul
+taskkill /F /IM WinDockConsole.exe /T 2>nul
 timeout /t 1 /nobreak >nul
 
-echo Launching MacDock from downloads folder...
-start "" "c:\Users\sahil\Downloads\Antigravity\MacDock.exe"
+echo Launching WinDock...
+start "" "%~dp0..\WinDock.exe"
 
-echo Done! MacDock has been restarted in Downloads folder.
+echo Done! WinDock has been restarted.
