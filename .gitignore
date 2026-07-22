@@ -30,8 +30,7 @@ ilspy7.zip
 PackageContent/
 app_payload.zip
 
-# Team/flag assets (large runtime assets)
-Team Logos/
+# Flag assets (not used)
 flags/
 
 # F1 Android sub-project
@@ -112,7 +111,6 @@ flag_error.txt
 lyrics_debug.txt
 lyrics_error.txt
 speech_manager_chunks.txt
-MacSettings.txt
 DashboardCode.txt
 knowledge.txt
 ai_debug_log.txt
@@ -180,6 +178,7 @@ implementation_plan.md
 # =============================================
 !config.json
 !config.example.json
+!MacSettings.txt
 !LICENSE
 !README.md
 !WinDock.csproj

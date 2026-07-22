@@ -1,0 +1,53 @@
+<UserControl x:Class="WinDockSetup.Steps.ProgressStep"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800"
+             Loaded="UserControl_Loaded">
+    <UserControl.Resources>
+        <Storyboard x:Key="ShimmerAnimation" RepeatBehavior="Forever">
+            <DoubleAnimation Storyboard.TargetName="ShimmerLine"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.3" To="0.7"
+                             Duration="0:0:1" AutoReverse="True"
+                             EasingFunction="{StaticResource QuadEaseOut}"/>
+        </Storyboard>
+    </UserControl.Resources>
+    
+    <Grid Margin="40">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <TextBlock x:Name="TitleText" Text="Installing WinDock"
+                   FontFamily="{StaticResource DisplayFontFamily}"
+                   FontSize="20" Foreground="{StaticResource FogWhiteBrush}"
+                   Margin="0,0,0,10"/>
+                   
+        <TextBlock x:Name="StatusText" Text="Preparing installation directory..."
+                   FontFamily="{StaticResource BodyFontFamily}"
+                   FontSize="13" Foreground="{StaticResource FogWhite70Brush}"
+                   Margin="0,0,0,20"/>
+                   
+        <Rectangle x:Name="ShimmerLine" Height="2" Fill="{StaticResource TelemetryCyanBrush}"
+                   Opacity="0.3" Margin="0,0,0,20" Grid.Row="2"/>
+                   
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Height="100" HorizontalAlignment="Left">
+            <TextBlock x:Name="LogText"
+                       FontFamily="{StaticResource MonoFontFamily}"
+                       FontSize="11" Foreground="{StaticResource FogWhite45Brush}"
+                       TextWrapping="Wrap"/>
+        </ScrollViewer>
+        
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,20,0,0">
+            <Button x:Name="CancelBtn" Content="Cancel" Style="{StaticResource GhostButtonStyle}" Click="CancelBtn_Click" Margin="0,0,10,0"/>
+            <Button x:Name="RetryBtn" Content="Retry" Style="{StaticResource PrimaryButtonStyle}" Click="RetryBtn_Click" Visibility="Collapsed"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

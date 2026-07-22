@@ -1,0 +1,630 @@
+<Grid xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="Transparent" Width="840" Height="640">
+    <Grid.Resources>
+        <!-- Font -->
+        <FontFamily x:Key="MacFont">Segoe UI, Helvetica Neue, Arial</FontFamily>
+        
+        <!-- Toggle Switch -->
+        <ControlTemplate x:Key="MacToggle" TargetType="CheckBox">
+                <Border x:Name="border" Width="44" Height="24" CornerRadius="12" Background="#39393D" HorizontalAlignment="Right">
+                    <Ellipse x:Name="knob" Width="20" Height="20" Fill="#FFFFFF" HorizontalAlignment="Left" Margin="2,0,0,0">
+                        <Ellipse.Effect>
+                            <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.3"/>
+                        </Ellipse.Effect>
+                    </Ellipse>
+                </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter TargetName="border" Property="Background" Value="#34C759"/>
+                    <Trigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ThicknessAnimation Storyboard.TargetName="knob" Storyboard.TargetProperty="Margin" To="22,0,0,0" Duration="0:0:0.15">
+                                    <ThicknessAnimation.EasingFunction>
+                                        <QuadraticEase EasingMode="EaseOut"/>
+                                    </ThicknessAnimation.EasingFunction>
+                                </ThicknessAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.EnterActions>
+                    <Trigger.ExitActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <ThicknessAnimation Storyboard.TargetName="knob" Storyboard.TargetProperty="Margin" To="2,0,0,0" Duration="0:0:0.15">
+                                    <ThicknessAnimation.EasingFunction>
+                                        <QuadraticEase EasingMode="EaseOut"/>
+                                    </ThicknessAnimation.EasingFunction>
+                                </ThicknessAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.ExitActions>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Sidebar Radio Button -->
+        <ControlTemplate x:Key="MacSidebarItem" TargetType="RadioButton">
+            <Border x:Name="border" CornerRadius="6" Height="32" Margin="10,2" Background="Transparent">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="32"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="iconBg" Width="22" Height="22" CornerRadius="4" Background="{TemplateBinding Background}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="{TemplateBinding Tag}" Foreground="White" FontFamily="Segoe MDL2 Assets" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{TemplateBinding Content}" Foreground="#FFFFFF" FontFamily="{StaticResource MacFont}" FontSize="13" VerticalAlignment="Center" Margin="5,0"/>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="border" Property="Background" Value="#1AFFFFFF"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter TargetName="border" Property="Background" Value="#007AFF"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Setting Card Style -->
+        <Style x:Key="MacCard" TargetType="Border">
+            <Setter Property="Background" Value="#1C1C1E"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Margin" Value="0,0,0,15"/>
+        </Style>
+
+        <Style x:Key="CardText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="{StaticResource MacFont}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="CardSubtext" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#8E8E93"/>
+            <Setter Property="FontFamily" Value="{StaticResource MacFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+                <Style x:Key="MacThemeRadio" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#8E8E93"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <StackPanel HorizontalAlignment="Center" Cursor="Hand">
+                            <Border x:Name="OuterBorder" Width="72" Height="48" CornerRadius="8" BorderThickness="2" BorderBrush="Transparent" Padding="2" Background="Transparent">
+                                <Border x:Name="InnerBorder" CornerRadius="6" Background="#1E1E1E" ClipToBounds="True">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="12"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        
+                                        <!-- Title Bar -->
+                                        <Border x:Name="TitleBar" Grid.Row="0" Background="#2D2D2D"/>
+                                        
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,0,0,0" VerticalAlignment="Center">
+                                            <Ellipse Width="4" Height="4" Fill="#FF5F56" Margin="0,0,2,0"/>
+                                            <Ellipse Width="4" Height="4" Fill="#FFBD2E" Margin="0,0,2,0"/>
+                                            <Ellipse Width="4" Height="4" Fill="#27C93F"/>
+                                        </StackPanel>
+    
+                                        <!-- Content -->
+                                        <Grid Grid.Row="1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="20"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- Sidebar -->
+                                            <Border x:Name="Sidebar" Grid.Column="0" Background="#1E1E1E" BorderThickness="0,0,1,0" BorderBrush="#2D2D2D"/>
+                                            
+                                            <!-- Main Area -->
+                                            <Border x:Name="MainArea" Grid.Column="1" Background="#000000">
+                                                <StackPanel Margin="4,4,4,0" VerticalAlignment="Top">
+                                                    <Border x:Name="MainLine1" Height="8" CornerRadius="2" Background="#2D2D2D" Margin="0,0,0,4"/>
+                                                    <Border x:Name="MainLine2" Height="4" CornerRadius="2" Background="#2D2D2D" Margin="0,0,12,4" HorizontalAlignment="Left" Width="20"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+    
+                                        <!-- Split overlay for AUTO -->
+                                        <Grid x:Name="AutoOverlay" Visibility="Collapsed">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <!-- Left Side: Light Theme Overlay -->
+                                            <Border Grid.Column="0" Background="White" ClipToBounds="True">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="12"/>
+                                                        <RowDefinition Height="*"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Border Grid.Row="0" Background="#E5E5EA"/>
+                                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,0,0,0" VerticalAlignment="Center">
+                                                        <Ellipse Width="4" Height="4" Fill="#FF5F56" Margin="0,0,2,0"/>
+                                                        <Ellipse Width="4" Height="4" Fill="#FFBD2E" Margin="0,0,2,0"/>
+                                                        <Ellipse Width="4" Height="4" Fill="#27C93F"/>
+                                                    </StackPanel>
+                                                    <Grid Grid.Row="1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="20"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Background="#F2F2F7" BorderThickness="0,0,1,0" BorderBrush="#E5E5EA"/>
+                                                        <Border Grid.Column="1" Background="White">
+                                                            <StackPanel Margin="4,4,4,0" VerticalAlignment="Top">
+                                                                <Border Height="8" CornerRadius="2" Background="#007AFF" Margin="0,0,0,4"/>
+                                                                <Border Height="4" CornerRadius="2" Background="#E5E5EA" Margin="0,0,12,4" HorizontalAlignment="Left" Width="20"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </Border>
+                            
+                            <TextBlock Text="{TemplateBinding Content}" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center" FontFamily="{StaticResource MacFont}"/>
+                        </StackPanel>
+                        
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Content, RelativeSource={RelativeSource Self}}" Value="Light">
+                                <Setter TargetName="InnerBorder" Property="Background" Value="White"/>
+                                <Setter TargetName="TitleBar" Property="Background" Value="#E5E5EA"/>
+                                <Setter TargetName="Sidebar" Property="Background" Value="#F2F2F7"/>
+                                <Setter TargetName="Sidebar" Property="BorderBrush" Value="#E5E5EA"/>
+                                <Setter TargetName="MainArea" Property="Background" Value="White"/>
+                                <Setter TargetName="MainLine1" Property="Background" Value="#007AFF"/>
+                                <Setter TargetName="MainLine2" Property="Background" Value="#E5E5EA"/>
+                            </DataTrigger>
+                            
+                            <DataTrigger Binding="{Binding Content, RelativeSource={RelativeSource Self}}" Value="Dark">
+                                <Setter TargetName="MainLine1" Property="Background" Value="#007AFF"/>
+                                <Setter TargetName="MainLine2" Property="Background" Value="#2D2D2D"/>
+                            </DataTrigger>
+                            
+                            <DataTrigger Binding="{Binding Content, RelativeSource={RelativeSource Self}}" Value="Auto">
+                                <Setter TargetName="AutoOverlay" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="MainLine1" Property="Background" Value="#007AFF"/>
+                                <Setter TargetName="MainLine2" Property="Background" Value="#2D2D2D"/>
+                            </DataTrigger>
+    
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="OuterBorder" Property="BorderBrush" Value="#007AFF"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Grid.Resources>
+
+    <Border CornerRadius="12" Background="#1E1E1E" ClipToBounds="True" Margin="20">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="30" ShadowDepth="10" Opacity="0.5"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- Title Bar Draggable Area -->
+            <Border x:Name="TitleBar" Grid.ColumnSpan="2" Height="40" VerticalAlignment="Top" Background="Transparent" Panel.ZIndex="10"/>
+
+            <!-- Sidebar -->
+            <Border Background="#282828" CornerRadius="12,0,0,12">
+                <StackPanel Margin="0,40,0,0">
+
+                    
+                    <TextBox Margin="15,0,15,15" Height="28" Background="#1C1C1E" Foreground="White" BorderThickness="1" BorderBrush="#333333" Padding="30,0,5,0" VerticalContentAlignment="Center">
+                        <TextBox.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="6"/>
+                            </Style>
+                        </TextBox.Resources>
+                    </TextBox>
+                    <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" Foreground="#8E8E93" FontSize="12" Margin="25,-36,0,0" VerticalAlignment="Top"/>
+
+                    <RadioButton x:Name="NavAppearance" Content="Appearance" Tag="&#xE790;" Background="#007AFF" Template="{StaticResource MacSidebarItem}" IsChecked="True"/>
+                    <RadioButton x:Name="NavDesktop" Content="Desktop &amp; Dock" Tag="&#xE8F1;" Background="#34C759" Template="{StaticResource MacSidebarItem}"/>
+                    <RadioButton x:Name="NavAnimations" Content="Animations" Tag="&#xE945;" Background="#FF2D55" Template="{StaticResource MacSidebarItem}"/>
+                    <RadioButton x:Name="NavWidgets" Content="Widgets &amp; Modules" Tag="&#xE774;" Background="#FF9500" Template="{StaticResource MacSidebarItem}"/>
+                    <RadioButton x:Name="NavGeneral" Content="General" Tag="&#xE713;" Background="#8E8E93" Template="{StaticResource MacSidebarItem}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Content Area -->
+            <Border Grid.Column="1" Background="#000000" CornerRadius="0,12,12,0">
+                <Grid>
+                <Border Height="50" VerticalAlignment="Top" BorderBrush="#1C1C1E" BorderThickness="0,0,0,1">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Margin="15,0,0,0">
+                            <TextBlock Text="&#xE72B;" FontFamily="Segoe MDL2 Assets" Foreground="#8E8E93" FontSize="14" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                            <TextBlock Text="&#xE72A;" FontFamily="Segoe MDL2 Assets" Foreground="#8E8E93" FontSize="14" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock x:Name="HeaderTitle" Text="Appearance" Foreground="White" FontSize="14" FontWeight="SemiBold" FontFamily="{StaticResource MacFont}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <TabControl x:Name="MainTabControl" Margin="0,50,0,0" Background="Transparent" BorderThickness="0">
+                    <TabControl.Resources>
+                        <Style TargetType="TabItem">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </Style>
+                    </TabControl.Resources>
+                    
+                    <!-- APPEARANCE TAB -->
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30,20">
+                                <TextBlock Text="Appearance" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Appearance" Style="{StaticResource CardText}" VerticalAlignment="Top" Margin="0,5,0,0"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <RadioButton x:Name="ThemeAuto" Content="Auto" Style="{StaticResource MacThemeRadio}" Margin="0,0,15,0"/>
+                                                <RadioButton x:Name="ThemeLight" Content="Light" Style="{StaticResource MacThemeRadio}" Margin="0,0,15,0"/>
+                                                <RadioButton x:Name="ThemeDark" Content="Dark" Style="{StaticResource MacThemeRadio}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Clock Style" Style="{StaticResource CardText}"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <RadioButton x:Name="ClockAdaptive" Content="Auto" Foreground="White" Margin="0,0,10,0"/>
+                                                <RadioButton x:Name="ClockLight" Content="Light" Foreground="White" Margin="0,0,10,0"/>
+                                                <RadioButton x:Name="ClockDark" Content="Dark" Foreground="White" Margin="0,0,10,0"/>
+                                                <RadioButton x:Name="ClockDigital" Content="Digital" Foreground="White"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Colors" Foreground="#8E8E93" FontSize="12" Margin="15,15,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Accent Color Hex" Style="{StaticResource CardText}"/>
+                                            <TextBox x:Name="AccentColorHex" Width="100" Height="24" Background="#1C1C1E" Foreground="White" BorderThickness="1" BorderBrush="#333333" HorizontalAlignment="Right" VerticalAlignment="Center" Padding="5,0"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Accent Color (Multicolor disables custom)" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="AutoAccent" Content="Auto from Wallpaper" Foreground="White" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Ambient Wallpaper Tint (Shadows match wallpaper)" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="AmbientTint" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Transparency" Foreground="#8E8E93" FontSize="12" Margin="15,15,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <Grid Margin="15,10">
+                                        <TextBlock Text="Glass Opacity" Style="{StaticResource CardText}"/>
+                                        <Slider x:Name="GlassOpacity" Minimum="0.1" Maximum="0.95" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- DESKTOP & DOCK TAB -->
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30,20">
+                                <TextBlock Text="Dock Size &amp; Position" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Base Size" Style="{StaticResource CardText}"/>
+                                            <Slider x:Name="BaseSize" Minimum="16" Maximum="128" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Max Magnification Size" Style="{StaticResource CardText}"/>
+                                            <Slider x:Name="MaxSize" Minimum="32" Maximum="256" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Magnification Range" Style="{StaticResource CardText}"/>
+                                            <Slider x:Name="MagRange" Minimum="1" Maximum="10" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Monitor" Style="{StaticResource CardText}"/>
+                                            <ComboBox x:Name="MonitorIndex" Width="150" Height="24" HorizontalAlignment="Right" VerticalAlignment="Center" Background="#1C1C1E" Foreground="White" BorderBrush="#333333">
+                                            </ComboBox>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Position on screen" Style="{StaticResource CardText}"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <RadioButton x:Name="PosLeft" Content="Left" Foreground="White" Margin="0,0,10,0"/>
+                                                <RadioButton x:Name="PosTop" Content="Top" Foreground="White" Margin="0,0,10,0"/>
+                                                <RadioButton x:Name="PosRight" Content="Right" Foreground="White" Margin="0,0,10,0"/>
+                                                <RadioButton x:Name="PosBottom" Content="Bottom" Foreground="White"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Behavior" Foreground="#8E8E93" FontSize="12" Margin="15,15,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Automatically hide and show the Dock" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="AutoHide" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Auto Hide Delay (seconds)" Style="{StaticResource CardText}"/>
+                                            <Slider x:Name="AutoHideDelay" Minimum="0" Maximum="15" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Show recent applications in Dock" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="ShowRecentApps" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Show Dock Border" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="ShowDockBorder" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Show Launchpad in Dock" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="ShowLaunchpad" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- ANIMATIONS TAB -->
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30,20">
+                                <TextBlock Text="Core Animations" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Animations" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="AnimationsEnabled" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Animation Speed (1-5)" Style="{StaticResource CardText}"/>
+                                            <Slider x:Name="AnimationSpeed" Minimum="1" Maximum="5" TickFrequency="1" IsSnapToTickEnabled="True" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Effects" Foreground="#8E8E93" FontSize="12" Margin="15,15,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Launch Glow" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="LaunchGlow" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Click Squish" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="ClickSquish" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Poof Animation" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="PoofAnimation" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Launch Particles" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="LaunchParticles" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Icon Hover Effects" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="IconEffects" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Dynamic Hover Border Color (Matches app color)" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="HoverBorderTint" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Radial Stacks" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="RadialStacks" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- WIDGETS TAB -->
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30,20">
+                                <TextBlock Text="Widgets" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Show Clock Widget" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="ShowClock" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Show Calendar Widget" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="ShowCalendar" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Live Weather" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="LiveWeather" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Weather Location" Style="{StaticResource CardText}"/>
+                                            <TextBox x:Name="WeatherLoc" Width="150" Height="24" Background="#1C1C1E" Foreground="White" BorderThickness="1" BorderBrush="#333333" HorizontalAlignment="Right" VerticalAlignment="Center" Padding="5,0"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Weather Unit" Style="{StaticResource CardText}"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <RadioButton x:Name="WeatherUnitC" Content="Celsius (°C)" Foreground="White" Margin="0,0,10,0"/>
+                                                <RadioButton x:Name="WeatherUnitF" Content="Fahrenheit (°F)" Foreground="White"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Control Center" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="ControlCenter" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Sports Widgets" Foreground="#8E8E93" FontSize="12" Margin="15,15,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <StackPanel>
+                                                <TextBlock Text="F1 Widget" Style="{StaticResource CardText}"/>
+                                                <TextBlock Text="Formula 1 race schedule &amp; results" Foreground="#8E8E93" FontSize="11" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <CheckBox x:Name="EnableF1Widget" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <StackPanel>
+                                                <TextBlock Text="FIFA World Cup Widget" Style="{StaticResource CardText}"/>
+                                                <TextBlock Text="Live World Cup 2026 matches &amp; standings" Foreground="#8E8E93" FontSize="11" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <CheckBox x:Name="EnableFifaWidget" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Spotify" Foreground="#8E8E93" FontSize="12" Margin="15,15,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Show Spotify Album Art" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="SpotifyArt" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Spotify Art Blur Radius" Style="{StaticResource CardText}"/>
+                                            <Slider x:Name="SpotifyArtBlur" Minimum="0" Maximum="100" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Spotify Widget Background Art" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="SpotifyArtBg" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- GENERAL TAB -->
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30,20">
+                                <TextBlock Text="System" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Start at login" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="AutoStart" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Performance Mode (Disable heavy graphics)" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="PerformanceMode" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable AI Assistant (Chonk)" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="EnableAIAssistant" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Local AI Training Data" Style="{StaticResource CardText}"/>
+                                            <Button x:Name="BtnEditIntents" Content="Edit Training Data" Width="130" Height="24" HorizontalAlignment="Right" Foreground="White" BorderThickness="0">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="#333333" CornerRadius="6">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Target FPS" Style="{StaticResource CardText}"/>
+                                            <Slider x:Name="TargetFPS" Minimum="30" Maximum="240" TickFrequency="30" IsSnapToTickEnabled="True" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Audio" Foreground="#8E8E93" FontSize="12" Margin="15,15,0,5" FontFamily="{StaticResource MacFont}"/>
+                                <Border Style="{StaticResource MacCard}">
+                                    <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Micro Sounds" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="MicroSounds" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Mute Sounds" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="MuteSounds" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Sound Volume" Style="{StaticResource CardText}"/>
+                                            <Slider x:Name="Volume" Minimum="0.0" Maximum="1.0" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Grid Margin="15,20">
+                                    <Button x:Name="BtnClose" Content="Close Settings" Width="150" Height="30" HorizontalAlignment="Right" Foreground="White" BorderThickness="0">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="#333333" CornerRadius="6">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                </TabControl>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Grid>

@@ -1,0 +1,95 @@
+<UserControl x:Class="WinDockSetup.Steps.WelcomeStep"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="400" d:DesignWidth="600"
+             Loaded="UserControl_Loaded">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Logo -->
+        <Image x:Name="LogoImage" Grid.Row="1" Source="/windock_logo.png" Width="72" Height="72" HorizontalAlignment="Center" Margin="0,0,0,24" Opacity="0" RenderTransformOrigin="0.5,0.5">
+            <Image.RenderTransform>
+                <ScaleTransform x:Name="LogoScale" ScaleX="0.96" ScaleY="0.96"/>
+            </Image.RenderTransform>
+        </Image>
+
+        <!-- Title -->
+        <TextBlock x:Name="TitleText" Grid.Row="2" Text="Welcome to WinDock" 
+                   FontFamily="{StaticResource DisplayFontFamily}" FontSize="26" 
+                   Foreground="{StaticResource FogWhiteBrush}" 
+                   HorizontalAlignment="Center" Margin="0,0,0,8" Opacity="0"/>
+
+        <!-- Subtitle -->
+        <TextBlock x:Name="SubtitleText" Grid.Row="3" Text="A macOS-style dock for Windows." 
+                   FontFamily="{StaticResource BodyFontFamily}" FontSize="14" 
+                   Foreground="{StaticResource FogWhite70Brush}" 
+                   HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Opacity="0"/>
+
+        <!-- High-tech telemetry spec card -->
+        <Border x:Name="SpecPanel" Grid.Row="4" Background="{StaticResource FrostPanelBackgroundBrush}" BorderBrush="{StaticResource FrostPanelBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16,14" VerticalAlignment="Center" Margin="24,0,24,0" Opacity="0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                    <TextBlock Text="PERFORMANCE" FontFamily="{StaticResource MonoFontFamily}" FontSize="8.5" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="60FPS GPU" FontFamily="{StaticResource BodyFontFamily}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TelemetryCyanBrush}" HorizontalAlignment="Center"/>
+                </StackPanel>
+                
+                <Border Grid.Column="1" Background="{StaticResource FrostPanelBorderBrush}" Margin="0,2"/>
+                
+                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                    <TextBlock Text="MEMORY" FontFamily="{StaticResource MonoFontFamily}" FontSize="8.5" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="&lt;15MB RAM" FontFamily="{StaticResource BodyFontFamily}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource FogWhiteBrush}" HorizontalAlignment="Center"/>
+                </StackPanel>
+                
+                <Border Grid.Column="3" Background="{StaticResource FrostPanelBorderBrush}" Margin="0,2"/>
+                
+                <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                    <TextBlock Text="INTEGRATION" FontFamily="{StaticResource MonoFontFamily}" FontSize="8.5" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="NATIVE DWM" FontFamily="{StaticResource BodyFontFamily}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource FogWhiteBrush}" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Keep settings checkbox (uninstall mode only) -->
+        <CheckBox x:Name="KeepConfigCheckBox" Grid.Row="4"
+                  Content="Keep my config.json settings"
+                  IsChecked="True"
+                  Style="{StaticResource CyanCheckBoxStyle}"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  Visibility="Collapsed"/>
+
+        <!-- Buttons Area -->
+        <Grid x:Name="ButtonsPanel" Grid.Row="5" Margin="0,32,0,0" Opacity="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            
+            <Button x:Name="CancelBtn" Grid.Column="0" Style="{StaticResource GhostButtonStyle}" Content="Cancel" Click="CancelBtn_Click"/>
+            
+            <TextBlock Grid.Column="1" Text="v1.0" FontFamily="{StaticResource MonoFontFamily}" FontSize="10" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+            <Button x:Name="ContinueBtn" Grid.Column="2" Style="{StaticResource PrimaryButtonStyle}" Content="Continue →" Click="ContinueBtn_Click"/>
+        </Grid>
+    </Grid>
+</UserControl>

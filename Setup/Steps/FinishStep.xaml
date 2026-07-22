@@ -1,0 +1,74 @@
+<UserControl x:Class="WinDockSetup.Steps.FinishStep"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="400" d:DesignWidth="600"
+             Loaded="UserControl_Loaded">
+
+
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center">
+            
+            <!-- Animated Checkmark -->
+            <Viewbox Width="60" Height="60" Margin="0,0,0,24">
+                <Path x:Name="CheckmarkPath" 
+                      Data="M 6,13 L 11,18 L 20,7" 
+                      Stroke="{DynamicResource PodiumGoldBrush}" 
+                      StrokeThickness="3" 
+                      StrokeEndLineCap="Round" 
+                      StrokeStartLineCap="Round" 
+                      StrokeLineJoin="Round"
+                      RenderTransformOrigin="0.5,0.5">
+                    <Path.RenderTransform>
+                        <ScaleTransform x:Name="CheckmarkScale" ScaleX="1.0" ScaleY="1.0" />
+                    </Path.RenderTransform>
+                </Path>
+            </Viewbox>
+
+            <!-- Title -->
+            <TextBlock x:Name="TitleText"
+                       Text="WinDock installed" 
+                       FontFamily="{DynamicResource DisplayFontFamily}" 
+                       FontSize="22" 
+                       Foreground="{DynamicResource FogWhiteBrush}" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,0,0,8"
+                       Opacity="0" />
+
+            <!-- Subtitle -->
+            <TextBlock x:Name="SubtitleText"
+                       Text="Your dock is ready to launch." 
+                       FontFamily="{DynamicResource BodyFontFamily}" 
+                       FontSize="13" 
+                       Foreground="{DynamicResource FogWhite70Brush}" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,0,0,24"
+                       Opacity="0" />
+
+            <!-- CheckBox -->
+            <CheckBox x:Name="LaunchCheckBox"
+                      Content="Launch WinDock now"
+                      IsChecked="True"
+                      Style="{StaticResource CyanCheckBoxStyle}"
+                      HorizontalAlignment="Center"
+                      Opacity="0" />
+        </StackPanel>
+
+        <!-- Bottom Button Row -->
+        <Border Grid.Row="1" Margin="24">
+            <Button x:Name="FinishButton" 
+                    Content="Finish" 
+                    Style="{StaticResource PrimaryButtonStyle}" 
+                    HorizontalAlignment="Right" 
+                    Click="FinishButton_Click"
+                    Opacity="0" />
+        </Border>
+    </Grid>
+</UserControl>

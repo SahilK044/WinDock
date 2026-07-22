@@ -1,0 +1,47 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         ANIMATIONS  ·  WinDock Setup
+         Reusable easing functions, durations, and timing tokens.
+         ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- ── Easing Functions ────────────────────────────────────────── -->
+
+    <!-- Spring-pop: logo entrance, toggle thumb, checkmark pulse -->
+    <BackEase      x:Key="BackEaseOut"    Amplitude="0.3"  EasingMode="EaseOut"/>
+
+    <!-- Stronger overshoot for toggle thumb slide -->
+    <BackEase      x:Key="BackEaseToggle" Amplitude="0.08" EasingMode="EaseOut"/>
+
+    <!-- Standard content transitions -->
+    <CubicEase     x:Key="CubicEaseOut"                    EasingMode="EaseOut"/>
+    <QuadraticEase x:Key="QuadEaseOut"                     EasingMode="EaseOut"/>
+
+    <!-- Button hover / press -->
+    <CubicEase     x:Key="HoverEase"                       EasingMode="EaseOut"/>
+    <CubicEase     x:Key="PressEase"                       EasingMode="EaseOut"/>
+
+    <!-- ── Duration Tokens ─────────────────────────────────────────── -->
+
+    <Duration x:Key="StepTransitionDuration">0:0:0.220</Duration>
+    <Duration x:Key="FadeInDuration">0:0:0.200</Duration>
+    <Duration x:Key="HoverDuration">0:0:0.120</Duration>
+    <Duration x:Key="PressDuration">0:0:0.080</Duration>
+    <Duration x:Key="ToggleSlideDuration">0:0:0.150</Duration>
+    <Duration x:Key="CheckmarkDrawDuration">0:0:0.400</Duration>
+    <Duration x:Key="PulseDuration">0:0:0.300</Duration>
+    <Duration x:Key="TelemetryFillDuration">0:0:0.300</Duration>
+
+    <!-- ── Scale Tokens ────────────────────────────────────────────── -->
+
+    <sys:Double x:Key="HoverScale">1.03</sys:Double>
+    <sys:Double x:Key="PressScale">0.97</sys:Double>
+    <sys:Double x:Key="EntranceStartScale">0.96</sys:Double>
+
+    <!-- ── Slide Distance (step transition) ────────────────────────── -->
+
+    <sys:Double x:Key="SlideDistance">24</sys:Double>
+
+</ResourceDictionary>

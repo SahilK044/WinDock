@@ -8,15 +8,13 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
-
   <ItemGroup>
     <Resource Include="..\windock_logo.png" Link="windock_logo.png" />
+    <Compile Include="..\NativeBlur.cs" Link="NativeBlur.cs" />
   </ItemGroup>
-
   <ItemGroup>
     <EmbeddedResource Include="..\app_payload.zip" Link="app_payload.zip" />
   </ItemGroup>
-
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.IO.Compression" />

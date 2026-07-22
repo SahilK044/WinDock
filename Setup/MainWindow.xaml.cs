@@ -1,346 +1,167 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Shapes;
 
 namespace WinDockSetup
 {
     public partial class MainWindow : Window
     {
-        private bool _isUninstallMode = false;
+        private int _currentStep = 0;
+        private UserControl[] _steps;
+        private Ellipse[] _stepDots;
+
+        public string InstallPath { get; set; }
+        public bool CreateDesktopShortcut { get; set; } = false;
+        public bool LaunchOnStartup { get; set; } = true;
+        public bool IsUninstallMode { get; private set; } = false;
+        public bool KeepConfig { get; set; } = true;
 
         public MainWindow()
         {
             InitializeComponent();
-            
-            InstallPathTextBox.Text = GetDefaultInstallPath();
+            InstallPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "WinDock");
 
-            string currentExeName = Path.GetFileName(Process.GetCurrentProcess().MainModule.FileName);
+            _stepDots = new[] { StepDot1, StepDot2, StepDot3, StepDot4 };
+
+            // Detect uninstall mode
+            string currentExeName = System.IO.Path.GetFileName(Process.GetCurrentProcess().MainModule.FileName);
             bool isUninstallFile = currentExeName.Equals("Uninstall.exe", StringComparison.OrdinalIgnoreCase);
-
             string[] args = Environment.GetCommandLineArgs();
             if (isUninstallFile || args.Contains("/uninstall", StringComparer.OrdinalIgnoreCase))
             {
-                _isUninstallMode = true;
-                TitleBarText.Text = "WinDock Uninstaller";
-                TitleText.Text = "Uninstall WinDock";
-                SubtitleText.Text = "This will remove WinDock and all its components from your computer.";
-                PathPanel.Visibility = Visibility.Collapsed;
-                OptionsPanel.Visibility = Visibility.Collapsed;
-                ActionButton.Content = "Uninstall";
+                IsUninstallMode = true;
             }
+
+            // Create steps
+            _steps = new UserControl[]
+            {
+                new Steps.WelcomeStep(),
+                new Steps.OptionsStep(),
+                new Steps.ProgressStep(),
+                new Steps.FinishStep()
+            };
+
+            if (IsUninstallMode)
+            {
+                StepDotsPanel.Visibility = Visibility.Collapsed;
+            }
+
+            NavigateToStep(0);
+            SourceInitialized += OnSourceInitialized;
+        }
+
+        private void OnSourceInitialized(object sender, EventArgs e)
+        {
+            EnableBlurBehind();
+        }
+
+        private void EnableBlurBehind()
+        {
+            try
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                WinDock.Shared.NativeBlur.ApplyBlur(hwnd, 0, 0, (int)Width, (int)Height, 12, 12);
+            }
+            catch { }
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed)
+            if (e.LeftButton == MouseButtonState.Pressed) DragMove();
+        }
+
+        private void CloseBtn_Click(object sender, RoutedEventArgs e) => Close();
+        private void MinBtn_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+        public void NavigateToStep(int index)
+        {
+            if (index < 0 || index >= _steps.Length) return;
+            _currentStep = index;
+
+            var step = _steps[index];
+            step.Opacity = 0;
+            step.RenderTransform = new TranslateTransform(24, 0);
+            StepHost.Content = step;
+
+            // Update step dots
+            for (int i = 0; i < _stepDots.Length; i++)
             {
-                DragMove();
+                _stepDots[i].Fill = i == index
+                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#35D6C7"))
+                    : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#26ffffff"));
             }
-        }
 
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
-
-        private string GetDefaultInstallPath()
-        {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "WinDock");
-        }
-
-        private string GetInstallPath()
-        {
-            string path = InstallPathTextBox.Text.Trim();
-            if (string.IsNullOrEmpty(path))
+            // Animate in
+            var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(220))
             {
-                path = GetDefaultInstallPath();
-            }
-            return path;
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            var slideIn = new DoubleAnimation(24, 0, TimeSpan.FromMilliseconds(220))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            step.BeginAnimation(OpacityProperty, fadeIn);
+            ((TranslateTransform)step.RenderTransform).BeginAnimation(TranslateTransform.XProperty, slideIn);
         }
 
-        private void BrowseButton_Click(object sender, RoutedEventArgs e)
+        public void GoNext()
         {
-            try
+            if (_currentStep < _steps.Length - 1)
             {
-                Type shellType = Type.GetTypeFromProgID("Shell.Application");
-                if (shellType != null)
+                if (IsUninstallMode && _currentStep == 0)
                 {
-                    dynamic shell = Activator.CreateInstance(shellType);
-                    dynamic folder = shell.BrowseForFolder(0, "Select installation folder:", 0x0041, 0);
-                    if (folder != null)
-                    {
-                        dynamic folderItem = folder.Self;
-                        string selectedPath = folderItem.Path;
-                        if (!string.IsNullOrEmpty(selectedPath))
-                        {
-                            InstallPathTextBox.Text = Path.Combine(selectedPath, "WinDock");
-                        }
-                    }
+                    // Skip OptionsStep (1) and jump to ProgressStep (2)
+                    NavigateToStep(2);
+                }
+                else
+                {
+                    NavigateToStep(_currentStep + 1);
                 }
             }
-            catch (Exception ex)
+        }
+
+        public void GoPrev()
+        {
+            if (_currentStep > 0)
             {
-                MessageBox.Show("Could not open folder picker: " + ex.Message, "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                if (IsUninstallMode && _currentStep == 2)
+                {
+                    // Back from ProgressStep (2) jumps to WelcomeStep (0)
+                    NavigateToStep(0);
+                }
+                else
+                {
+                    NavigateToStep(_currentStep - 1);
+                }
             }
         }
 
-        private void ActionButton_Click(object sender, RoutedEventArgs e)
+        public void UpdateTelemetry(string action, string detail, double progressPercent)
         {
-            if (_isUninstallMode)
+            Dispatcher.Invoke(() =>
             {
-                Uninstall();
-            }
-            else
-            {
-                Install();
-            }
-        }
+                TelemetryAction.Text = action.ToUpperInvariant();
+                TelemetryDetail.Text = detail.ToUpperInvariant();
 
-        private async void Install()
-        {
-            bool createShortcut = ShortcutCheckbox.IsChecked == true;
-            bool runOnStartup = StartupCheckbox.IsChecked == true;
-            string installPath = GetInstallPath();
+                var parent = TelemetryFill.Parent as FrameworkElement;
+                double targetWidth = parent != null ? parent.ActualWidth * (progressPercent / 100.0) : 0;
 
-            WelcomePanel.Visibility = Visibility.Collapsed;
-            ProgressPanel.Visibility = Visibility.Visible;
-
-            await Task.Run(() =>
-            {
-                try
+                var widthAnim = new DoubleAnimation(targetWidth, TimeSpan.FromMilliseconds(300))
                 {
-
-                    // Create installation directory
-                    UpdateStatus("Creating directory...", 10);
-                    if (!Directory.Exists(installPath))
-                    {
-                        Directory.CreateDirectory(installPath);
-                    }
-
-                    // Terminate running WinDock processes to release file locks
-                    UpdateStatus("Closing running instances...", 15);
-                    foreach (var process in System.Diagnostics.Process.GetProcessesByName("WinDock"))
-                    {
-                        try
-                        {
-                            process.Kill();
-                            process.WaitForExit(3000);
-                        }
-                        catch {}
-                    }
-
-                    // Extract embedded ZIP payload
-                    UpdateStatus("Extracting application files...", 20);
-                    var assembly = Assembly.GetExecutingAssembly();
-                    string resourceName = assembly.GetManifestResourceNames()
-                        .FirstOrDefault(name => name.EndsWith("app_payload.zip", StringComparison.OrdinalIgnoreCase));
-
-                    if (string.IsNullOrEmpty(resourceName))
-                    {
-                        throw new FileNotFoundException("Embedded installer payload not found.");
-                    }
-
-                    using (var stream = assembly.GetManifestResourceStream(resourceName))
-                    using (var archive = new ZipArchive(stream))
-                    {
-                        int total = archive.Entries.Count;
-                        int current = 0;
-
-                        foreach (var entry in archive.Entries)
-                        {
-                            if (string.IsNullOrEmpty(entry.Name))
-                            {
-                                Directory.CreateDirectory(Path.Combine(installPath, entry.FullName));
-                                continue;
-                            }
-
-                            string destPath = Path.Combine(installPath, entry.FullName);
-                            string destDir = Path.GetDirectoryName(destPath);
-                            if (!Directory.Exists(destDir))
-                            {
-                                Directory.CreateDirectory(destDir);
-                            }
-
-                            try
-                            {
-                                entry.ExtractToFile(destPath, overwrite: true);
-                            }
-                            catch
-                            {
-                                Thread.Sleep(500);
-                                entry.ExtractToFile(destPath, overwrite: true);
-                            }
-
-                            current++;
-                            double progressVal = 20 + ((double)current / total * 60);
-                            UpdateStatus("Extracting " + entry.Name + "...", progressVal);
-                            Thread.Sleep(30);
-                        }
-                    }
-
-                    // Copy installer to install directory as Uninstall.exe
-                    UpdateStatus("Creating uninstaller...", 85);
-                    try
-                    {
-                        string currentExe = Process.GetCurrentProcess().MainModule.FileName;
-                        if (File.Exists(currentExe))
-                        {
-                            File.Copy(currentExe, Path.Combine(installPath, "Uninstall.exe"), true);
-                        }
-                    }
-                    catch {}
-
-                    // Create Desktop Shortcut
-                    if (createShortcut)
-                    {
-                        UpdateStatus("Creating shortcuts...", 92);
-                        string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                        string shortcutPath = Path.Combine(desktopPath, "WinDock.lnk");
-                        string exePath = Path.Combine(installPath, "WinDock.exe");
-
-                        string psScript = $"$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{shortcutPath}'); $s.TargetPath = '{exePath}'; $s.WorkingDirectory = '{installPath}'; $s.Save()";
-                        var startInfo = new ProcessStartInfo
-                        {
-                            FileName = "powershell.exe",
-                            Arguments = $"-NoProfile -WindowStyle Hidden -Command \"{psScript}\"",
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        };
-                        using (var p = Process.Start(startInfo))
-                        {
-                            p?.WaitForExit();
-                        }
-                    }
-
-                    // Register startup run key in registry
-                    if (runOnStartup)
-                    {
-                        UpdateStatus("Configuring system integration...", 96);
-                        string exePath = Path.Combine(installPath, "WinDock.exe");
-                        using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
-                        {
-                            key?.SetValue("WinDock", exePath);
-                        }
-                    }
-
-                    UpdateStatus("Finalizing...", 100);
-                    Thread.Sleep(500);
-
-                    // Switch to Complete Panel
-                    Dispatcher.BeginInvoke((Action)delegate
-                    {
-                        ProgressPanel.Visibility = Visibility.Collapsed;
-                        CompletePanel.Visibility = Visibility.Visible;
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Dispatcher.BeginInvoke((Action)delegate
-                    {
-                        MessageBox.Show("Installation failed:\n" + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                        ProgressPanel.Visibility = Visibility.Collapsed;
-                        WelcomePanel.Visibility = Visibility.Visible;
-                    });
-                }
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                TelemetryFill.BeginAnimation(WidthProperty, widthAnim);
             });
-        }
-
-        private async void Uninstall()
-        {
-            WelcomePanel.Visibility = Visibility.Collapsed;
-            ProgressPanel.Visibility = Visibility.Visible;
-
-            await Task.Run(() =>
-            {
-                try
-                {
-                    UpdateStatus("Stopping running instances...", 20);
-                    foreach (var process in Process.GetProcessesByName("WinDock"))
-                    {
-                        try { process.Kill(); process.WaitForExit(); } catch {}
-                    }
-
-                    UpdateStatus("Removing registry settings...", 40);
-                    using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
-                    {
-                        key?.DeleteValue("WinDock", false);
-                    }
-
-                    UpdateStatus("Removing shortcuts...", 60);
-                    string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                    string shortcutPath = Path.Combine(desktopPath, "WinDock.lnk");
-                    if (File.Exists(shortcutPath))
-                    {
-                        try { File.Delete(shortcutPath); } catch {}
-                    }
-
-                    UpdateStatus("Cleaning files...", 80);
-                    Thread.Sleep(500);
-
-                    // Trigger cmd self-delete script
-                    string installPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                    string cmdCommand = $"/c timeout /t 1 & del /f /q \"{installPath}\\*\" & rmdir /s /q \"{installPath}\"";
-                    
-                    ProcessStartInfo startInfo = new ProcessStartInfo
-                    {
-                        FileName = "cmd.exe",
-                        Arguments = cmdCommand,
-                        CreateNoWindow = true,
-                        UseShellExecute = false
-                    };
-
-                    Process.Start(startInfo);
-
-                    Dispatcher.BeginInvoke((Action)delegate
-                    {
-                        MessageBox.Show("WinDock was successfully uninstalled.", "Uninstall", MessageBoxButton.OK, MessageBoxImage.Information);
-                        Close();
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Dispatcher.BeginInvoke((Action)delegate
-                    {
-                        MessageBox.Show("Uninstall failed:\n" + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                        Close();
-                    });
-                }
-            });
-        }
-
-        private void UpdateStatus(string message, double progress)
-        {
-            Dispatcher.BeginInvoke((Action)delegate
-            {
-                StatusText.Text = message;
-                InstallProgressBar.Value = progress;
-            });
-        }
-
-        private void LaunchButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                string installPath = GetInstallPath();
-                string exePath = Path.Combine(installPath, "WinDock.exe");
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = exePath,
-                    WorkingDirectory = installPath
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Could not launch WinDock:\n" + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            Close();
         }
     }
 }

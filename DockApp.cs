@@ -15252,6 +15252,48 @@ namespace MacStyleDock
 
 			}
 
+			if (Config != null && Config.FilePath == "action:weather") {
+
+				try {
+
+					string weatherExe = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Weather", "Weather.exe");
+
+					if (File.Exists (weatherExe)) {
+
+						Process.Start (new ProcessStartInfo (weatherExe) {
+
+							UseShellExecute = true,
+
+							WorkingDirectory = System.IO.Path.GetDirectoryName (weatherExe)
+
+						});
+
+					} else {
+
+						try {
+
+							Process.Start (new ProcessStartInfo ("ms-weather:") { UseShellExecute = true });
+
+						} catch {
+
+							Process.Start (new ProcessStartInfo ("https://weather.com") { UseShellExecute = true });
+
+						}
+
+					}
+
+					return;
+
+				} catch (Exception exWeather) {
+
+					System.Windows.MessageBox.Show ("Could not open Weather app: " + exWeather.Message, "Launch Error", MessageBoxButton.OK, MessageBoxImage.Hand);
+
+					return;
+
+				}
+
+			}
+
 			if (Config != null && !string.IsNullOrEmpty (Config.FilePath) && Directory.Exists (Config.FilePath)) {
 
 				if (Window.GetWindow (this) is DockWindow dockWindow4) {
@@ -17109,7 +17151,26 @@ namespace MacStyleDock
 
 			base.ShowInTaskbar = false;
 
-			string text = File.ReadAllText (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "MacSettings.txt"));
+			string text = null;
+			string macSettingsPath = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "MacSettings.txt");
+			if (File.Exists (macSettingsPath)) {
+				text = File.ReadAllText (macSettingsPath);
+			} else {
+				try {
+					var asm = System.Reflection.Assembly.GetExecutingAssembly ();
+					using (var stream = asm.GetManifestResourceStream ("WinDock.MacSettings.txt")) {
+						if (stream != null) {
+							using (var reader = new System.IO.StreamReader (stream)) {
+								text = reader.ReadToEnd ();
+							}
+						}
+					}
+				} catch {}
+			}
+
+			if (string.IsNullOrEmpty (text)) {
+				throw new System.IO.FileNotFoundException ("MacSettings.txt could not be loaded from disk or embedded resources.", macSettingsPath);
+			}
 
 			if (!(ownerWindow.GetEffectiveTheme ().ToLower () == "dark")) {
 
@@ -25067,6 +25128,27 @@ namespace MacStyleDock
 
 			base.Height = 750.0;
 
+			base.Cursor = System.Windows.Input.Cursors.Hand;
+
+			base.MouseLeftButtonDown += delegate {
+				try {
+					string weatherExe = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Weather", "Weather.exe");
+					if (File.Exists (weatherExe)) {
+						Process.Start (new ProcessStartInfo (weatherExe) {
+							UseShellExecute = true,
+							WorkingDirectory = System.IO.Path.GetDirectoryName (weatherExe)
+						});
+					} else {
+						try {
+							Process.Start (new ProcessStartInfo ("ms-weather:") { UseShellExecute = true });
+						} catch {
+							Process.Start (new ProcessStartInfo ("https://weather.com") { UseShellExecute = true });
+						}
+					}
+					this.Hide ();
+				} catch {}
+			};
+
 			double totalHours = DateTime.Now.TimeOfDay.TotalHours;
 
 			if (parent != null && parent.settings != null && !string.IsNullOrEmpty (parent.settings.WeatherUnit) && !parent.settings.WeatherUnit.Equals ("fahrenheit", StringComparison.OrdinalIgnoreCase)) {
@@ -32548,313 +32630,120 @@ namespace MacStyleDock
 			}
 
 			if (!string.IsNullOrEmpty (text2)) {
-
-				string text3 = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Team Logos", text2);
-
-				if (File.Exists (text3)) {
-
-					return text3;
-
-				}
-
-				string text4 = System.IO.Path.Combine (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Team Logos"), text2);
-
-				if (!File.Exists (text4)) {
-
-					text4 = System.IO.Path.Combine (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Team Logos"), text2);
-
-				}
-
-				if (File.Exists (text4)) {
-
-					return text4;
-
-				}
-
+				string text3 = ResolveAssetPath ("Team Logos", text2);
+				if (!string.IsNullOrEmpty (text3)) return text3;
 			}
 
 			return "";
-
 		}
 
+		public static string ResolveAssetPath (string folderName, string fileName)
+		{
+			if (string.IsNullOrEmpty (fileName)) return "";
 
+			string[] baseDirs = new string[] {
+				AppDomain.CurrentDomain.BaseDirectory,
+				System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..")
+			};
+
+			string[] folderNames = (folderName == "Cars" || folderName == "F1 Cars")
+				? new string[] { "Cars", "F1 Cars" }
+				: new string[] { folderName };
+
+			foreach (string dir in baseDirs) {
+				foreach (string folder in folderNames) {
+					try {
+						string full = System.IO.Path.Combine (dir, folder, fileName);
+						if (File.Exists (full)) return full;
+					} catch {}
+				}
+			}
+			return "";
+		}
 
 		private string GetConstructorCarPath (string name)
-
 		{
-
-			if (string.IsNullOrEmpty (name)) {
-
-				return "";
-
-			}
+			if (string.IsNullOrEmpty (name)) return "";
 
 			string text = name.ToLower ();
-
 			string text2 = "";
 
-			if (text.Contains ("ferrari")) {
-
-				text2 = "Ferrari.png";
-
-			} else if (text.Contains ("mercedes")) {
-
-				text2 = "Mercedes.png";
-
-			} else if (text.Contains ("red bull")) {
-
-				text2 = "Redbull Racing.png";
-
-			} else if (text.Contains ("mclaren")) {
-
-				text2 = "McLaren.png";
-
-			} else if (text.Contains ("aston martin")) {
-
-				text2 = "Aston Martin.png";
-
-			} else if (text.Contains ("alpine")) {
-
-				text2 = "Alpine.png";
-
-			} else if (text.Contains ("williams")) {
-
-				text2 = "Williams.png";
-
-			} else if (text.Contains ("haas")) {
-
-				text2 = "Haas.png";
-
-			} else if (text.Contains ("rb") || text.Contains ("alphatauri") || text.Contains ("toro rosso") || text.Contains ("visa")) {
-
-				text2 = "Racing Bulls.png";
-
-			} else if (text.Contains ("sauber") || text.Contains ("kick") || text.Contains ("alfa romeo") || text.Contains ("audi")) {
-
-				text2 = "Audi.png";
-
-			} else if (text.Contains ("cadillac")) {
-
-				text2 = "Cadillac.png";
-
-			}
+			if (text.Contains ("ferrari")) text2 = "Ferrari.png";
+			else if (text.Contains ("mercedes")) text2 = "Mercedes.png";
+			else if (text.Contains ("red bull")) text2 = "Redbull Racing.png";
+			else if (text.Contains ("mclaren")) text2 = "McLaren.png";
+			else if (text.Contains ("aston martin")) text2 = "Aston Martin.png";
+			else if (text.Contains ("alpine")) text2 = "Alpine.png";
+			else if (text.Contains ("williams")) text2 = "Williams.png";
+			else if (text.Contains ("haas")) text2 = "Haas.png";
+			else if (text.Contains ("rb") || text.Contains ("alphatauri") || text.Contains ("toro rosso") || text.Contains ("visa")) text2 = "Racing Bulls.png";
+			else if (text.Contains ("sauber") || text.Contains ("kick") || text.Contains ("alfa romeo") || text.Contains ("audi")) text2 = "Audi.png";
+			else if (text.Contains ("cadillac")) text2 = "Cadillac.png";
 
 			if (!string.IsNullOrEmpty (text2)) {
-
-				string text3 = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "F1 Cars", text2);
-
-				if (File.Exists (text3)) {
-
-					return text3;
-
-				}
-
+				return ResolveAssetPath ("Cars", text2);
 			}
-
 			return "";
-
 		}
-
-
 
 		private string GetDriverImagePath (string givenName, string familyName)
-
 		{
-
-			if (string.IsNullOrEmpty (givenName) || string.IsNullOrEmpty (familyName)) {
-
-				return "";
-
-			}
+			if (string.IsNullOrEmpty (givenName) || string.IsNullOrEmpty (familyName)) return "";
 
 			if (givenName.Contains ("Andrea Kimi") || (givenName == "Andrea" && familyName.Contains ("Kimi"))) {
-
 				givenName = "Kimi";
-
 				familyName = "Antonelli";
-
 			}
-
-			if (familyName == "Hülkenberg") {
-
-				familyName = "Hulkenberg";
-
-			}
-
-			if (familyName == "Pérez") {
-
-				familyName = "Perez";
-
-			}
-
-			if (givenName == "Alexander" && familyName == "Albon") {
-
-				givenName = "Alex";
-
-			}
-
-			if (givenName == "Guanyu" && familyName == "Zhou") {
-
-				givenName = "Zhou";
-
-				familyName = "Guanyu";
-
-			}
+			if (familyName == "Hülkenberg" || familyName == "H\u00fclkenberg") familyName = "Hulkenberg";
+			if (familyName == "Pérez" || familyName == "P\u00e9rez") familyName = "Perez";
+			if (givenName == "Alexander" && familyName == "Albon") givenName = "Alex";
+			if (givenName == "Guanyu" && familyName == "Zhou") { givenName = "Zhou"; familyName = "Guanyu"; }
 
 			string path = givenName + " " + familyName + ".png";
-
-			string text = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Drivers", path);
-
-			if (File.Exists (text)) {
-
-				return text;
-
-			}
-
-			return "";
-
+			return ResolveAssetPath ("Drivers", path);
 		}
-
-
 
 		private string GetDriverHeadshotPath (string givenName, string familyName)
-
 		{
+			if (string.IsNullOrEmpty (givenName) || string.IsNullOrEmpty (familyName)) return "";
 
-			if (string.IsNullOrEmpty (givenName) || string.IsNullOrEmpty (familyName)) {
+			if (familyName == "Antonelli" || givenName.Contains ("Andrea Kimi")) givenName = "Kimi";
+			if (familyName == "Hülkenberg" || familyName == "H\u00fclkenberg") familyName = "Hulkenberg";
+			if (familyName == "Pérez" || familyName == "P\u00e9rez") familyName = "Perez";
+			if (givenName == "Alexander" && familyName == "Albon") givenName = "Alex";
+			if (givenName.Contains (" ")) givenName = givenName.Split (' ') [0];
 
-				return "";
-
-			}
-
-			// Kimi Antonelli – OpenF1 givenName is "Andrea", headshot file uses "Kimi"
-			if (familyName == "Antonelli") {
-
-				givenName = "Kimi";
-
-			}
-
-			if (familyName == "H\u00fclkenberg") {
-
-				familyName = "Hulkenberg";
-
-			}
-
-			if (familyName == "P\u00e9rez") {
-
-				familyName = "Perez";
-
-			}
-
-			if (givenName == "Alexander" && familyName == "Albon") {
-
-				givenName = "Alex";
-
-			}
-
-			// Take only the first word if given name contains spaces (e.g. "Andrea Kimi")
-			if (givenName.Contains (" ")) {
-
-				givenName = givenName.Split (' ') [0];
-
-			}
-
-			string fullPath = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Headshots", givenName + " " + familyName + ".png");
-
-			return File.Exists (fullPath) ? fullPath : "";
-
+			string path = givenName + " " + familyName + ".png";
+			return ResolveAssetPath ("Headshots", path);
 		}
-
-
 
 		private string GetDriverNumberImagePath (string fullName)
-
 		{
-
-			if (string.IsNullOrEmpty (fullName)) {
-
-				return "";
-
-			}
-
-			string fullPath = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Driver Number", fullName + " Number.png");
-
-			return File.Exists (fullPath) ? fullPath : "";
-
+			if (string.IsNullOrEmpty (fullName)) return "";
+			string path = fullName + " Number.png";
+			return ResolveAssetPath ("Driver Number", path);
 		}
 
-
-
 		private string GetTeamLogoPath (string teamName)
-
 		{
-
-			if (string.IsNullOrEmpty (teamName)) {
-
-				return "";
-
-			}
-
+			if (string.IsNullOrEmpty (teamName)) return "";
 			string lower = teamName.ToLowerInvariant ();
-
 			string logoFile = "";
 
-			if (lower.Contains ("red bull")) {
+			if (lower.Contains ("red bull")) logoFile = "Redbull F1 Team Logo.png";
+			else if (lower.Contains ("ferrari")) logoFile = "Ferrari F1 Team Logo.png";
+			else if (lower.Contains ("mclaren")) logoFile = "McLaren F1 Team Logo.png";
+			else if (lower.Contains ("mercedes")) logoFile = "Mercedes AMG Petronas F1 Team logo.png";
+			else if (lower.Contains ("aston martin")) logoFile = "Aston Martin F1 Team logo-Photoroom.png";
+			else if (lower.Contains ("williams")) logoFile = "Williams F1 Team Logo.png";
+			else if (lower.Contains ("alpine")) logoFile = "Alpine F1 Team Logo.png";
+			else if (lower.Contains ("haas")) logoFile = "TGR Haas F1 Team Logo.png";
+			else if (lower.Contains ("sauber") || lower.Contains ("audi")) logoFile = "Audi F1 Team Logopng.png";
+			else if (lower.Contains ("visa") || lower.Contains (" rb") || lower.Contains ("racing bulls")) logoFile = "Visa RB F1 Team Logo.png";
+			else if (lower.Contains ("cadillac")) logoFile = "Cadillac F1 Team Logo.png";
 
-				logoFile = "Redbull F1 Team Logo.png";
-
-			} else if (lower.Contains ("ferrari")) {
-
-				logoFile = "Ferrari F1 Team Logo.png";
-
-			} else if (lower.Contains ("mclaren")) {
-
-				logoFile = "McLaren F1 Team Logo.png";
-
-			} else if (lower.Contains ("mercedes")) {
-
-				logoFile = "Mercedes AMG Petronas F1 Team logo.png";
-
-			} else if (lower.Contains ("aston martin")) {
-
-				logoFile = "Aston Martin F1 Team logo-Photoroom.png";
-
-			} else if (lower.Contains ("williams")) {
-
-				logoFile = "Williams F1 Team Logo.png";
-
-			} else if (lower.Contains ("alpine")) {
-
-				logoFile = "Alpine F1 Team Logo.png";
-
-			} else if (lower.Contains ("haas")) {
-
-				logoFile = "TGR Haas F1 Team Logo.png";
-
-			} else if (lower.Contains ("sauber") || lower.Contains ("audi")) {
-
-				logoFile = "Audi F1 Team Logopng.png";
-
-			} else if (lower.Contains ("visa") || lower.Contains (" rb") || lower.Contains ("racing bulls")) {
-
-				logoFile = "Visa RB F1 Team Logo.png";
-
-			} else if (lower.Contains ("cadillac")) {
-
-				logoFile = "Cadillac F1 Team Logo.png";
-
-			}
-
-			if (string.IsNullOrEmpty (logoFile)) {
-
-				return "";
-
-			}
-
-			string fullPath = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Team Logos", logoFile);
-
-			return File.Exists (fullPath) ? fullPath : "";
-
+			if (string.IsNullOrEmpty (logoFile)) return "";
+			return ResolveAssetPath ("Team Logos", logoFile);
 		}
 
 
@@ -33583,6 +33472,43 @@ namespace MacStyleDock
 					grid2.Children.Add (image);
 
 				}
+
+				StackPanel teamInfoPanel = new StackPanel {
+					Orientation = System.Windows.Controls.Orientation.Horizontal,
+					HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+					VerticalAlignment = VerticalAlignment.Center,
+					Margin = new Thickness (20.0, 0.0, 0.0, 0.0)
+				};
+
+				if (!string.IsNullOrEmpty (constructorLogoPath)) {
+					System.Windows.Controls.Image logoFront = new System.Windows.Controls.Image {
+						Source = new BitmapImage (new Uri (constructorLogoPath, UriKind.Absolute)),
+						Stretch = Stretch.Uniform,
+						Height = 36.0,
+						Width = 36.0,
+						VerticalAlignment = VerticalAlignment.Center,
+						Margin = new Thickness (0.0, 0.0, 12.0, 0.0)
+					};
+					RenderOptions.SetBitmapScalingMode (logoFront, BitmapScalingMode.HighQuality);
+					teamInfoPanel.Children.Add (logoFront);
+				}
+
+				TextBlock teamNameText = new TextBlock {
+					Text = text.ToUpper (),
+					FontSize = 24.0,
+					FontWeight = FontWeights.Black,
+					FontFamily = new System.Windows.Media.FontFamily ("Segoe UI, Bahnschrift, sans-serif"),
+					Foreground = System.Windows.Media.Brushes.White,
+					VerticalAlignment = VerticalAlignment.Center,
+					Effect = new DropShadowEffect {
+						Color = Colors.Black,
+						BlurRadius = 6.0,
+						ShadowDepth = 1.0,
+						Opacity = 0.5
+					}
+				};
+				teamInfoPanel.Children.Add (teamNameText);
+				grid2.Children.Add (teamInfoPanel);
 
 				TextBlock element = new TextBlock {
 
@@ -35635,27 +35561,6 @@ namespace MacStyleDock
 		private const double SpotlightResultsHeight = 384.0;
 		private static readonly System.Windows.Media.FontFamily SpotlightFont = new System.Windows.Media.FontFamily ("SF Pro Display, SF Pro Text, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif");
 
-		[StructLayout (LayoutKind.Sequential)]
-		internal struct DWM_BLURBEHIND
-		{
-			public uint dwFlags;
-			public bool fEnable;
-			public IntPtr hRgnBlur;
-			public bool fTransitionOnMaximized;
-		}
-
-		private const uint DWM_BB_ENABLE = 0x00000001;
-		private const uint DWM_BB_BLURREGION = 0x00000002;
-
-		[DllImport ("dwmapi.dll")]
-		internal static extern void DwmEnableBlurBehindWindow (IntPtr hwnd, ref DWM_BLURBEHIND blurBehind);
-
-		[DllImport ("gdi32.dll")]
-		internal static extern IntPtr CreateRoundRectRgn (int x1, int y1, int x2, int y2, int cx, int cy);
-
-		[DllImport ("gdi32.dll")]
-		internal static extern bool DeleteObject (IntPtr hObject);
-
 		public void EnableBlur (bool enable)
 		{
 			try {
@@ -35684,30 +35589,17 @@ namespace MacStyleDock
 						int right = (int)((40 + pillWidth) * dpiX);
 						int bottom = (int)((28 + pillHeight) * dpiY);
 						
-						left -= (int)Math.Ceiling (2.0 * dpiX);
-						top -= (int)Math.Ceiling (2.0 * dpiY);
-						right += (int)Math.Ceiling (2.0 * dpiX);
-						bottom += (int)Math.Ceiling (2.0 * dpiY);
+						left = (int)(40 * dpiX) - (int)Math.Ceiling (2.0 * dpiX);
+						top = (int)(28 * dpiY) - (int)Math.Ceiling (2.0 * dpiY);
+						right = (int)((40 + pillWidth) * dpiX) + (int)Math.Ceiling (2.0 * dpiX);
+						bottom = (int)((28 + pillHeight) * dpiY) + (int)Math.Ceiling (2.0 * dpiY);
 						
 						int cornerWidth = (int)(48 * dpiX);
 						int cornerHeight = (int)(48 * dpiY);
 
-						IntPtr hRgn = CreateRoundRectRgn (left, top, right, bottom, cornerWidth, cornerHeight);
-
-						DWM_BLURBEHIND bb = new DWM_BLURBEHIND {
-							dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION,
-							fEnable = true,
-							hRgnBlur = hRgn
-						};
-
-						DwmEnableBlurBehindWindow (handle, ref bb);
-						DeleteObject (hRgn);
+						WinDock.Shared.NativeBlur.ApplyBlur(handle, left, top, right, bottom, cornerWidth, cornerHeight);
 					} else {
-						DWM_BLURBEHIND bb = new DWM_BLURBEHIND {
-							dwFlags = DWM_BB_ENABLE,
-							fEnable = false
-						};
-						DwmEnableBlurBehindWindow (handle, ref bb);
+						WinDock.Shared.NativeBlur.DisableBlur(handle);
 					}
 				}
 			} catch {}
@@ -47986,18 +47878,12 @@ namespace MacStyleDock
 				.Replace ("P\u00e9rez", "Perez")
 				.Replace ("Alexander Albon", "Alex Albon");
 
-			string path = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Headshots", n + ".png");
-
-			return System.IO.File.Exists (path) ? path : "";
-
+			string path = n + ".png";
+			return F1OverlayWindow.ResolveAssetPath ("Headshots", path);
 		}
 
-
-
 		private static string GetStaticDriverNumberPath (string fullName)
-
 		{
-
 			if (string.IsNullOrEmpty (fullName)) return "";
 
 			string n = fullName
@@ -48006,22 +47892,15 @@ namespace MacStyleDock
 				.Replace ("P\u00e9rez", "Sergio Perez")
 				.Replace ("Alexander Albon", "Alex Albon");
 
-			string path = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Driver Number", n + " Number.png");
-
-			return System.IO.File.Exists (path) ? path : "";
-
+			string path = n + " Number.png";
+			return F1OverlayWindow.ResolveAssetPath ("Driver Number", path);
 		}
 
-
-
 		private static string GetStaticTeamLogoPath (string teamName)
-
 		{
-
 			if (string.IsNullOrEmpty (teamName)) return "";
 
 			string lower = teamName.ToLowerInvariant ();
-
 			string logoFile = "";
 
 			if (lower.Contains ("red bull")) logoFile = "Redbull F1 Team Logo.png";
@@ -48037,11 +47916,7 @@ namespace MacStyleDock
 			else if (lower.Contains ("cadillac")) logoFile = "Cadillac F1 Team Logo.png";
 
 			if (string.IsNullOrEmpty (logoFile)) return "";
-
-			string path = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Team Logos", logoFile);
-
-			return System.IO.File.Exists (path) ? path : "";
-
+			return F1OverlayWindow.ResolveAssetPath ("Team Logos", logoFile);
 		}
 
 
