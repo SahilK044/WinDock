@@ -4058,13 +4058,15 @@ namespace MacStyleDock
 			RebuildDockUI ();
 
 			dockBorder.SizeChanged += delegate {
-
 				UpdateHotzoneDimensions ();
-
 				UpdateHideTranslation ();
-
-				Update3DShelf ();
-
+				double newW = dockBorder.ActualWidth;
+				double newH = dockBorder.ActualHeight;
+				if (Math.Abs (newW - _lastShelfW) > 2.0 || Math.Abs (newH - _lastShelfH) > 2.0) {
+					_lastShelfW = newW;
+					_lastShelfH = newH;
+					Update3DShelf ();
+				}
 			};
 
 			SetupDragAndDrop ();
@@ -7747,6 +7749,8 @@ namespace MacStyleDock
 
 		private Polygon _shelfPolygon;
 		private Line _shelfHighlightLine;
+		private double _lastShelfW;
+		private double _lastShelfH;
 
 		public void Update3DShelf ()
 		{
@@ -8653,25 +8657,21 @@ namespace MacStyleDock
 			try {
 				dockSlideTransform.BeginAnimation (TranslateTransform.XProperty, null);
 				dockSlideTransform.BeginAnimation (TranslateTransform.YProperty, null);
+				dockBorder.BeginAnimation (UIElement.OpacityProperty, null);
 			} catch {
 			}
 
-			TimeSpan slideDur = IsAnimationEnabled ? TimeSpan.FromMilliseconds (240.0) : TimeSpan.Zero;
+			dockBorder.Opacity = 1.0;
+
+			TimeSpan slideDur = IsAnimationEnabled ? TimeSpan.FromMilliseconds (220.0) : TimeSpan.Zero;
 
 			DoubleAnimation slideAnim = new DoubleAnimation (currentVal, hideTargetValue, slideDur) {
-				EasingFunction = new QuarticEase {
-					EasingMode = EasingMode.EaseIn
-				}
-			};
-
-			DoubleAnimation opacityAnim = new DoubleAnimation (dockBorder.Opacity, 0.0, IsAnimationEnabled ? TimeSpan.FromMilliseconds (200.0) : TimeSpan.Zero) {
 				EasingFunction = new CubicEase {
 					EasingMode = EasingMode.EaseIn
 				}
 			};
 
 			dockSlideTransform.BeginAnimation (propToAnimate, slideAnim);
-			dockBorder.BeginAnimation (UIElement.OpacityProperty, opacityAnim);
 		}
 
 		private void ShowDock ()
@@ -8702,28 +8702,23 @@ namespace MacStyleDock
 			try {
 				dockSlideTransform.BeginAnimation (TranslateTransform.XProperty, null);
 				dockSlideTransform.BeginAnimation (TranslateTransform.YProperty, null);
+				dockBorder.BeginAnimation (UIElement.OpacityProperty, null);
 			} catch {
 			}
 
 			dockSlideTransform.X = (dp == TranslateTransform.XProperty) ? currentVal : 0.0;
 			dockSlideTransform.Y = (dp == TranslateTransform.YProperty) ? currentVal : 0.0;
+			dockBorder.Opacity = 1.0;
 
-			TimeSpan slideDur = IsAnimationEnabled ? TimeSpan.FromMilliseconds (240.0) : TimeSpan.Zero;
+			TimeSpan slideDur = IsAnimationEnabled ? TimeSpan.FromMilliseconds (250.0) : TimeSpan.Zero;
 
 			DoubleAnimation slideAnim = new DoubleAnimation (currentVal, 0.0, slideDur) {
-				EasingFunction = new QuarticEase {
-					EasingMode = EasingMode.EaseOut
-				}
-			};
-
-			DoubleAnimation opacityAnim = new DoubleAnimation (dockBorder.Opacity, 1.0, IsAnimationEnabled ? TimeSpan.FromMilliseconds (180.0) : TimeSpan.Zero) {
 				EasingFunction = new CubicEase {
 					EasingMode = EasingMode.EaseOut
 				}
 			};
 
 			dockSlideTransform.BeginAnimation (dp, slideAnim);
-			dockBorder.BeginAnimation (UIElement.OpacityProperty, opacityAnim);
 		}
 
 		private double GetStableCrossCenter ()
@@ -9059,7 +9054,7 @@ namespace MacStyleDock
 							}
 							double crossVal = isHorizontal ? dockItemControl.WaveTransform.Y : dockItemControl.WaveTransform.X;
 							if (Math.Abs (num12 - crossVal) > 0.005 || Math.Abs (crossVal) > 0.005) {
-								double nextVal = crossVal + (num12 - crossVal) * 0.28;
+								double nextVal = crossVal + (num12 - crossVal) * 0.45;
 								if (isHorizontal) {
 									if (dockItemControl.WaveTransform.Y != nextVal) dockItemControl.WaveTransform.Y = nextVal;
 								} else {
@@ -9095,12 +9090,12 @@ namespace MacStyleDock
 							bool needUpdateX = Math.Abs (num14 - array [0]) > 0.005 || Math.Abs (array [0]) > 0.005;
 							bool needUpdateY = Math.Abs (num15 - array [1]) > 0.005 || Math.Abs (array [1]) > 0.005;
 							if (needUpdateX) {
-								array [0] += (num14 - array [0]) * 0.15;
+								array [0] += (num14 - array [0]) * 0.35;
 							} else {
 								array [0] = 0.0;
 							}
 							if (needUpdateY) {
-								array [1] += (num15 - array [1]) * 0.15;
+								array [1] += (num15 - array [1]) * 0.35;
 							} else {
 								array [1] = 0.0;
 							}
