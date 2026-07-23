@@ -2894,91 +2894,56 @@ namespace MacStyleDock
 			}
 
 			try {
+				double left = 0;
+				double top = 0;
 
-				System.Windows.Point point = PhysicalToLogical (targetItem.PointToScreen (new System.Windows.Point (0.0, 0.0)), targetItem);
-
-				double left;
-
-				double top;
-
-				if (settings.Position == "Left") {
-
-					left = point.X + targetItem.ActualWidth + 8.0 - 10.0;
-
-					top = point.Y + (targetItem.ActualHeight - f1Overlay.Height) / 2.0;
-
-				} else if (settings.Position == "Right") {
-
-					left = point.X - f1Overlay.Width - 8.0 + 10.0;
-
-					top = point.Y + (targetItem.ActualHeight - f1Overlay.Height) / 2.0;
-
-				} else if (settings.Position == "Top") {
-
-					left = point.X + (targetItem.ActualWidth - f1Overlay.Width) / 2.0;
-
-					top = point.Y + targetItem.ActualHeight + 8.0 - 10.0;
-
+				if (targetItem != null) {
+					System.Windows.Point point = PhysicalToLogical (targetItem.PointToScreen (new System.Windows.Point (0.0, 0.0)), targetItem);
+					if (settings.Position == "Left") {
+						left = point.X + targetItem.ActualWidth + 8.0 - 10.0;
+						top = point.Y + (targetItem.ActualHeight - f1Overlay.Height) / 2.0;
+					} else if (settings.Position == "Right") {
+						left = point.X - f1Overlay.Width - 8.0 + 10.0;
+						top = point.Y + (targetItem.ActualHeight - f1Overlay.Height) / 2.0;
+					} else if (settings.Position == "Top") {
+						left = point.X + (targetItem.ActualWidth - f1Overlay.Width) / 2.0;
+						top = point.Y + targetItem.ActualHeight + 8.0 - 10.0;
+					} else {
+						left = point.X + (targetItem.ActualWidth - f1Overlay.Width) / 2.0;
+						top = point.Y - f1Overlay.Height - 8.0 + 10.0;
+					}
 				} else {
-
-					left = point.X + (targetItem.ActualWidth - f1Overlay.Width) / 2.0;
-
-					top = point.Y - f1Overlay.Height - 8.0 + 10.0;
-
+					left = (SystemParameters.PrimaryScreenWidth - f1Overlay.Width) / 2.0;
+					top = (SystemParameters.PrimaryScreenHeight - f1Overlay.Height) / 2.0;
 				}
 
 				f1Overlay.Left = left;
-
 				f1Overlay.Top = top;
 
 				if (flag || !f1Overlay.IsVisible) {
-
 					f1Overlay.Opacity = 0.0;
-
 					f1Overlay.Show ();
-
+					f1Overlay.Activate ();
+					f1Overlay.Topmost = true;
 				}
 
-				DoubleAnimation animation = new DoubleAnimation (f1Overlay.Opacity, 1.0, TimeSpan.FromMilliseconds (220.0)) {
-
-					EasingFunction = new CubicEase {
-
-						EasingMode = EasingMode.EaseOut
-
-					}
-
+				DoubleAnimation showAnim = new DoubleAnimation (f1Overlay.Opacity, 1.0, TimeSpan.FromMilliseconds (200.0)) {
+					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
 				};
-
-				f1Overlay.BeginAnimation (UIElement.OpacityProperty, animation);
+				f1Overlay.BeginAnimation (UIElement.OpacityProperty, showAnim);
 
 				if (f1Overlay.Content is FrameworkElement frameworkElement) {
-
 					TranslateTransform translateTransform = frameworkElement.RenderTransform as TranslateTransform;
-
 					if (translateTransform == null) {
-
 						translateTransform = (TranslateTransform)(frameworkElement.RenderTransform = new TranslateTransform ());
-
 					}
 
 					DoubleAnimation animation2 = new DoubleAnimation (12.0, 0.0, TimeSpan.FromMilliseconds (220.0)) {
-
-						EasingFunction = new CubicEase {
-
-							EasingMode = EasingMode.EaseOut
-
-						}
-
+						EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
 					};
-
 					translateTransform.BeginAnimation (TranslateTransform.YProperty, animation2);
-
 				}
-
-			} catch {
-
-			}
-
+			} catch {}
 		}
 
 
@@ -36576,20 +36541,79 @@ namespace MacStyleDock
 			if (previewPanel == null) return;
 			previewPanel.Children.Clear ();
 
+			string effectiveTheme = ownerWindow != null ? ownerWindow.GetEffectiveTheme () : "dark";
+			bool isDark = (effectiveTheme == "dark" || effectiveTheme == "tahoe");
+
+			System.Windows.Media.Color teamAccentColor = System.Windows.Media.Color.FromRgb (225, 6, 0);
+			string teamLower = teamName.ToLower ();
+			if (teamLower.Contains ("red bull")) teamAccentColor = System.Windows.Media.Color.FromRgb (236, 17, 48);
+			else if (teamLower.Contains ("ferrari")) teamAccentColor = System.Windows.Media.Color.FromRgb (232, 0, 45);
+			else if (teamLower.Contains ("mclaren")) teamAccentColor = System.Windows.Media.Color.FromRgb (255, 128, 0);
+			else if (teamLower.Contains ("mercedes")) teamAccentColor = System.Windows.Media.Color.FromRgb (39, 244, 210);
+			else if (teamLower.Contains ("aston martin")) teamAccentColor = System.Windows.Media.Color.FromRgb (34, 153, 113);
+			else if (teamLower.Contains ("williams")) teamAccentColor = System.Windows.Media.Color.FromRgb (100, 196, 255);
+			else if (teamLower.Contains ("alpine")) teamAccentColor = System.Windows.Media.Color.FromRgb (0, 147, 204);
+			else if (teamLower.Contains ("visa") || teamLower.Contains ("rb")) teamAccentColor = System.Windows.Media.Color.FromRgb (102, 146, 255);
+
+			Border cardBorder = new Border {
+				CornerRadius = new CornerRadius (14.0),
+				Padding = new Thickness (16.0, 14.0, 16.0, 16.0),
+				Margin = new Thickness (0, 4, 0, 4),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch
+			};
+
+			LinearGradientBrush cardBg = new LinearGradientBrush {
+				StartPoint = new System.Windows.Point (0, 0),
+				EndPoint = new System.Windows.Point (0, 1)
+			};
+			cardBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (isDark ? (byte)45 : (byte)210, teamAccentColor.R, teamAccentColor.G, teamAccentColor.B), 0.0));
+			cardBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (isDark ? (byte)15 : (byte)140, 15, 18, 24), 1.0));
+			cardBorder.Background = cardBg;
+
+			LinearGradientBrush cardStroke = new LinearGradientBrush {
+				StartPoint = new System.Windows.Point (0, 0),
+				EndPoint = new System.Windows.Point (1, 1)
+			};
+			cardStroke.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (90, teamAccentColor.R, teamAccentColor.G, teamAccentColor.B), 0.0));
+			cardStroke.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (30, 255, 255, 255), 1.0));
+			cardBorder.BorderBrush = cardStroke;
+			cardBorder.BorderThickness = new Thickness (1.2);
+
+			StackPanel cardStack = new StackPanel {
+				Orientation = System.Windows.Controls.Orientation.Vertical,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+			};
+			cardBorder.Child = cardStack;
+
 			string headshotPath = F1OverlayWindow.ResolveAssetPath ("Headshots", driverName + ".png");
 			if (!File.Exists (headshotPath)) {
 				headshotPath = F1OverlayWindow.ResolveAssetPath ("Drivers", driverName + ".png");
 			}
 
 			Border avatarBorder = new Border {
-				Width = 120.0,
-				Height = 120.0,
-				CornerRadius = new CornerRadius (60.0),
-				BorderThickness = new Thickness (2.0),
-				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (80, 255, 255, 255)),
+				Width = 124.0,
+				Height = 124.0,
+				CornerRadius = new CornerRadius (62.0),
+				BorderThickness = new Thickness (2.5),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 10, 0, 12),
+				Margin = new Thickness (0, 4, 0, 10),
 				ClipToBounds = true
+			};
+
+			LinearGradientBrush avatarBorderBrush = new LinearGradientBrush {
+				StartPoint = new System.Windows.Point (0, 0),
+				EndPoint = new System.Windows.Point (1, 1)
+			};
+			avatarBorderBrush.GradientStops.Add (new GradientStop (teamAccentColor, 0.0));
+			avatarBorderBrush.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (180, 255, 255, 255), 1.0));
+			avatarBorder.BorderBrush = avatarBorderBrush;
+
+			avatarBorder.Effect = new System.Windows.Media.Effects.DropShadowEffect {
+				BlurRadius = 18.0,
+				ShadowDepth = 3.0,
+				Opacity = 0.45,
+				Color = teamAccentColor,
+				Direction = 270
 			};
 
 			if (File.Exists (headshotPath)) {
@@ -36602,8 +36626,8 @@ namespace MacStyleDock
 
 					System.Windows.Controls.Image headshotImg = new System.Windows.Controls.Image {
 						Source = img,
-						Width = 120.0,
-						Height = 120.0,
+						Width = 124.0,
+						Height = 124.0,
 						Stretch = System.Windows.Media.Stretch.UniformToFill
 					};
 					RenderOptions.SetBitmapScalingMode (headshotImg, BitmapScalingMode.HighQuality);
@@ -36618,11 +36642,11 @@ namespace MacStyleDock
 				};
 			}
 
-			previewPanel.Children.Add (avatarBorder);
+			cardStack.Children.Add (avatarBorder);
 
 			TextBlock nameBlock = new TextBlock {
 				Text = driverName,
-				Foreground = textBrush,
+				Foreground = System.Windows.Media.Brushes.White,
 				FontSize = 22.0,
 				FontWeight = FontWeights.Bold,
 				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
@@ -36630,13 +36654,23 @@ namespace MacStyleDock
 				TextAlignment = TextAlignment.Center,
 				Margin = new Thickness (0, 0, 0, 4)
 			};
-			previewPanel.Children.Add (nameBlock);
+			cardStack.Children.Add (nameBlock);
+
+			Border teamBadge = new Border {
+				CornerRadius = new CornerRadius (12.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (45, 255, 255, 255)),
+				BorderThickness = new Thickness (1.0),
+				Padding = new Thickness (10.0, 4.0, 12.0, 4.0),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				Margin = new Thickness (0, 0, 0, 10)
+			};
 
 			StackPanel teamPanel = new StackPanel {
 				Orientation = System.Windows.Controls.Orientation.Horizontal,
-				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 0, 0, 14)
+				VerticalAlignment = VerticalAlignment.Center
 			};
+			teamBadge.Child = teamPanel;
 
 			string logoPath = F1OverlayWindow.ResolveAssetPath ("Team Logos", teamLogoFile);
 			if (File.Exists (logoPath)) {
@@ -36649,10 +36683,10 @@ namespace MacStyleDock
 
 					System.Windows.Controls.Image logoControl = new System.Windows.Controls.Image {
 						Source = logoImg,
-						Width = 24.0,
-						Height = 24.0,
+						Width = 22.0,
+						Height = 22.0,
 						Stretch = System.Windows.Media.Stretch.Uniform,
-						Margin = new Thickness (0, 0, 8, 0)
+						Margin = new Thickness (0, 0, 7, 0)
 					};
 					RenderOptions.SetBitmapScalingMode (logoControl, BitmapScalingMode.HighQuality);
 					teamPanel.Children.Add (logoControl);
@@ -36661,14 +36695,14 @@ namespace MacStyleDock
 
 			TextBlock teamText = new TextBlock {
 				Text = teamName,
-				Foreground = subTextBrush,
-				FontSize = 13.0,
+				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (230, 235, 245)),
+				FontSize = 12.0,
 				FontWeight = FontWeights.SemiBold,
 				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Text, Segoe UI, sans-serif"),
 				VerticalAlignment = VerticalAlignment.Center
 			};
 			teamPanel.Children.Add (teamText);
-			previewPanel.Children.Add (teamPanel);
+			cardStack.Children.Add (teamBadge);
 
 			string numberPath = F1OverlayWindow.ResolveAssetPath ("Driver Number", driverName + " Number.png");
 			if (File.Exists (numberPath)) {
@@ -36681,48 +36715,89 @@ namespace MacStyleDock
 
 					System.Windows.Controls.Image numControl = new System.Windows.Controls.Image {
 						Source = numImg,
-						Height = 40.0,
+						Height = 36.0,
 						Stretch = System.Windows.Media.Stretch.Uniform,
 						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-						Margin = new Thickness (0, 0, 0, 16)
+						Margin = new Thickness (0, 0, 0, 12)
 					};
 					RenderOptions.SetBitmapScalingMode (numControl, BitmapScalingMode.HighQuality);
-					previewPanel.Children.Add (numControl);
+					cardStack.Children.Add (numControl);
 				} catch {}
 			}
 
 			Border btn = new Border {
-				Width = 180.0,
-				Height = 34.0,
-				CornerRadius = new CornerRadius (8.0),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (225, 6, 0)),
+				Width = 210.0,
+				Height = 36.0,
+				CornerRadius = new CornerRadius (18.0),
 				Cursor = System.Windows.Input.Cursors.Hand,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 5, 0, 5)
+				Margin = new Thickness (0, 2, 0, 2)
 			};
-			btn.Child = new TextBlock {
+
+			LinearGradientBrush btnGradient = new LinearGradientBrush {
+				StartPoint = new System.Windows.Point (0, 0),
+				EndPoint = new System.Windows.Point (1, 0)
+			};
+			btnGradient.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (240, 20, 10), 0.0));
+			btnGradient.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (200, 5, 0), 1.0));
+			btn.Background = btnGradient;
+
+			btn.Effect = new System.Windows.Media.Effects.DropShadowEffect {
+				BlurRadius = 14.0,
+				ShadowDepth = 3.0,
+				Opacity = 0.5,
+				Color = System.Windows.Media.Color.FromRgb (225, 6, 0),
+				Direction = 270
+			};
+
+			StackPanel btnStack = new StackPanel {
+				Orientation = System.Windows.Controls.Orientation.Horizontal,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center
+			};
+
+			TextBlock btnIcon = new TextBlock {
+				Text = "🏁",
+				FontSize = 13.0,
+				Margin = new Thickness (0, 0, 6, 0),
+				VerticalAlignment = VerticalAlignment.Center
+			};
+			btnStack.Children.Add (btnIcon);
+
+			TextBlock btnText = new TextBlock {
 				Text = "Open F1 Standings Overlay",
 				Foreground = System.Windows.Media.Brushes.White,
 				FontSize = 12.0,
 				FontWeight = FontWeights.Bold,
 				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
-				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 				VerticalAlignment = VerticalAlignment.Center
 			};
+			btnStack.Children.Add (btnText);
+			btn.Child = btnStack;
+
 			btn.MouseEnter += (s, e) => {
-				btn.Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (245, 20, 10));
+				LinearGradientBrush hoverBg = new LinearGradientBrush {
+					StartPoint = new System.Windows.Point (0, 0),
+					EndPoint = new System.Windows.Point (1, 0)
+				};
+				hoverBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (255, 40, 30), 0.0));
+				hoverBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (220, 10, 5), 1.0));
+				btn.Background = hoverBg;
 			};
 			btn.MouseLeave += (s, e) => {
-				btn.Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (225, 6, 0));
+				btn.Background = btnGradient;
 			};
+
 			btn.PreviewMouseLeftButtonDown += delegate {
 				try {
+					Hide ();
 					if (ownerWindow != null) {
 						ownerWindow.ShowF1Overlay ();
 					}
 				} catch {}
 			};
-			previewPanel.Children.Add (btn);
+			cardStack.Children.Add (btn);
+			previewPanel.Children.Add (cardBorder);
 		}
 
 		private void RenderWebCard (SearchResultItem item, System.Windows.Media.Brush textBrush, System.Windows.Media.Brush subTextBrush)
