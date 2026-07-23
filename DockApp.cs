@@ -7195,285 +7195,173 @@ namespace MacStyleDock
 
 
 		public void RebuildDockUI ()
-
 		{
+			trashItemControl = null;
+			clockItemControl = null;
 
 			foreach (DockItemControl runningItem in runningItems) {
-
 				try {
-
 					if (LogicalTreeHelper.GetParent (runningItem) is System.Windows.Controls.Panel panel) {
-
 						panel.Children.Remove (runningItem);
-
 					}
-
 				} catch {
-
 				}
-
 			}
 
 			dockPanel.Children.Clear ();
-
 			dockItems.Clear ();
-
 			recentControls.Clear ();
 
 			if (dockBorder.Child is Grid grid) {
-
 				try {
-
 					grid.Children.Remove (dockPanel);
-
 				} catch {
-
 				}
 
 				if (_shimmerOverlay != null) {
-
 					try {
-
 						grid.Children.Remove (_shimmerOverlay);
-
 					} catch {
-
 					}
-
 				}
-
 			}
 
 			Grid grid2 = new Grid ();
-
 			SafeAdd (grid2, dockPanel, "dockContentGrid.Add(dockPanel)");
 
 			if (_shimmerOverlay != null) {
-
 				_shimmerOverlay.HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch;
-
 				_shimmerOverlay.VerticalAlignment = VerticalAlignment.Stretch;
-
 				SafeAdd (grid2, _shimmerOverlay, "dockContentGrid.Add(_shimmerOverlay)");
-
 			}
 
 			_clockLabel = null;
-
 			_batteryLabel = null;
 
 			if (_clockTimer != null) {
-
 				_clockTimer.Stop ();
-
 				_clockTimer = null;
-
 			}
 
 			dockBorder.Child = grid2;
-
 			List<DockItemConfig> list = new List<DockItemConfig> ();
 
 			foreach (DockItemConfig item in settings.Items) {
-
 				if ((!(item.FilePath == "action:weather") || settings.EnableLiveWeather) && (!(item.FilePath == "action:controlcenter") || settings.EnableControlCenter) && (!(item.FilePath == "action:launchpad") || settings.ShowLaunchpad) && !Directory.Exists (item.FilePath) && item.FilePath != "action:search" && item.FilePath != "action:trash") {
-
 					list.Add (item);
-
 				}
-
 			}
 
 			DockItemConfig dockItemConfig = settings.Items.FirstOrDefault ((DockItemConfig i) => i.FilePath == "action:search");
-
 			if (dockItemConfig != null) {
-
 				DockItemControl dockItemControl = CreateDockItemControlHelper (dockItemConfig, canDrag: true);
-
 				SafeAdd (dockPanel, dockItemControl, "dockPanel.Add(searchCtrl)");
-
 				dockItems.Add (dockItemControl);
-
 			}
 
 			foreach (DockItemConfig item2 in list) {
-
 				DockItemControl dockItemControl2 = CreateDockItemControlHelper (item2, canDrag: true);
-
 				SafeAdd (dockPanel, dockItemControl2, "dockPanel.Add(pinnedItem)");
-
 				dockItems.Add (dockItemControl2);
-
 			}
 
 			Border border = CreateDividerControl ();
-
 			SafeAdd (dockPanel, border, "dockPanel.Add(divider1)");
 
 			int num = 0;
-
 			foreach (DockItemControl itemControl in runningItems) {
-
+				itemControl.UpdateBaseSize (baseSize);
 				if (!settings.Items.Any ((DockItemConfig p) => p.ProcessName.ToLower () == itemControl.Config.ProcessName.ToLower ())) {
-
 					SafeAdd (dockPanel, itemControl, "dockPanel.Add(runningItem)");
-
 					num++;
-
 				}
-
 			}
 
 			int num2 = 0;
-
 			if (settings.ShowRecentApps) {
-
 				foreach (DockItemConfig config in recentApps) {
-
 					if (!runningItems.Any ((DockItemControl r) => r.Config.ProcessName.ToLower () == config.ProcessName.ToLower ())) {
-
 						DockItemControl dockItemControl3 = CreateDockItemControlHelper (config, canDrag: false);
-
 						dockItemControl3.IndicatorDot.Opacity = 0.0;
-
 						SafeAdd (dockPanel, dockItemControl3, "dockPanel.Add(recentItem)");
-
 						recentControls.Add (dockItemControl3);
-
 						num2++;
-
 					}
-
 				}
-
 			}
 
 			border.Visibility = ((num + num2 <= 0) ? Visibility.Collapsed : Visibility.Visible);
-
 			Border border2 = CreateDividerControl ();
-
 			SafeAdd (dockPanel, border2, "dockPanel.Add(divider2)");
 
 			List<DockItemConfig> list2 = new List<DockItemConfig> ();
-
 			foreach (DockItemConfig item3 in settings.Items) {
-
 				if (Directory.Exists (item3.FilePath)) {
-
 					list2.Add (item3);
-
 				}
-
 			}
 
 			int num3 = 0;
-
 			foreach (DockItemConfig item4 in list2) {
-
 				DockItemControl dockItemControl4 = CreateDockItemControlHelper (item4, canDrag: true);
-
 				SafeAdd (dockPanel, dockItemControl4, "dockPanel.Add(folderStack)");
-
 				dockItems.Add (dockItemControl4);
-
 				num3++;
-
 			}
 
 			foreach (DockItemControl item in minimizedItems) {
-
+				item.UpdateBaseSize (baseSize);
 				if (item.Parent != null) {
-
 					try {
-
 						((System.Windows.Controls.Panel)item.Parent).Children.Remove (item);
-
 					} catch {}
-
 				}
-
 				SafeAdd (dockPanel, item, "dockPanel.Add(minimizedItem)");
-
 			}
 
 			if (trashItemControl == null) {
-
 				DockItemConfig config2 = new DockItemConfig {
-
 					Name = "Trash",
-
 					FilePath = "action:trash",
-
 					ProcessName = "Trash"
-
 				};
-
 				trashItemControl = CreateDockItemControlHelper (config2, canDrag: false);
-
 			}
 
 			SafeAdd (dockPanel, trashItemControl, "dockPanel.Add(trashItem)");
-
 			QueryRecycleBinState ();
 
 			if (settings.ShowCalendarWidget) {
-
 				DockItemConfig config3 = new DockItemConfig {
-
 					Name = "Calendar",
-
 					FilePath = "action:calendar",
-
 					ProcessName = "Calendar"
-
 				};
-
 				DockItemControl dockItemControl5 = CreateDockItemControlHelper (config3, canDrag: false);
-
 				SafeAdd (dockPanel, dockItemControl5, "dockPanel.Add(calItem)");
-
 				dockItems.Add (dockItemControl5);
-
 				UpdateCalendarIconState ();
-
 			}
 
 			if (settings.ShowClockWidget) {
-
 				if (clockItemControl == null) {
-
 					DockItemConfig config4 = new DockItemConfig {
-
 						Name = "Clock",
-
 						FilePath = "action:clock",
-
 						ProcessName = "Clock"
-
 					};
-
 					clockItemControl = CreateDockItemControlHelper (config4, canDrag: false);
-
 					clockItemControl.MouseEnter += delegate {
-
 						ShowClockOverlay (clockItemControl);
-
 					};
-
 					clockItemControl.MouseLeave += delegate {
-
 						StartHideClockOverlay ();
-
 					};
-
 				}
 
 				UpdateClockIconState ();
-
 				SafeAdd (dockPanel, clockItemControl, "dockPanel.Add(clockItem)");
-
 				dockItems.Add (clockItemControl);
-
 			} else {
 
 				if (clockItemControl != null) {
@@ -13696,10 +13584,40 @@ namespace MacStyleDock
 				}
 
 			};
-
 		}
 
+		public void UpdateBaseSize (double newBaseSize)
+		{
+			base.Width = newBaseSize;
+			base.Height = newBaseSize + 12.0;
 
+			if (VisualContainer != null) {
+				VisualContainer.Width = newBaseSize;
+				VisualContainer.Height = newBaseSize;
+			}
+
+			if (IconImage != null) {
+				IconImage.Width = newBaseSize;
+				IconImage.Height = newBaseSize;
+			}
+
+			if (ReflectionGrid != null) {
+				ReflectionGrid.Width = newBaseSize;
+				ReflectionGrid.Height = newBaseSize * 0.4;
+				ReflectionGrid.Margin = new Thickness (0.0, 0.0, 0.0, (0.0 - newBaseSize) * 0.38);
+			}
+
+			if (IndicatorDot != null) {
+				IndicatorDot.Width = Math.Max (3.0, Math.Min (6.0, newBaseSize * 0.09));
+				IndicatorDot.Height = IndicatorDot.Width;
+			}
+
+			if (BadgeBorder != null) {
+				BadgeBorder.MinWidth = Math.Max (14.0, newBaseSize * 0.29);
+				BadgeBorder.Height = BadgeBorder.MinWidth;
+				BadgeBorder.CornerRadius = new CornerRadius (BadgeBorder.MinWidth / 2.0);
+			}
+		}
 
 		private System.Windows.HorizontalAlignment CenterAlignmentHelper ()
 
