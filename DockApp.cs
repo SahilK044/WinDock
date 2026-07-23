@@ -35569,7 +35569,26 @@ namespace MacStyleDock
 				IntPtr handle = new WindowInteropHelper (this).Handle;
 				if (handle != IntPtr.Zero) {
 					if (enable) {
-						WinDock.Shared.NativeBlur.ApplyBlur(handle, 0, 0, 0, 0, 0, 0);
+						double dpiX = 1.0;
+						double dpiY = 1.0;
+						var source = PresentationSource.FromVisual (this);
+						if (source != null && source.CompositionTarget != null) {
+							dpiX = source.CompositionTarget.TransformToDevice.M11;
+							dpiY = source.CompositionTarget.TransformToDevice.M22;
+						}
+
+						double pillWidth = searchPill != null && searchPill.ActualWidth > 0 ? searchPill.ActualWidth : SpotlightPanelWidth;
+						double pillHeight = searchPill != null && searchPill.ActualHeight > 0 ? searchPill.ActualHeight : SpotlightSearchHeight;
+
+						int left = (int)(40.0 * dpiX);
+						int top = (int)(28.0 * dpiY);
+						int right = (int)((40.0 + pillWidth) * dpiX);
+						int bottom = (int)((28.0 + pillHeight) * dpiY);
+
+						int cornerWidth = (int)(44.0 * dpiX);
+						int cornerHeight = (int)(44.0 * dpiY);
+
+						WinDock.Shared.NativeBlur.ApplyBlur(handle, left, top, right, bottom, cornerWidth, cornerHeight);
 					} else {
 						WinDock.Shared.NativeBlur.DisableBlur(handle);
 					}
@@ -37673,7 +37692,7 @@ namespace MacStyleDock
 			base.Topmost = true;
 			base.AllowsTransparency = true;
 			base.WindowStyle = WindowStyle.None;
-			base.Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (1, 0, 0, 0));
+			base.Background = System.Windows.Media.Brushes.Transparent;
 			base.Width = SpotlightOuterWidth;
 			base.SizeToContent = SizeToContent.Manual;
 			base.Height = 116.0;
