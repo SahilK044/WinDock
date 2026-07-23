@@ -36536,6 +36536,45 @@ namespace MacStyleDock
 			UpdatePreviewPane ();
 		}
 
+		private static string GetDriverHeadshotPath (string driverName)
+		{
+			if (string.IsNullOrEmpty (driverName)) return "";
+			string titleCase = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase (driverName.ToLower ().Trim ());
+
+			string path = F1OverlayWindow.ResolveAssetPath ("Drivers", titleCase + ".png");
+			if (File.Exists (path)) return path;
+
+			path = F1OverlayWindow.ResolveAssetPath ("Headshots", titleCase + ".png");
+			if (File.Exists (path)) return path;
+
+			path = F1OverlayWindow.ResolveAssetPath ("Drivers", driverName.Trim () + ".png");
+			if (File.Exists (path)) return path;
+
+			path = F1OverlayWindow.ResolveAssetPath ("Headshots", driverName.Trim () + ".png");
+			if (File.Exists (path)) return path;
+
+			try {
+				string dir = F1OverlayWindow.ResolveAssetPath ("Drivers", "Max Verstappen.png");
+				if (!string.IsNullOrEmpty (dir)) {
+					string folder = System.IO.Path.GetDirectoryName (dir);
+					if (Directory.Exists (folder)) {
+						string query = driverName.ToLower ().Trim ();
+						string[] parts = query.Split (' ');
+						string lastName = parts.Length > 0 ? parts [parts.Length - 1] : query;
+						string[] files = Directory.GetFiles (folder, "*.png");
+						foreach (string f in files) {
+							string fname = System.IO.Path.GetFileNameWithoutExtension (f).ToLower ();
+							if (fname.Contains (lastName) || lastName.Contains (fname)) {
+								return f;
+							}
+						}
+					}
+				}
+			} catch {}
+
+			return "";
+		}
+
 		private void RenderF1DriverCard (string driverName, string teamName, string teamLogoFile, System.Windows.Media.Brush textBrush, System.Windows.Media.Brush subTextBrush)
 		{
 			if (previewPanel == null) return;
@@ -36546,7 +36585,7 @@ namespace MacStyleDock
 
 			Border cardBorder = new Border {
 				CornerRadius = new CornerRadius (12.0),
-				Padding = new Thickness (12.0, 10.0, 12.0, 12.0),
+				Padding = new Thickness (12.0, 16.0, 12.0, 16.0),
 				Margin = new Thickness (0, 2, 0, 2),
 				Background = System.Windows.Media.Brushes.Transparent,
 				BorderBrush = System.Windows.Media.Brushes.Transparent,
@@ -36560,48 +36599,17 @@ namespace MacStyleDock
 			};
 			cardBorder.Child = cardStack;
 
-			string onlineUrl = null;
-			string driverLower = driverName.ToLower ();
-			if (driverLower.Contains ("hamilton")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LEWHAM01_Lewis_Hamilton/lewham01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("verstappen")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/M/MAXVER01_Max_Verstappen/maxver01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("leclerc")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/C/CHALEC01_Charles_Leclerc/chalec01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("norris")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LANNOR01_Lando_Norris/lannor01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("piastri")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/O/OSCPIA01_Oscar_Piastri/oscpia01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("sainz")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/C/CARSAI01_Carlos_Sainz/carsai01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("russell")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/G/GEORUS01_George_Russell/georus01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("alonso")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/F/FERALO01_Fernando_Alonso/feralo01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("gasly")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/P/PIEGAS01_Pierre_Gasly/piegas01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("ocon")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/E/ESTOCO01_Esteban_Ocon/estoco01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("tsunoda")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/Y/YUKTSU01_Yuki_Tsunoda/yuktsu01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("albon")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/A/ALEALB01_Alexander_Albon/alealb01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("stroll")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LANSTR01_Lance_Stroll/lanstr01.png.transform/2proc/image.png";
-			else if (driverLower.Contains ("hulkenberg")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/N/NICHUL01_Nico_Hulkenberg/nichul01.png.transform/2proc/image.png";
-
-			string headshotPath = F1OverlayWindow.ResolveAssetPath ("Headshots", driverName + ".png");
-			if (!File.Exists (headshotPath)) {
-				headshotPath = F1OverlayWindow.ResolveAssetPath ("Drivers", driverName + ".png");
-			}
+			string headshotPath = GetDriverHeadshotPath (driverName);
 
 			Border headshotFrame = new Border {
-				Height = 160.0,
-				Width = 160.0,
+				Height = 165.0,
+				Width = 165.0,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 2, 0, 10)
+				Margin = new Thickness (0, 4, 0, 14)
 			};
 
 			System.Windows.Media.ImageSource driverImgSource = null;
-			if (onlineUrl != null) {
-				try {
-					BitmapImage onlineBmp = new BitmapImage ();
-					onlineBmp.BeginInit ();
-					onlineBmp.UriSource = new Uri (onlineUrl, UriKind.Absolute);
-					onlineBmp.CacheOption = BitmapCacheOption.OnLoad;
-					onlineBmp.EndInit ();
-					driverImgSource = onlineBmp;
-				} catch {}
-			}
-
-			if (driverImgSource == null && File.Exists (headshotPath)) {
+			if (!string.IsNullOrEmpty (headshotPath) && File.Exists (headshotPath)) {
 				try {
 					BitmapImage localBmp = new BitmapImage ();
 					localBmp.BeginInit ();
@@ -36615,8 +36623,8 @@ namespace MacStyleDock
 			if (driverImgSource != null) {
 				System.Windows.Controls.Image headshotImg = new System.Windows.Controls.Image {
 					Source = driverImgSource,
-					Height = 160.0,
-					Width = 160.0,
+					Height = 165.0,
+					Width = 165.0,
 					Stretch = System.Windows.Media.Stretch.Uniform
 				};
 				RenderOptions.SetBitmapScalingMode (headshotImg, BitmapScalingMode.HighQuality);
@@ -36633,14 +36641,14 @@ namespace MacStyleDock
 			cardStack.Children.Add (headshotFrame);
 
 			TextBlock nameBlock = new TextBlock {
-				Text = driverName,
+				Text = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase (driverName.ToLower ()),
 				Foreground = textBrush,
 				FontSize = 22.0,
 				FontWeight = FontWeights.Bold,
 				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 				TextAlignment = TextAlignment.Center,
-				Margin = new Thickness (0, 0, 0, 6)
+				Margin = new Thickness (0, 0, 0, 8)
 			};
 			cardStack.Children.Add (nameBlock);
 
@@ -36649,9 +36657,9 @@ namespace MacStyleDock
 				Background = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (25, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (15, 0, 0, 0)),
 				BorderBrush = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (20, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (20, 0, 0, 0)),
 				BorderThickness = new Thickness (1.0),
-				Padding = new Thickness (10.0, 5.0, 12.0, 5.0),
+				Padding = new Thickness (12.0, 6.0, 14.0, 6.0),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 0, 0, 12)
+				Margin = new Thickness (0, 0, 0, 14)
 			};
 
 			StackPanel teamPanel = new StackPanel {
@@ -36671,8 +36679,8 @@ namespace MacStyleDock
 
 					System.Windows.Controls.Image logoControl = new System.Windows.Controls.Image {
 						Source = logoImg,
-						Width = 22.0,
-						Height = 22.0,
+						Width = 24.0,
+						Height = 24.0,
 						Stretch = System.Windows.Media.Stretch.Uniform,
 						Margin = new Thickness (0, 0, 8, 0)
 					};
@@ -36684,7 +36692,7 @@ namespace MacStyleDock
 			TextBlock teamText = new TextBlock {
 				Text = teamName,
 				Foreground = subTextBrush,
-				FontSize = 12.5,
+				FontSize = 13.0,
 				FontWeight = FontWeights.SemiBold,
 				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Text, Segoe UI, sans-serif"),
 				VerticalAlignment = VerticalAlignment.Center
@@ -36692,8 +36700,8 @@ namespace MacStyleDock
 			teamPanel.Children.Add (teamText);
 			cardStack.Children.Add (teamBadge);
 
-			string numberPath = F1OverlayWindow.ResolveAssetPath ("Driver Number", driverName + " Number.png");
-			if (File.Exists (numberPath)) {
+			string numberPath = GetDriverNumberPath (driverName);
+			if (!string.IsNullOrEmpty (numberPath) && File.Exists (numberPath)) {
 				try {
 					BitmapImage numImg = new BitmapImage ();
 					numImg.BeginInit ();
@@ -36703,81 +36711,50 @@ namespace MacStyleDock
 
 					System.Windows.Controls.Image numControl = new System.Windows.Controls.Image {
 						Source = numImg,
-						Height = 36.0,
+						Height = 40.0,
 						Stretch = System.Windows.Media.Stretch.Uniform,
 						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-						Margin = new Thickness (0, 0, 0, 14)
+						Margin = new Thickness (0, 2, 0, 4)
 					};
 					RenderOptions.SetBitmapScalingMode (numControl, BitmapScalingMode.HighQuality);
 					cardStack.Children.Add (numControl);
 				} catch {}
 			}
 
-			Border btn = new Border {
-				Width = 210.0,
-				Height = 36.0,
-				CornerRadius = new CornerRadius (8.0),
-				Cursor = System.Windows.Input.Cursors.Hand,
-				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 2, 0, 2)
-			};
-
-			LinearGradientBrush btnGradient = new LinearGradientBrush {
-				StartPoint = new System.Windows.Point (0, 0),
-				EndPoint = new System.Windows.Point (1, 0)
-			};
-			btnGradient.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (235, 10, 0), 0.0));
-			btnGradient.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (195, 0, 0), 1.0));
-			btn.Background = btnGradient;
-
-			StackPanel btnStack = new StackPanel {
-				Orientation = System.Windows.Controls.Orientation.Horizontal,
-				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				VerticalAlignment = VerticalAlignment.Center
-			};
-
-			TextBlock btnIcon = new TextBlock {
-				Text = "🏎️",
-				FontSize = 13.0,
-				Margin = new Thickness (0, 0, 6, 0),
-				VerticalAlignment = VerticalAlignment.Center
-			};
-			btnStack.Children.Add (btnIcon);
-
-			TextBlock btnText = new TextBlock {
-				Text = "Open F1 Standings Overlay",
-				Foreground = System.Windows.Media.Brushes.White,
-				FontSize = 12.0,
-				FontWeight = FontWeights.Bold,
-				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
-				VerticalAlignment = VerticalAlignment.Center
-			};
-			btnStack.Children.Add (btnText);
-			btn.Child = btnStack;
-
-			btn.MouseEnter += (s, e) => {
-				LinearGradientBrush hoverBg = new LinearGradientBrush {
-					StartPoint = new System.Windows.Point (0, 0),
-					EndPoint = new System.Windows.Point (1, 0)
-				};
-				hoverBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (250, 25, 15), 0.0));
-				hoverBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (215, 5, 0), 1.0));
-				btn.Background = hoverBg;
-			};
-			btn.MouseLeave += (s, e) => {
-				btn.Background = btnGradient;
-			};
-
-			btn.PreviewMouseLeftButtonDown += delegate {
-				try {
-					Hide ();
-					if (ownerWindow != null) {
-						ownerWindow.ShowF1Overlay ();
-					}
-				} catch {}
-			};
-			cardStack.Children.Add (btn);
 			previewPanel.Children.Add (cardBorder);
+		}
+
+		private static string GetDriverNumberPath (string driverName)
+		{
+			if (string.IsNullOrEmpty (driverName)) return "";
+			string titleCase = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase (driverName.ToLower ().Trim ());
+
+			string path = F1OverlayWindow.ResolveAssetPath ("Driver Number", titleCase + " Number.png");
+			if (File.Exists (path)) return path;
+
+			path = F1OverlayWindow.ResolveAssetPath ("Driver Number", driverName.Trim () + " Number.png");
+			if (File.Exists (path)) return path;
+
+			try {
+				string sample = F1OverlayWindow.ResolveAssetPath ("Driver Number", "Max Verstappen Number.png");
+				if (!string.IsNullOrEmpty (sample)) {
+					string folder = System.IO.Path.GetDirectoryName (sample);
+					if (Directory.Exists (folder)) {
+						string query = driverName.ToLower ().Trim ();
+						string[] parts = query.Split (' ');
+						string lastName = parts.Length > 0 ? parts [parts.Length - 1] : query;
+						string[] files = Directory.GetFiles (folder, "*.png");
+						foreach (string f in files) {
+							string fname = System.IO.Path.GetFileNameWithoutExtension (f).ToLower ();
+							if (fname.Contains (lastName) || lastName.Contains (fname)) {
+								return f;
+							}
+						}
+					}
+				}
+			} catch {}
+
+			return "";
 		}
 
 		private void RenderWebCard (SearchResultItem item, System.Windows.Media.Brush textBrush, System.Windows.Media.Brush subTextBrush)
