@@ -511,14 +511,6 @@
                                             </StackPanel>
                                             <CheckBox x:Name="EnableF1Widget" Template="{StaticResource MacToggle}"/>
                                         </Grid>
-                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
-                                        <Grid Margin="15,10">
-                                            <StackPanel>
-                                                <TextBlock Text="FIFA World Cup Widget" Style="{StaticResource CardText}"/>
-                                                <TextBlock Text="Live World Cup 2026 matches &amp; standings" Foreground="#8E8E93" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <CheckBox x:Name="EnableFifaWidget" Template="{StaticResource MacToggle}"/>
-                                        </Grid>
                                     </StackPanel>
                                 </Border>
 

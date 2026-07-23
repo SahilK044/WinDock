@@ -1360,25 +1360,13 @@ namespace MacStyleDock
 
 		public F1OverlayWindow f1Overlay;
 
-		public WorldCupOverlayWindow worldCupOverlay;
-
-
-
 		public AIAssistantWindow aiAssistantOverlay;
-
-
 
 		public SpeechManager speechManager;
 
-
-
 		private DispatcherTimer weatherOverlayTimer;
 
-
-
 		private DispatcherTimer f1OverlayTimer;
-
-		private DispatcherTimer worldCupOverlayTimer;
 
 
 
@@ -3024,131 +3012,6 @@ namespace MacStyleDock
 
 			f1OverlayTimer.Start ();
 
-		}
-
-
-
-		private void ShowWorldCupOverlay (DockItemControl targetItem)
-		{
-			if (worldCupOverlayTimer != null) {
-				worldCupOverlayTimer.Stop ();
-			}
-			bool flag = false;
-			if (worldCupOverlay == null) {
-				worldCupOverlay = new WorldCupOverlayWindow (this);
-				worldCupOverlay.MouseEnter += delegate {
-					if (worldCupOverlayTimer != null) {
-						worldCupOverlayTimer.Stop ();
-					}
-					DoubleAnimation animation3 = new DoubleAnimation (worldCupOverlay.Opacity, 1.0, TimeSpan.FromMilliseconds (180.0)) {
-						EasingFunction = new CubicEase {
-							EasingMode = EasingMode.EaseOut
-						}
-					};
-					worldCupOverlay.BeginAnimation (UIElement.OpacityProperty, animation3);
-				};
-				worldCupOverlay.MouseLeave += delegate {
-					StartHideWorldCupOverlay ();
-				};
-				worldCupOverlay.Deactivated += delegate {
-					StartHideWorldCupOverlay ();
-				};
-				worldCupOverlay.KeyDown += delegate(object s, System.Windows.Input.KeyEventArgs e) {
-					if (e.Key == Key.Escape) {
-						StartHideWorldCupOverlay ();
-					}
-				};
-				flag = true;
-			}
-			try {
-				System.Windows.Point point = PhysicalToLogical (targetItem.PointToScreen (new System.Windows.Point (0.0, 0.0)), targetItem);
-				double left;
-				double top;
-				if (settings.Position == "Left") {
-					left = point.X + targetItem.ActualWidth + 8.0 - 10.0;
-					top = point.Y + (targetItem.ActualHeight - worldCupOverlay.Height) / 2.0;
-				} else if (settings.Position == "Right") {
-					left = point.X - worldCupOverlay.Width - 8.0 + 10.0;
-					top = point.Y + (targetItem.ActualHeight - worldCupOverlay.Height) / 2.0;
-				} else if (settings.Position == "Top") {
-					left = point.X + (targetItem.ActualWidth - worldCupOverlay.Width) / 2.0;
-					top = point.Y + targetItem.ActualHeight + 8.0 - 10.0;
-				} else {
-					left = point.X + (targetItem.ActualWidth - worldCupOverlay.Width) / 2.0;
-					top = point.Y - worldCupOverlay.Height - 8.0 + 10.0;
-				}
-				worldCupOverlay.Left = left;
-				worldCupOverlay.Top = top;
-				if (flag || !worldCupOverlay.IsVisible) {
-					worldCupOverlay.Opacity = 0.0;
-					worldCupOverlay.Show ();
-				}
-				DoubleAnimation animation = new DoubleAnimation (worldCupOverlay.Opacity, 1.0, TimeSpan.FromMilliseconds (220.0)) {
-					EasingFunction = new CubicEase {
-						EasingMode = EasingMode.EaseOut
-					}
-				};
-				if (flag || !worldCupOverlay.IsVisible) {
-					animation.From = 0.0;
-				}
-				worldCupOverlay.BeginAnimation (UIElement.OpacityProperty, animation);
-				if (worldCupOverlay.Content is FrameworkElement frameworkElement) {
-					TranslateTransform translateTransform = frameworkElement.RenderTransform as TranslateTransform;
-					if (translateTransform == null) {
-						translateTransform = (TranslateTransform)(frameworkElement.RenderTransform = new TranslateTransform ());
-					}
-					DoubleAnimation animation2 = new DoubleAnimation (translateTransform.Y, 0.0, TimeSpan.FromMilliseconds (220.0)) {
-						EasingFunction = new CubicEase {
-							EasingMode = EasingMode.EaseOut
-						}
-					};
-					if (flag || !worldCupOverlay.IsVisible) {
-						animation2.From = 12.0;
-					}
-					translateTransform.BeginAnimation (TranslateTransform.YProperty, animation2);
-				}
-			} catch {
-			}
-		}
-
-		private void StartHideWorldCupOverlay ()
-		{
-			if (worldCupOverlayTimer == null) {
-				worldCupOverlayTimer = new DispatcherTimer ();
-				worldCupOverlayTimer.Interval = TimeSpan.FromMilliseconds (250.0);
-				worldCupOverlayTimer.Tick += delegate {
-					if (worldCupOverlay != null) {
-						worldCupOverlayTimer.Stop ();
-						DoubleAnimation doubleAnimation = new DoubleAnimation (worldCupOverlay.Opacity, 0.0, TimeSpan.FromMilliseconds (180.0)) {
-							EasingFunction = new CubicEase {
-								EasingMode = EasingMode.EaseIn
-							}
-						};
-						if (worldCupOverlay.Content is FrameworkElement frameworkElement) {
-							TranslateTransform translateTransform = frameworkElement.RenderTransform as TranslateTransform;
-							if (translateTransform == null) {
-								translateTransform = (TranslateTransform)(frameworkElement.RenderTransform = new TranslateTransform ());
-							}
-							DoubleAnimation animation = new DoubleAnimation (translateTransform.Y, 12.0, TimeSpan.FromMilliseconds (180.0)) {
-								EasingFunction = new CubicEase {
-									EasingMode = EasingMode.EaseIn
-								}
-							};
-							translateTransform.BeginAnimation (TranslateTransform.YProperty, animation);
-						}
-						doubleAnimation.Completed += delegate {
-							if (worldCupOverlay != null && worldCupOverlay.Opacity == 0.0) {
-								worldCupOverlay.Hide ();
-							}
-						};
-						worldCupOverlay.BeginAnimation (UIElement.OpacityProperty, doubleAnimation);
-					} else {
-						worldCupOverlayTimer.Stop ();
-					}
-				};
-			}
-			worldCupOverlayTimer.Stop ();
-			worldCupOverlayTimer.Start ();
 		}
 
 
@@ -6739,22 +6602,6 @@ namespace MacStyleDock
 					itemControl.MouseLeave += delegate {
 
 						StartHideF1Overlay ();
-
-					};
-
-				} else if (config.FilePath == "action:worldcup") {
-
-					DockItemControl closureItemWorldCup = itemControl;
-
-					itemControl.MouseEnter += delegate {
-
-						ShowWorldCupOverlay (closureItemWorldCup);
-
-					};
-
-					itemControl.MouseLeave += delegate {
-
-						StartHideWorldCupOverlay ();
 
 					};
 
@@ -14536,42 +14383,6 @@ namespace MacStyleDock
 
 			}
 
-			if (imageSource == null && Config != null && Config.FilePath == "action:worldcup") {
-
-				string textWC = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "fifa_logo.png");
-
-				if (File.Exists (textWC)) {
-
-					try {
-
-						BitmapImage bitmapImageWC = new BitmapImage ();
-
-						bitmapImageWC.BeginInit ();
-
-						bitmapImageWC.UriSource = new Uri (textWC);
-
-						bitmapImageWC.CacheOption = BitmapCacheOption.OnLoad;
-
-						bitmapImageWC.EndInit ();
-
-						bitmapImageWC.Freeze ();
-
-						imageSource = bitmapImageWC;
-
-					} catch {
-
-					}
-
-				}
-
-				if (imageSource == null) {
-
-					imageSource = IconExtractor.CreateWorldCupIcon ();
-
-				}
-
-			}
-
 			if (imageSource == null && Config != null && Config.FilePath == "action:launchpad") {
 
 				imageSource = IconExtractor.CreateLaunchpadIcon ();
@@ -16277,41 +16088,7 @@ namespace MacStyleDock
 
 
 
-		public static ImageSource CreateWorldCupIcon ()
 
-		{
-
-			int num = 128;
-
-			RenderTargetBitmap renderTargetBitmap = new RenderTargetBitmap (num, num, 96.0, 96.0, PixelFormats.Pbgra32);
-
-			DrawingVisual drawingVisual = new DrawingVisual ();
-
-			using (DrawingContext drawingContext = drawingVisual.RenderOpen ()) {
-
-				LinearGradientBrush brush = new LinearGradientBrush (System.Windows.Media.Color.FromRgb (28, 28, 30), System.Windows.Media.Color.FromRgb (10, 10, 12), new System.Windows.Point (0.0, 0.0), new System.Windows.Point (1.0, 1.0));
-
-				drawingContext.DrawEllipse (brush, new System.Windows.Media.Pen (new SolidColorBrush (System.Windows.Media.Color.FromRgb (212, 175, 55)), 2.5), new System.Windows.Point ((double)num / 2.0, (double)num / 2.0), (double)num / 2.0 - 4.0, (double)num / 2.0 - 4.0);
-
-				Typeface typeface = new Typeface (new System.Windows.Media.FontFamily ("Impact, Arial Black, sans-serif"), FontStyles.Italic, FontWeights.UltraBold, FontStretches.Normal);
-
-				FormattedText formattedText = new FormattedText ("FIFA", CultureInfo.InvariantCulture, System.Windows.FlowDirection.LeftToRight, typeface, 44.0, new SolidColorBrush (System.Windows.Media.Color.FromRgb (212, 175, 55)));
-
-				double num2 = ((double)num - formattedText.Width) / 2.0;
-
-				double num3 = ((double)num - formattedText.Height) / 2.0 - 1.0;
-
-				drawingContext.DrawText (formattedText, new System.Windows.Point (num2, num3));
-
-			}
-
-			renderTargetBitmap.Render (drawingVisual);
-
-			renderTargetBitmap.Freeze ();
-
-			return renderTargetBitmap;
-
-		}
 
 
 

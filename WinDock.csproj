@@ -14,8 +14,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="windock_logo.png" />
-    <Resource Include="fifa_logo.png" />
-    <Resource Include="fifa_logo_black.png" />
     <Resource Include="weather_sunny.png" />
     <Resource Include="weather_cloudy.png" />
     <Resource Include="weather_rain.png" />
@@ -53,9 +51,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="spotify_logo.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="fifa_logo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Drivers\**\*">
