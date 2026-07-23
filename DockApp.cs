@@ -4454,7 +4454,7 @@ namespace MacStyleDock
 
 					hotzone.Width = double.NaN;
 
-					hotzone.Height = 12.0;
+					hotzone.Height = 24.0;
 
 					hotzone.HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch;
 
@@ -4464,7 +4464,7 @@ namespace MacStyleDock
 
 					hotzone.Height = double.NaN;
 
-					hotzone.Width = 12.0;
+					hotzone.Width = 24.0;
 
 					hotzone.VerticalAlignment = VerticalAlignment.Stretch;
 
@@ -8505,46 +8505,39 @@ namespace MacStyleDock
 
 
 		private bool IsMouseAlignedWithDock (System.Windows.Point p)
-
 		{
-
 			if (dockBorder == null || !dockBorder.IsLoaded) {
-
 				return true;
-
 			}
-
 			try {
+				double width = dockBorder.ActualWidth > 0 ? dockBorder.ActualWidth : dockPanel != null && dockPanel.ActualWidth > 0 ? dockPanel.ActualWidth : 500.0;
+				double height = dockBorder.ActualHeight > 0 ? dockBorder.ActualHeight : dockPanel != null && dockPanel.ActualHeight > 0 ? dockPanel.ActualHeight : 500.0;
 
 				if (settings.Position == "Bottom" || settings.Position == "Top") {
-
 					double x = dockBorder.TranslatePoint (new System.Windows.Point (0.0, 0.0), this).X;
-
-					double num = x + dockBorder.ActualWidth;
-
-					return p.X >= x && p.X <= num;
-
+					if ((x <= 0 || x >= this.ActualWidth) && this.ActualWidth > 0) {
+						x = (this.ActualWidth - width) / 2.0;
+					}
+					double num = x + width;
+					return p.X >= (x - 60.0) && p.X <= (num + 60.0);
+				} else {
+					double y = dockBorder.TranslatePoint (new System.Windows.Point (0.0, 0.0), this).Y;
+					if ((y <= 0 || y >= this.ActualHeight) && this.ActualHeight > 0) {
+						y = (this.ActualHeight - height) / 2.0;
+					}
+					double num2 = y + height;
+					return p.Y >= (y - 60.0) && p.Y <= (num2 + 60.0);
 				}
-
-				double y = dockBorder.TranslatePoint (new System.Windows.Point (0.0, 0.0), this).Y;
-
-				double num2 = y + dockBorder.ActualHeight;
-
-				return p.Y >= y && p.Y <= num2;
-
 			} catch {
-
 				return true;
-
 			}
-
 		}
 
 
 
 		private void SetupAutoHide ()
 		{
-			_edgeHoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (180) };
+			_edgeHoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (120) };
 			_edgeHoverTimer.Tick += delegate {
 				_edgeHoverTimer.Stop ();
 				if (isDockHidden && settings.AutoHide) {
@@ -8587,13 +8580,15 @@ namespace MacStyleDock
 				if (isDockHidden && settings.AutoHide) {
 					System.Windows.Point position = e.GetPosition (this);
 					bool isNearEdge = false;
+					double edgeThreshold = 35.0;
+
 					if (settings.Position == "Bottom") {
-						if (position.Y >= base.Height - 16.0) isNearEdge = true;
+						if (position.Y >= base.Height - edgeThreshold) isNearEdge = true;
 					} else if (settings.Position == "Top") {
-						if (position.Y <= 16.0) isNearEdge = true;
+						if (position.Y <= edgeThreshold) isNearEdge = true;
 					} else if (settings.Position == "Left") {
-						if (position.X <= 16.0) isNearEdge = true;
-					} else if (settings.Position == "Right" && position.X >= base.Width - 16.0) {
+						if (position.X <= edgeThreshold) isNearEdge = true;
+					} else if (settings.Position == "Right" && position.X >= base.Width - edgeThreshold) {
 						isNearEdge = true;
 					}
 
@@ -8602,7 +8597,15 @@ namespace MacStyleDock
 							_edgeHoverTimer.Start ();
 						}
 					} else {
-						_edgeHoverTimer.Stop ();
+						bool isFar = false;
+						if (settings.Position == "Bottom" && position.Y < base.Height - 50.0) isFar = true;
+						else if (settings.Position == "Top" && position.Y > 50.0) isFar = true;
+						else if (settings.Position == "Left" && position.X > 50.0) isFar = true;
+						else if (settings.Position == "Right" && position.X < base.Width - 50.0) isFar = true;
+
+						if (isFar) {
+							_edgeHoverTimer.Stop ();
+						}
 					}
 				}
 			};
