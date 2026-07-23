@@ -148,20 +148,6 @@ namespace WinDockSetup
 
         public void UpdateTelemetry(string action, string detail, double progressPercent)
         {
-            Dispatcher.Invoke(() =>
-            {
-                TelemetryAction.Text = action.ToUpperInvariant();
-                TelemetryDetail.Text = detail.ToUpperInvariant();
-
-                var parent = TelemetryFill.Parent as FrameworkElement;
-                double targetWidth = parent != null ? parent.ActualWidth * (progressPercent / 100.0) : 0;
-
-                var widthAnim = new DoubleAnimation(targetWidth, TimeSpan.FromMilliseconds(300))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
-                TelemetryFill.BeginAnimation(WidthProperty, widthAnim);
-            });
         }
     }
 }

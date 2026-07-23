@@ -33,7 +33,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="36"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="38"/>
             </Grid.RowDefinitions>
 
             <!-- Row 0 — Title Bar -->
@@ -123,56 +122,6 @@
                                 Grid.Row="1"
                                 Margin="40,24,40,24"/>
             </Grid>
-
-            <!-- Row 2 — Telemetry Strip -->
-            <Border Grid.Row="2"
-                    Height="38"
-                    Background="#0DFFFFFF"
-                    BorderBrush="#10FFFFFF"
-                    BorderThickness="0,1,0,0"
-                    CornerRadius="0,0,12,12">
-                <Grid>
-                    <!-- Progress fill (behind text) -->
-                    <Border x:Name="TelemetryFill"
-                            HorizontalAlignment="Left"
-                            Width="0">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                <GradientStop Color="#0035D6C7" Offset="0"/>
-                                <GradientStop Color="#1035D6C7" Offset="0.7"/>
-                                <GradientStop Color="#2C35D6C7" Offset="1"/>
-                            </LinearGradientBrush>
-                        </Border.Background>
-                    </Border>
-
-                    <!-- Text container -->
-                    <Grid Margin="16,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Left label -->
-                        <TextBlock x:Name="TelemetryAction"
-                                   Grid.Column="0"
-                                   Text="WINDOCK SETUP v1.0"
-                                   FontFamily="{StaticResource MonoFontFamily}"
-                                   FontSize="10.5"
-                                   Foreground="{StaticResource FogWhite45Brush}"
-                                   VerticalAlignment="Center"/>
-
-                        <!-- Right label -->
-                        <TextBlock x:Name="TelemetryDetail"
-                                   Grid.Column="1"
-                                   Text="READY"
-                                   FontFamily="{StaticResource MonoFontFamily}"
-                                   FontSize="10.5"
-                                   Foreground="{StaticResource FogWhite45Brush}"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Right"/>
-                    </Grid>
-                </Grid>
-            </Border>
         </Grid>
     </Border>
 </Window>
