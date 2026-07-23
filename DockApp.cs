@@ -36544,40 +36544,15 @@ namespace MacStyleDock
 			string effectiveTheme = ownerWindow != null ? ownerWindow.GetEffectiveTheme () : "dark";
 			bool isDark = (effectiveTheme == "dark" || effectiveTheme == "tahoe");
 
-			System.Windows.Media.Color teamAccentColor = System.Windows.Media.Color.FromRgb (225, 6, 0);
-			string teamLower = teamName.ToLower ();
-			if (teamLower.Contains ("red bull")) teamAccentColor = System.Windows.Media.Color.FromRgb (236, 17, 48);
-			else if (teamLower.Contains ("ferrari")) teamAccentColor = System.Windows.Media.Color.FromRgb (232, 0, 45);
-			else if (teamLower.Contains ("mclaren")) teamAccentColor = System.Windows.Media.Color.FromRgb (255, 128, 0);
-			else if (teamLower.Contains ("mercedes")) teamAccentColor = System.Windows.Media.Color.FromRgb (39, 244, 210);
-			else if (teamLower.Contains ("aston martin")) teamAccentColor = System.Windows.Media.Color.FromRgb (34, 153, 113);
-			else if (teamLower.Contains ("williams")) teamAccentColor = System.Windows.Media.Color.FromRgb (100, 196, 255);
-			else if (teamLower.Contains ("alpine")) teamAccentColor = System.Windows.Media.Color.FromRgb (0, 147, 204);
-			else if (teamLower.Contains ("visa") || teamLower.Contains ("rb")) teamAccentColor = System.Windows.Media.Color.FromRgb (102, 146, 255);
-
 			Border cardBorder = new Border {
-				CornerRadius = new CornerRadius (14.0),
-				Padding = new Thickness (16.0, 14.0, 16.0, 16.0),
+				CornerRadius = new CornerRadius (12.0),
+				Padding = new Thickness (16.0, 16.0, 16.0, 16.0),
 				Margin = new Thickness (0, 4, 0, 4),
+				Background = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 255, 255, 255)),
+				BorderBrush = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (25, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 0, 0, 0)),
+				BorderThickness = new Thickness (1.0),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch
 			};
-
-			LinearGradientBrush cardBg = new LinearGradientBrush {
-				StartPoint = new System.Windows.Point (0, 0),
-				EndPoint = new System.Windows.Point (0, 1)
-			};
-			cardBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (isDark ? (byte)45 : (byte)210, teamAccentColor.R, teamAccentColor.G, teamAccentColor.B), 0.0));
-			cardBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (isDark ? (byte)15 : (byte)140, 15, 18, 24), 1.0));
-			cardBorder.Background = cardBg;
-
-			LinearGradientBrush cardStroke = new LinearGradientBrush {
-				StartPoint = new System.Windows.Point (0, 0),
-				EndPoint = new System.Windows.Point (1, 1)
-			};
-			cardStroke.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (90, teamAccentColor.R, teamAccentColor.G, teamAccentColor.B), 0.0));
-			cardStroke.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (30, 255, 255, 255), 1.0));
-			cardBorder.BorderBrush = cardStroke;
-			cardBorder.BorderThickness = new Thickness (1.2);
 
 			StackPanel cardStack = new StackPanel {
 				Orientation = System.Windows.Controls.Orientation.Vertical,
@@ -36590,30 +36565,13 @@ namespace MacStyleDock
 				headshotPath = F1OverlayWindow.ResolveAssetPath ("Drivers", driverName + ".png");
 			}
 
-			Border avatarBorder = new Border {
-				Width = 124.0,
-				Height = 124.0,
-				CornerRadius = new CornerRadius (62.0),
-				BorderThickness = new Thickness (2.5),
+			Border headshotFrame = new Border {
+				Height = 145.0,
+				Width = 145.0,
+				CornerRadius = new CornerRadius (10.0),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 4, 0, 10),
+				Margin = new Thickness (0, 2, 0, 12),
 				ClipToBounds = true
-			};
-
-			LinearGradientBrush avatarBorderBrush = new LinearGradientBrush {
-				StartPoint = new System.Windows.Point (0, 0),
-				EndPoint = new System.Windows.Point (1, 1)
-			};
-			avatarBorderBrush.GradientStops.Add (new GradientStop (teamAccentColor, 0.0));
-			avatarBorderBrush.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (180, 255, 255, 255), 1.0));
-			avatarBorder.BorderBrush = avatarBorderBrush;
-
-			avatarBorder.Effect = new System.Windows.Media.Effects.DropShadowEffect {
-				BlurRadius = 18.0,
-				ShadowDepth = 3.0,
-				Opacity = 0.45,
-				Color = teamAccentColor,
-				Direction = 270
 			};
 
 			if (File.Exists (headshotPath)) {
@@ -36626,15 +36584,15 @@ namespace MacStyleDock
 
 					System.Windows.Controls.Image headshotImg = new System.Windows.Controls.Image {
 						Source = img,
-						Width = 124.0,
-						Height = 124.0,
+						Height = 145.0,
+						Width = 145.0,
 						Stretch = System.Windows.Media.Stretch.UniformToFill
 					};
 					RenderOptions.SetBitmapScalingMode (headshotImg, BitmapScalingMode.HighQuality);
-					avatarBorder.Child = headshotImg;
+					headshotFrame.Child = headshotImg;
 				} catch {}
 			} else {
-				avatarBorder.Child = new TextBlock {
+				headshotFrame.Child = new TextBlock {
 					Text = "🏎️",
 					FontSize = 48.0,
 					HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
@@ -36642,28 +36600,28 @@ namespace MacStyleDock
 				};
 			}
 
-			cardStack.Children.Add (avatarBorder);
+			cardStack.Children.Add (headshotFrame);
 
 			TextBlock nameBlock = new TextBlock {
 				Text = driverName,
-				Foreground = System.Windows.Media.Brushes.White,
+				Foreground = textBrush,
 				FontSize = 22.0,
 				FontWeight = FontWeights.Bold,
 				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 				TextAlignment = TextAlignment.Center,
-				Margin = new Thickness (0, 0, 0, 4)
+				Margin = new Thickness (0, 0, 0, 6)
 			};
 			cardStack.Children.Add (nameBlock);
 
 			Border teamBadge = new Border {
-				CornerRadius = new CornerRadius (12.0),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
-				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (45, 255, 255, 255)),
+				CornerRadius = new CornerRadius (8.0),
+				Background = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (25, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (15, 0, 0, 0)),
+				BorderBrush = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (20, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (20, 0, 0, 0)),
 				BorderThickness = new Thickness (1.0),
-				Padding = new Thickness (10.0, 4.0, 12.0, 4.0),
+				Padding = new Thickness (10.0, 5.0, 12.0, 5.0),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 0, 0, 10)
+				Margin = new Thickness (0, 0, 0, 12)
 			};
 
 			StackPanel teamPanel = new StackPanel {
@@ -36686,7 +36644,7 @@ namespace MacStyleDock
 						Width = 22.0,
 						Height = 22.0,
 						Stretch = System.Windows.Media.Stretch.Uniform,
-						Margin = new Thickness (0, 0, 7, 0)
+						Margin = new Thickness (0, 0, 8, 0)
 					};
 					RenderOptions.SetBitmapScalingMode (logoControl, BitmapScalingMode.HighQuality);
 					teamPanel.Children.Add (logoControl);
@@ -36695,8 +36653,8 @@ namespace MacStyleDock
 
 			TextBlock teamText = new TextBlock {
 				Text = teamName,
-				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (230, 235, 245)),
-				FontSize = 12.0,
+				Foreground = subTextBrush,
+				FontSize = 12.5,
 				FontWeight = FontWeights.SemiBold,
 				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Text, Segoe UI, sans-serif"),
 				VerticalAlignment = VerticalAlignment.Center
@@ -36718,7 +36676,7 @@ namespace MacStyleDock
 						Height = 36.0,
 						Stretch = System.Windows.Media.Stretch.Uniform,
 						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-						Margin = new Thickness (0, 0, 0, 12)
+						Margin = new Thickness (0, 0, 0, 14)
 					};
 					RenderOptions.SetBitmapScalingMode (numControl, BitmapScalingMode.HighQuality);
 					cardStack.Children.Add (numControl);
@@ -36728,7 +36686,7 @@ namespace MacStyleDock
 			Border btn = new Border {
 				Width = 210.0,
 				Height = 36.0,
-				CornerRadius = new CornerRadius (18.0),
+				CornerRadius = new CornerRadius (8.0),
 				Cursor = System.Windows.Input.Cursors.Hand,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 				Margin = new Thickness (0, 2, 0, 2)
@@ -36738,17 +36696,9 @@ namespace MacStyleDock
 				StartPoint = new System.Windows.Point (0, 0),
 				EndPoint = new System.Windows.Point (1, 0)
 			};
-			btnGradient.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (240, 20, 10), 0.0));
-			btnGradient.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (200, 5, 0), 1.0));
+			btnGradient.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (235, 10, 0), 0.0));
+			btnGradient.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (195, 0, 0), 1.0));
 			btn.Background = btnGradient;
-
-			btn.Effect = new System.Windows.Media.Effects.DropShadowEffect {
-				BlurRadius = 14.0,
-				ShadowDepth = 3.0,
-				Opacity = 0.5,
-				Color = System.Windows.Media.Color.FromRgb (225, 6, 0),
-				Direction = 270
-			};
 
 			StackPanel btnStack = new StackPanel {
 				Orientation = System.Windows.Controls.Orientation.Horizontal,
@@ -36757,7 +36707,7 @@ namespace MacStyleDock
 			};
 
 			TextBlock btnIcon = new TextBlock {
-				Text = "🏁",
+				Text = "🏎️",
 				FontSize = 13.0,
 				Margin = new Thickness (0, 0, 6, 0),
 				VerticalAlignment = VerticalAlignment.Center
@@ -36780,8 +36730,8 @@ namespace MacStyleDock
 					StartPoint = new System.Windows.Point (0, 0),
 					EndPoint = new System.Windows.Point (1, 0)
 				};
-				hoverBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (255, 40, 30), 0.0));
-				hoverBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (220, 10, 5), 1.0));
+				hoverBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (250, 25, 15), 0.0));
+				hoverBg.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromRgb (215, 5, 0), 1.0));
 				btn.Background = hoverBg;
 			};
 			btn.MouseLeave += (s, e) => {
