@@ -563,12 +563,12 @@
                                         </Grid>
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
-                                            <TextBlock Text="Enable AI Assistant (Chonk)" Style="{StaticResource CardText}"/>
+                                            <TextBlock Text="Enable Voice Assistant (Chonk)" Style="{StaticResource CardText}"/>
                                             <CheckBox x:Name="EnableAIAssistant" Template="{StaticResource MacToggle}"/>
                                         </Grid>
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
-                                            <TextBlock Text="Local AI Training Data" Style="{StaticResource CardText}"/>
+                                            <TextBlock Text="Local Voice Training Data" Style="{StaticResource CardText}"/>
                                             <Button x:Name="BtnEditIntents" Content="Edit Training Data" Width="130" Height="24" HorizontalAlignment="Right" Foreground="White" BorderThickness="0">
                                                 <Button.Template>
                                                     <ControlTemplate TargetType="Button">

@@ -36332,10 +36332,10 @@ namespace MacStyleDock
 				OpenShellUri ("https://www.amazon.com/s?k=" + Uri.EscapeDataString (param));
 			} else if (code == "action://maps") {
 				OpenShellUri ("https://www.google.com/maps/search/" + Uri.EscapeDataString (param));
-			} else if (code == "action://chatgpt") {
-				OpenShellUri (string.IsNullOrWhiteSpace (param) ? "https://chatgpt.com/" : "https://chatgpt.com/?q=" + Uri.EscapeDataString (param));
-			} else if (code == "action://copilot") {
-				OpenShellUri ("https://copilot.microsoft.com/");
+			} else if (code == "action://google") {
+				OpenShellUri (string.IsNullOrWhiteSpace (param) ? "https://www.google.com/" : "https://www.google.com/search?q=" + Uri.EscapeDataString (param));
+			} else if (code == "action://bing") {
+				OpenShellUri (string.IsNullOrWhiteSpace (param) ? "https://www.bing.com/" : "https://www.bing.com/search?q=" + Uri.EscapeDataString (param));
 			} else if (code == "action://camera") {
 				OpenShellUri ("microsoft.windows.camera:");
 			} else if (code == "action://soundrecorder") {
@@ -36486,8 +36486,8 @@ namespace MacStyleDock
 				("yt", "Search YouTube", "action://youtube", "Search YouTube"),
 				("az", "Search Amazon", "action://amazon", "Search Amazon"),
 				("map", "Search Maps", "action://maps", "Search maps or directions"),
-				("ai", "Ask ChatGPT", "action://chatgpt", "Ask ChatGPT"),
-				("cp", "Ask Copilot", "action://copilot", "Open Microsoft Copilot"),
+				("wb", "Search Web", "action://google", "Search the web on Google"),
+				("ms", "Microsoft Search", "action://bing", "Search Microsoft Bing"),
 				("cam", "Open Camera", "action://camera", "Open Camera"),
 				("rec", "Record Audio", "action://soundrecorder", "Open Sound Recorder"),
 				("mag", "Magnifier", "action://magnifier", "Open Magnifier"),
@@ -44836,8 +44836,7 @@ namespace MacStyleDock
 
 				break;
 
-			case "AI":
-
+			case "Assistant":
 			case "System":
 
 				border.Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (130, 25, 25, 30));
@@ -44970,7 +44969,7 @@ namespace MacStyleDock
 
 									SetSiriState ("calm");
 
-									AppendChat ("AI", $"Successfully trained locally!\nIntent: {intentName}\nExample: \"{example}\"\nAction: {actionScript}");
+									AppendChat ("Assistant", $"Successfully trained locally!\nIntent: {intentName}\nExample: \"{example}\"\nAction: {actionScript}");
 
 								});
 
@@ -44984,7 +44983,7 @@ namespace MacStyleDock
 
 							SetSiriState ("calm");
 
-							AppendChat ("AI", "To train me locally, type:\ntrain <intent> | <example> | <powershell_script>\n\nExample:\ntrain open_calc | open calculator | Start-Process calc");
+							AppendChat ("Assistant", "To train me locally, type:\ntrain <intent> | <example> | <powershell_script>\n\nExample:\ntrain open_calc | open calculator | Start-Process calc");
 
 						});
 
@@ -45036,7 +45035,7 @@ namespace MacStyleDock
 
 							base.Dispatcher.BeginInvoke ((Action)delegate {
 
-								AppendChat ("AI", $"Matched Intent: {bestIntent.Intent} (Confidence: {maxScore:P0})\nExecuting local action...");
+								AppendChat ("Assistant", $"Matched Intent: {bestIntent.Intent} (Confidence: {maxScore:P0})\nExecuting local action...");
 
 							});
 
@@ -45046,7 +45045,7 @@ namespace MacStyleDock
 
 							base.Dispatcher.BeginInvoke ((Action)delegate {
 
-								AppendChat ("AI", "Searching the web for an answer...");
+								AppendChat ("Assistant", "Searching the web for an answer...");
 
 							});
 
@@ -46162,7 +46161,7 @@ namespace MacStyleDock
 
 							if (!string.IsNullOrEmpty (error) && _dockWindow.aiAssistantOverlay != null) {
 
-								_dockWindow.aiAssistantOverlay.AppendChat ("AI", "Could not start microphone: " + error + ". Please ensure a default recording device is connected and enabled.");
+								_dockWindow.aiAssistantOverlay.AppendChat ("Assistant", "Could not start microphone: " + error + ". Please ensure a default recording device is connected and enabled.");
 
 							}
 
@@ -46556,7 +46555,7 @@ namespace MacStyleDock
 
 				if (_dockWindow.aiAssistantOverlay != null) {
 
-					_dockWindow.aiAssistantOverlay.AppendChat ("AI", "Timed out listening for command.");
+					_dockWindow.aiAssistantOverlay.AppendChat ("Assistant", "Timed out listening for command.");
 
 					_dockWindow.aiAssistantOverlay.SetSiriState ("calm");
 
