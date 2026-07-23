@@ -7750,95 +7750,108 @@ namespace MacStyleDock
 			Grid grid2 = dockBorder.Child as Grid;
 			if (grid2 == null) return;
 
-			bool isHorizontal = (settings.Position == "Bottom" || settings.Position == "Top");
+			double w = dockBorder.ActualWidth;
+			double h = dockBorder.ActualHeight;
+			if (w <= 0) w = 600.0;
+			if (h <= 0) h = 80.0;
+			double skew = 16.0;
 
-			if (isHorizontal) {
-				double w = dockBorder.ActualWidth;
-				double h = dockBorder.ActualHeight;
-				if (w <= 0) w = 600.0;
-				if (h <= 0) h = 80.0;
-				double skew = 16.0;
+			if (_shelfPolygon == null) {
+				_shelfPolygon = new Polygon ();
+				grid2.Children.Insert (0, _shelfPolygon);
+			}
+			_shelfPolygon.Visibility = Visibility.Visible;
 
-				if (_shelfPolygon == null) {
-					_shelfPolygon = new Polygon ();
-					grid2.Children.Insert (0, _shelfPolygon);
-				}
-				_shelfPolygon.Visibility = Visibility.Visible;
+			if (_shelfHighlightLine == null) {
+				_shelfHighlightLine = new Line ();
+				grid2.Children.Add (_shelfHighlightLine);
+			}
+			_shelfHighlightLine.Visibility = Visibility.Visible;
 
-				if (_shelfHighlightLine == null) {
-					_shelfHighlightLine = new Line ();
-					grid2.Children.Add (_shelfHighlightLine);
-				}
-				_shelfHighlightLine.Visibility = Visibility.Visible;
+			if (_shelfPolygon.Points == null || _shelfPolygon.Points.Count != 4) {
+				_shelfPolygon.Points = new PointCollection {
+					new System.Windows.Point (0, 0),
+					new System.Windows.Point (0, 0),
+					new System.Windows.Point (0, 0),
+					new System.Windows.Point (0, 0)
+				};
+			}
 
-				if (_shelfPolygon.Points == null || _shelfPolygon.Points.Count != 4) {
-					_shelfPolygon.Points = new PointCollection {
-						new System.Windows.Point (0, 0),
-						new System.Windows.Point (0, 0),
-						new System.Windows.Point (0, 0),
-						new System.Windows.Point (0, 0)
-					};
-				}
+			if (settings.Position == "Bottom") {
+				_shelfPolygon.Points [0] = new System.Windows.Point (skew, 0);
+				_shelfPolygon.Points [1] = new System.Windows.Point (w - skew, 0);
+				_shelfPolygon.Points [2] = new System.Windows.Point (w, h);
+				_shelfPolygon.Points [3] = new System.Windows.Point (0, h);
 
-				if (settings.Position == "Bottom") {
-					_shelfPolygon.Points [0] = new System.Windows.Point (skew, 0);
-					_shelfPolygon.Points [1] = new System.Windows.Point (w - skew, 0);
-					_shelfPolygon.Points [2] = new System.Windows.Point (w, h);
-					_shelfPolygon.Points [3] = new System.Windows.Point (0, h);
+				if (_shelfHighlightLine.X1 != skew) _shelfHighlightLine.X1 = skew;
+				if (_shelfHighlightLine.Y1 != 0.0) _shelfHighlightLine.Y1 = 0.0;
+				if (_shelfHighlightLine.X2 != w - skew) _shelfHighlightLine.X2 = w - skew;
+				if (_shelfHighlightLine.Y2 != 0.0) _shelfHighlightLine.Y2 = 0.0;
+			} else if (settings.Position == "Top") {
+				_shelfPolygon.Points [0] = new System.Windows.Point (0, 0);
+				_shelfPolygon.Points [1] = new System.Windows.Point (w, 0);
+				_shelfPolygon.Points [2] = new System.Windows.Point (w - skew, h);
+				_shelfPolygon.Points [3] = new System.Windows.Point (skew, h);
 
-					if (_shelfHighlightLine.X1 != skew) _shelfHighlightLine.X1 = skew;
-					if (_shelfHighlightLine.Y1 != 0.0) _shelfHighlightLine.Y1 = 0.0;
-					if (_shelfHighlightLine.X2 != w - skew) _shelfHighlightLine.X2 = w - skew;
-					if (_shelfHighlightLine.Y2 != 0.0) _shelfHighlightLine.Y2 = 0.0;
-				} else {
-					_shelfPolygon.Points [0] = new System.Windows.Point (0, 0);
-					_shelfPolygon.Points [1] = new System.Windows.Point (w, 0);
-					_shelfPolygon.Points [2] = new System.Windows.Point (w - skew, h);
-					_shelfPolygon.Points [3] = new System.Windows.Point (skew, h);
+				if (_shelfHighlightLine.X1 != skew) _shelfHighlightLine.X1 = skew;
+				if (_shelfHighlightLine.Y1 != h) _shelfHighlightLine.Y1 = h;
+				if (_shelfHighlightLine.X2 != w - skew) _shelfHighlightLine.X2 = w - skew;
+				if (_shelfHighlightLine.Y2 != h) _shelfHighlightLine.Y2 = h;
+			} else if (settings.Position == "Left") {
+				_shelfPolygon.Points [0] = new System.Windows.Point (0, 0);
+				_shelfPolygon.Points [1] = new System.Windows.Point (w, skew);
+				_shelfPolygon.Points [2] = new System.Windows.Point (w, h - skew);
+				_shelfPolygon.Points [3] = new System.Windows.Point (0, h);
 
-					if (_shelfHighlightLine.X1 != skew) _shelfHighlightLine.X1 = skew;
-					if (_shelfHighlightLine.Y1 != h) _shelfHighlightLine.Y1 = h;
-					if (_shelfHighlightLine.X2 != w - skew) _shelfHighlightLine.X2 = w - skew;
-					if (_shelfHighlightLine.Y2 != h) _shelfHighlightLine.Y2 = h;
-				}
+				if (_shelfHighlightLine.X1 != w) _shelfHighlightLine.X1 = w;
+				if (_shelfHighlightLine.Y1 != skew) _shelfHighlightLine.Y1 = skew;
+				if (_shelfHighlightLine.X2 != w) _shelfHighlightLine.X2 = w;
+				if (_shelfHighlightLine.Y2 != h - skew) _shelfHighlightLine.Y2 = h - skew;
+			} else { // "Right"
+				_shelfPolygon.Points [0] = new System.Windows.Point (0, skew);
+				_shelfPolygon.Points [1] = new System.Windows.Point (w, 0);
+				_shelfPolygon.Points [2] = new System.Windows.Point (w, h);
+				_shelfPolygon.Points [3] = new System.Windows.Point (0, h - skew);
 
-				System.Windows.Media.Brush targetFill = null;
-				if (dockBorder.Background is LinearGradientBrush lgb) {
-					targetFill = lgb;
-				} else if (dockBorder.Background != System.Windows.Media.Brushes.Transparent) {
-					targetFill = dockBorder.Background;
-				}
+				if (_shelfHighlightLine.X1 != 0.0) _shelfHighlightLine.X1 = 0.0;
+				if (_shelfHighlightLine.Y1 != skew) _shelfHighlightLine.Y1 = skew;
+				if (_shelfHighlightLine.X2 != 0.0) _shelfHighlightLine.X2 = 0.0;
+				if (_shelfHighlightLine.Y2 != h - skew) _shelfHighlightLine.Y2 = h - skew;
+			}
 
-				if (targetFill != null && _shelfPolygon.Fill != targetFill) {
-					_shelfPolygon.Fill = targetFill;
-				}
+			System.Windows.Media.Brush targetFill = null;
+			if (dockBorder.Background is LinearGradientBrush lgb) {
+				targetFill = lgb;
+			} else if (dockBorder.Background != System.Windows.Media.Brushes.Transparent) {
+				targetFill = dockBorder.Background;
+			}
 
-				if (_shelfHighlightLine.Stroke != _cachedHighlightBrush) {
-					_shelfHighlightLine.Stroke = _cachedHighlightBrush;
-				}
-				if (_shelfHighlightLine.StrokeThickness != 1.2) {
-					_shelfHighlightLine.StrokeThickness = 1.2;
-				}
+			if (targetFill != null && _shelfPolygon.Fill != targetFill) {
+				_shelfPolygon.Fill = targetFill;
+			}
 
-				if (dockBorder.Background != System.Windows.Media.Brushes.Transparent) {
-					dockBorder.Background = System.Windows.Media.Brushes.Transparent;
-				}
-				if (dockBorder.BorderBrush != System.Windows.Media.Brushes.Transparent) {
-					dockBorder.BorderBrush = System.Windows.Media.Brushes.Transparent;
-				}
-				if (dockBorder.BorderThickness.Left != 0) {
-					dockBorder.BorderThickness = new Thickness (0);
-				}
-				if (dockBorder.Effect != null) {
-					dockBorder.Effect = null;
-				}
+			if (_shelfHighlightLine.Stroke != _cachedHighlightBrush) {
+				_shelfHighlightLine.Stroke = _cachedHighlightBrush;
+			}
+			if (_shelfHighlightLine.StrokeThickness != 1.2) {
+				_shelfHighlightLine.StrokeThickness = 1.2;
+			}
 
-				if (_shelfPolygon.Effect != null) {
-					_shelfPolygon.Effect = null;
-				}
-			} else {
-				if (_shelfPolygon != null) _shelfPolygon.Visibility = Visibility.Collapsed;
-				if (_shelfHighlightLine != null) _shelfHighlightLine.Visibility = Visibility.Collapsed;
+			if (dockBorder.Background != System.Windows.Media.Brushes.Transparent) {
+				dockBorder.Background = System.Windows.Media.Brushes.Transparent;
+			}
+			if (dockBorder.BorderBrush != System.Windows.Media.Brushes.Transparent) {
+				dockBorder.BorderBrush = System.Windows.Media.Brushes.Transparent;
+			}
+			if (dockBorder.BorderThickness.Left != 0) {
+				dockBorder.BorderThickness = new Thickness (0);
+			}
+			if (dockBorder.Effect != null) {
+				dockBorder.Effect = null;
+			}
+
+			if (_shelfPolygon.Effect != null) {
+				_shelfPolygon.Effect = null;
 			}
 		}
 
