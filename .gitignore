@@ -147,22 +147,12 @@ replace.ps1
 fix_mojibake.ps1
 
 # =============================================
-# Image assets not part of the project
+# Temporary / Test files
 # =============================================
 F1 Dashboard.png
-f1_logo.png
-f1_logo_black.png
-f1_logo_cropped.png
-f1_logo_white.png
 dolby_logo.png
-recycle_bin.png
 test_flag.png
 screenshot.png
-weather_cloudy.png
-weather_rain.png
-weather_sunny.png
-weather_thunderstorm.png
-spotify_logo.png
 
 # =============================================
 # Artifact / Planning files (not for repo)
