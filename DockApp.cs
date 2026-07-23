@@ -36546,11 +36546,11 @@ namespace MacStyleDock
 
 			Border cardBorder = new Border {
 				CornerRadius = new CornerRadius (12.0),
-				Padding = new Thickness (16.0, 16.0, 16.0, 16.0),
-				Margin = new Thickness (0, 4, 0, 4),
-				Background = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 255, 255, 255)),
-				BorderBrush = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (25, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 0, 0, 0)),
-				BorderThickness = new Thickness (1.0),
+				Padding = new Thickness (12.0, 10.0, 12.0, 12.0),
+				Margin = new Thickness (0, 2, 0, 2),
+				Background = System.Windows.Media.Brushes.Transparent,
+				BorderBrush = System.Windows.Media.Brushes.Transparent,
+				BorderThickness = new Thickness (0),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch
 			};
 
@@ -36560,37 +36560,67 @@ namespace MacStyleDock
 			};
 			cardBorder.Child = cardStack;
 
+			string onlineUrl = null;
+			string driverLower = driverName.ToLower ();
+			if (driverLower.Contains ("hamilton")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LEWHAM01_Lewis_Hamilton/lewham01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("verstappen")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/M/MAXVER01_Max_Verstappen/maxver01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("leclerc")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/C/CHALEC01_Charles_Leclerc/chalec01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("norris")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LANNOR01_Lando_Norris/lannor01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("piastri")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/O/OSCPIA01_Oscar_Piastri/oscpia01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("sainz")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/C/CARSAI01_Carlos_Sainz/carsai01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("russell")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/G/GEORUS01_George_Russell/georus01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("alonso")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/F/FERALO01_Fernando_Alonso/feralo01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("gasly")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/P/PIEGAS01_Pierre_Gasly/piegas01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("ocon")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/E/ESTOCO01_Esteban_Ocon/estoco01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("tsunoda")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/Y/YUKTSU01_Yuki_Tsunoda/yuktsu01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("albon")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/A/ALEALB01_Alexander_Albon/alealb01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("stroll")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LANSTR01_Lance_Stroll/lanstr01.png.transform/2proc/image.png";
+			else if (driverLower.Contains ("hulkenberg")) onlineUrl = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/N/NICHUL01_Nico_Hulkenberg/nichul01.png.transform/2proc/image.png";
+
 			string headshotPath = F1OverlayWindow.ResolveAssetPath ("Headshots", driverName + ".png");
 			if (!File.Exists (headshotPath)) {
 				headshotPath = F1OverlayWindow.ResolveAssetPath ("Drivers", driverName + ".png");
 			}
 
 			Border headshotFrame = new Border {
-				Height = 145.0,
-				Width = 145.0,
-				CornerRadius = new CornerRadius (10.0),
+				Height = 160.0,
+				Width = 160.0,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 2, 0, 12),
-				ClipToBounds = true
+				Margin = new Thickness (0, 2, 0, 10)
 			};
 
-			if (File.Exists (headshotPath)) {
+			System.Windows.Media.ImageSource driverImgSource = null;
+			if (onlineUrl != null) {
 				try {
-					BitmapImage img = new BitmapImage ();
-					img.BeginInit ();
-					img.UriSource = new Uri (headshotPath, UriKind.Absolute);
-					img.CacheOption = BitmapCacheOption.OnLoad;
-					img.EndInit ();
-
-					System.Windows.Controls.Image headshotImg = new System.Windows.Controls.Image {
-						Source = img,
-						Height = 145.0,
-						Width = 145.0,
-						Stretch = System.Windows.Media.Stretch.UniformToFill
-					};
-					RenderOptions.SetBitmapScalingMode (headshotImg, BitmapScalingMode.HighQuality);
-					headshotFrame.Child = headshotImg;
+					BitmapImage onlineBmp = new BitmapImage ();
+					onlineBmp.BeginInit ();
+					onlineBmp.UriSource = new Uri (onlineUrl, UriKind.Absolute);
+					onlineBmp.CacheOption = BitmapCacheOption.OnLoad;
+					onlineBmp.EndInit ();
+					driverImgSource = onlineBmp;
 				} catch {}
+			}
+
+			if (driverImgSource == null && File.Exists (headshotPath)) {
+				try {
+					BitmapImage localBmp = new BitmapImage ();
+					localBmp.BeginInit ();
+					localBmp.UriSource = new Uri (headshotPath, UriKind.Absolute);
+					localBmp.CacheOption = BitmapCacheOption.OnLoad;
+					localBmp.EndInit ();
+					driverImgSource = localBmp;
+				} catch {}
+			}
+
+			if (driverImgSource != null) {
+				System.Windows.Controls.Image headshotImg = new System.Windows.Controls.Image {
+					Source = driverImgSource,
+					Height = 160.0,
+					Width = 160.0,
+					Stretch = System.Windows.Media.Stretch.Uniform
+				};
+				RenderOptions.SetBitmapScalingMode (headshotImg, BitmapScalingMode.HighQuality);
+				headshotFrame.Child = headshotImg;
 			} else {
 				headshotFrame.Child = new TextBlock {
 					Text = "🏎️",
