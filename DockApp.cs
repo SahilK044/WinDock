@@ -1460,6 +1460,8 @@ namespace MacStyleDock
 
 		private DispatcherTimer autoHideTimer;
 
+		private DispatcherTimer _edgeHoverTimer;
+
 
 
 		private bool isDockHidden;
@@ -3989,17 +3991,19 @@ namespace MacStyleDock
 
 			hotzone.MouseEnter += delegate {
 
-				if (isDockHidden && settings.AutoHide && GetCursorPos (out var lpPoint)) {
+				if (isDockHidden && settings.AutoHide) {
 
-					System.Windows.Point p = PointFromScreen (new System.Windows.Point (lpPoint.X, lpPoint.Y));
+					_edgeHoverTimer?.Stop ();
 
-					if (IsMouseAlignedWithDock (p)) {
-
-						ShowDock ();
-
-					}
+					_edgeHoverTimer?.Start ();
 
 				}
+
+			};
+
+			hotzone.MouseLeave += delegate {
+
+				_edgeHoverTimer?.Stop ();
 
 			};
 
@@ -8539,283 +8543,184 @@ namespace MacStyleDock
 
 
 		private void SetupAutoHide ()
-
 		{
+			_edgeHoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (180) };
+			_edgeHoverTimer.Tick += delegate {
+				_edgeHoverTimer.Stop ();
+				if (isDockHidden && settings.AutoHide) {
+					ShowDock ();
+				}
+			};
 
 			autoHideTimer = new DispatcherTimer ();
-
 			autoHideTimer.Interval = TimeSpan.FromSeconds (settings.AutoHideDelay);
-
 			autoHideTimer.Tick += delegate {
-
 				autoHideTimer.Stop ();
-
 				if (settings.AutoHide && !isDockHidden) {
-
 					if (!IsMousePhysicallyOverDock ()) {
-
 						HideDock ();
-
 					} else {
-
 						autoHideTimer.Start ();
-
 					}
-
 				}
-
 			};
 
 			dockBorder.MouseEnter += delegate {
-
+				_edgeHoverTimer.Stop ();
 				autoHideTimer.Stop ();
-
 				if (isDockHidden && settings.AutoHide) {
-
 					ShowDock ();
-
 				}
-
 				AnimateDockShadow (hover: true);
-
 			};
 
 			dockBorder.MouseLeave += delegate {
-
+				_edgeHoverTimer.Stop ();
 				if (settings.AutoHide) {
-
 					autoHideTimer.Interval = TimeSpan.FromSeconds (settings.AutoHideDelay);
-
 					autoHideTimer.Start ();
-
 				}
-
 				AnimateDockShadow (hover: false);
-
 			};
 
 			base.MouseMove += delegate(object s, System.Windows.Input.MouseEventArgs e) {
-
 				if (isDockHidden && settings.AutoHide) {
-
 					System.Windows.Point position = e.GetPosition (this);
-
-					bool flag = false;
-
+					bool isNearEdge = false;
 					if (settings.Position == "Bottom") {
-
-						if (position.Y >= base.Height - 45.0) {
-
-							flag = true;
-
-						}
-
+						if (position.Y >= base.Height - 16.0) isNearEdge = true;
 					} else if (settings.Position == "Top") {
-
-						if (position.Y <= 45.0) {
-
-							flag = true;
-
-						}
-
+						if (position.Y <= 16.0) isNearEdge = true;
 					} else if (settings.Position == "Left") {
+						if (position.X <= 16.0) isNearEdge = true;
+					} else if (settings.Position == "Right" && position.X >= base.Width - 16.0) {
+						isNearEdge = true;
+					}
 
-						if (position.X <= 45.0) {
-
-							flag = true;
-
+					if (isNearEdge && IsMouseAlignedWithDock (position)) {
+						if (!_edgeHoverTimer.IsEnabled) {
+							_edgeHoverTimer.Start ();
 						}
-
-					} else if (settings.Position == "Right" && position.X >= base.Width - 45.0) {
-
-						flag = true;
-
+					} else {
+						_edgeHoverTimer.Stop ();
 					}
-
-					if (flag && IsMouseAlignedWithDock (position)) {
-
-						ShowDock ();
-
-					}
-
 				}
-
 			};
 
 			base.Loaded += delegate {
-
 				ApplyAutoHideState ();
-
 			};
-
 		}
-
-
 
 		private void ApplyAutoHideState ()
-
 		{
-
 			autoHideTimer.Stop ();
+			_edgeHoverTimer?.Stop ();
 
 			if (settings.AutoHide) {
-
 				autoHideTimer.Interval = TimeSpan.FromSeconds (settings.AutoHideDelay);
-
 				if (!IsMousePhysicallyOverDock ()) {
-
-					autoHideTimer.Start ();
-
+					HideDock ();
 				} else {
-
 					ShowDock ();
-
 				}
-
 			} else {
-
 				ShowDock ();
-
 			}
-
 		}
 
-
-
 		private void HideDock ()
-
 		{
-
 			SoundEffects.PlaySwoosh ();
-
 			isDockHidden = true;
+			_edgeHoverTimer?.Stop ();
 
 			if (hotzone != null) {
-
 				try {
-
 					hotzone.Visibility = Visibility.Visible;
-
 				} catch {
-
 				}
-
 			}
 
 			DependencyProperty propToAnimate;
-
 			double hideTargetValue = GetHideTargetValue (out propToAnimate);
 
+			double currentVal = (propToAnimate == TranslateTransform.XProperty) ? dockSlideTransform.X : dockSlideTransform.Y;
+
 			try {
-
 				dockSlideTransform.BeginAnimation (TranslateTransform.XProperty, null);
-
 				dockSlideTransform.BeginAnimation (TranslateTransform.YProperty, null);
-
 			} catch {
-
 			}
 
-			dockSlideTransform.X = 0.0;
+			TimeSpan slideDur = IsAnimationEnabled ? TimeSpan.FromMilliseconds (240.0) : TimeSpan.Zero;
 
-			dockSlideTransform.Y = 0.0;
-
-			DoubleAnimation animation = new DoubleAnimation (hideTargetValue, slideDuration) {
-
-				EasingFunction = new CubicEase {
-
-					EasingMode = EasingMode.EaseInOut
-
+			DoubleAnimation slideAnim = new DoubleAnimation (currentVal, hideTargetValue, slideDur) {
+				EasingFunction = new QuarticEase {
+					EasingMode = EasingMode.EaseIn
 				}
-
 			};
 
-			DoubleAnimation animation2 = new DoubleAnimation (0.0, slideDuration) {
-
+			DoubleAnimation opacityAnim = new DoubleAnimation (dockBorder.Opacity, 0.0, IsAnimationEnabled ? TimeSpan.FromMilliseconds (200.0) : TimeSpan.Zero) {
 				EasingFunction = new CubicEase {
-
-					EasingMode = EasingMode.EaseInOut
-
+					EasingMode = EasingMode.EaseIn
 				}
-
 			};
 
-			dockSlideTransform.BeginAnimation (propToAnimate, animation);
-
-			dockBorder.BeginAnimation (UIElement.OpacityProperty, animation2);
-
+			dockSlideTransform.BeginAnimation (propToAnimate, slideAnim);
+			dockBorder.BeginAnimation (UIElement.OpacityProperty, opacityAnim);
 		}
 
-
-
 		private void ShowDock ()
-
 		{
-
 			SoundEffects.PlaySwoosh ();
-
 			isDockHidden = false;
+			_edgeHoverTimer?.Stop ();
 
 			if (hotzone != null) {
-
 				try {
-
 					hotzone.Visibility = Visibility.Collapsed;
-
 				} catch {
-
 				}
-
 			}
 
 			DependencyProperty dp = TranslateTransform.YProperty;
-
 			if (settings.Position == "Left" || settings.Position == "Right") {
-
 				dp = TranslateTransform.XProperty;
+			}
 
+			double hideTargetValue = GetHideTargetValue (out dp);
+
+			double currentVal = (dp == TranslateTransform.XProperty) ? dockSlideTransform.X : dockSlideTransform.Y;
+			if (currentVal == 0.0) {
+				currentVal = hideTargetValue;
 			}
 
 			try {
-
 				dockSlideTransform.BeginAnimation (TranslateTransform.XProperty, null);
-
 				dockSlideTransform.BeginAnimation (TranslateTransform.YProperty, null);
-
 			} catch {
-
 			}
 
-			dockSlideTransform.X = 0.0;
+			dockSlideTransform.X = (dp == TranslateTransform.XProperty) ? currentVal : 0.0;
+			dockSlideTransform.Y = (dp == TranslateTransform.YProperty) ? currentVal : 0.0;
 
-			dockSlideTransform.Y = 0.0;
+			TimeSpan slideDur = IsAnimationEnabled ? TimeSpan.FromMilliseconds (240.0) : TimeSpan.Zero;
 
-			DoubleAnimation animation = ((!IsAnimationEnabled) ? new DoubleAnimation (0.0, TimeSpan.Zero) : new DoubleAnimation (0.0, showSlideDuration) {
-
-				EasingFunction = new BackEase {
-
-					EasingMode = EasingMode.EaseOut,
-
-					Amplitude = 0.3
-
-				}
-
-			});
-
-			DoubleAnimation animation2 = new DoubleAnimation (1.0, IsAnimationEnabled ? fadeDuration : TimeSpan.Zero) {
-
-				EasingFunction = new CubicEase {
-
+			DoubleAnimation slideAnim = new DoubleAnimation (currentVal, 0.0, slideDur) {
+				EasingFunction = new QuarticEase {
 					EasingMode = EasingMode.EaseOut
-
 				}
-
 			};
 
-			dockSlideTransform.BeginAnimation (dp, animation);
+			DoubleAnimation opacityAnim = new DoubleAnimation (dockBorder.Opacity, 1.0, IsAnimationEnabled ? TimeSpan.FromMilliseconds (180.0) : TimeSpan.Zero) {
+				EasingFunction = new CubicEase {
+					EasingMode = EasingMode.EaseOut
+				}
+			};
 
-			dockBorder.BeginAnimation (UIElement.OpacityProperty, animation2);
-
+			dockSlideTransform.BeginAnimation (dp, slideAnim);
+			dockBorder.BeginAnimation (UIElement.OpacityProperty, opacityAnim);
 		}
 
 		private double GetStableCrossCenter ()
