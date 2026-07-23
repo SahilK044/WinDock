@@ -12314,21 +12314,9 @@ namespace MacStyleDock
 									res.Control.TargetHwnd = res.Hwnd;
 
 									if (res.IsActive) {
-
 										res.Control.StartBreathingDot ();
-
 									} else {
-
 										res.Control.StopBreathingDot ();
-
-										if (res.Control.IndicatorDot.Opacity != 0.0) {
-
-											DoubleAnimation animation = new DoubleAnimation (0.0, IsAnimationEnabled ? fadeDuration : TimeSpan.FromMilliseconds (0.0));
-
-											res.Control.IndicatorDot.BeginAnimation (UIElement.OpacityProperty, animation);
-
-										}
-
 									}
 
 									if (res.Control.isLaunching && (res.IsActive || (DateTime.Now - res.Control.launchTime).TotalSeconds > 8.0)) {
@@ -15580,94 +15568,48 @@ namespace MacStyleDock
 
 
 
-		public void StartBreathingDot ()
+		private bool _isBreathingDotRunning = false;
 
+		public void StartBreathingDot ()
 		{
+			if (_isBreathingDotRunning) return;
+			_isBreathingDotRunning = true;
 
 			try {
-
 				if (System.Windows.Application.Current.MainWindow is DockWindow dockWindow && dockWindow.settings.EnableIconEffects) {
-
 					if (_breathingAnim == null) {
-
-						_breathingAnim = new DoubleAnimation (0.4, 1.0, new Duration (TimeSpan.FromSeconds (1.8))) {
-
+						_breathingAnim = new DoubleAnimation (0.45, 1.0, new Duration (TimeSpan.FromSeconds (2.2))) {
 							AutoReverse = true,
-
 							RepeatBehavior = RepeatBehavior.Forever,
-
 							EasingFunction = new SineEase {
-
 								EasingMode = EasingMode.EaseInOut
-
 							}
-
 						};
-
 					}
-
 					IndicatorDot.BeginAnimation (UIElement.OpacityProperty, _breathingAnim);
-
-					ScaleTransform scaleTransform = new ScaleTransform (1.0, 1.0);
-
-					IndicatorDot.RenderTransformOrigin = new System.Windows.Point (0.5, 0.5);
-
-					IndicatorDot.RenderTransform = scaleTransform;
-
-					DoubleAnimation animation = new DoubleAnimation (1.0, 1.35, new Duration (TimeSpan.FromSeconds (1.8))) {
-
-						AutoReverse = true,
-
-						RepeatBehavior = RepeatBehavior.Forever,
-
-						EasingFunction = new SineEase {
-
-							EasingMode = EasingMode.EaseInOut
-
-						}
-
-					};
-
-					scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, animation);
-
-					scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, animation);
-
 				} else {
-
 					IndicatorDot.BeginAnimation (UIElement.OpacityProperty, null);
-
 					IndicatorDot.Opacity = 1.0;
-
 				}
-
 			} catch {
-
 			}
-
 		}
 
-
-
 		public void StopBreathingDot ()
-
 		{
+			if (!_isBreathingDotRunning && IndicatorDot.Opacity == 1.0) return;
+			_isBreathingDotRunning = false;
 
 			try {
-
 				IndicatorDot.BeginAnimation (UIElement.OpacityProperty, null);
-
-				if (IndicatorDot.RenderTransform != null && IndicatorDot.RenderTransform is ScaleTransform scaleTransform) {
-
+				if (IndicatorDot.RenderTransform is ScaleTransform scaleTransform) {
 					scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, null);
-
 					scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, null);
-
+					IndicatorDot.RenderTransform = null;
 				}
-
+				IndicatorDot.Opacity = 1.0;
 			} catch {
-
 			}
-
 		}
 
 
