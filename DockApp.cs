@@ -9279,38 +9279,7 @@ namespace MacStyleDock
 				if (child is DockItemControl dockItemControl) {
 					double num5 = isHorizontal ? Math.Abs (mousePosInWindow.X - unmagCenters[i]) : Math.Abs (mousePosInWindow.Y - unmagCenters[i]);
 
-					try {
-						if (IsAnimationEnabled && dockItemControl.IndicatorDot != null && dockItemControl.IndicatorDot.Opacity > 0.05) {
-							float sharedAudioPeak = SharedAudioPeak;
-							if (sharedAudioPeak > 0.02f) {
-								double a = wavePhase * 1.4 + (double)num3 * 0.8;
-								double num10 = (double)sharedAudioPeak * (0.7 + 0.3 * Math.Sin (a));
-								double num11 = 4.5 + num10 * 5.5;
-								double width2 = dockItemControl.IndicatorDot.Width;
-								double nextWidth = width2 + (num11 - width2) * 0.25;
-								if (Math.Abs (width2 - nextWidth) > 0.01) {
-									dockItemControl.IndicatorDot.Width = nextWidth;
-									dockItemControl.IndicatorDot.Height = nextWidth;
-								}
-								if (dockItemControl.IndicatorDot.Effect is DropShadowEffect dropShadowEffect) {
-									double nextOpacity = Math.Min (1.0, 0.8 + num10 * 0.8);
-									if (dropShadowEffect.Opacity != nextOpacity) {
-										dropShadowEffect.Opacity = nextOpacity;
-									}
-								}
-							} else {
-								double width2 = dockItemControl.IndicatorDot.Width;
-								if (Math.Abs (width2 - 4.5) > 0.01) {
-									double newWidth = width2 + (4.5 - width2) * 0.2;
-									dockItemControl.IndicatorDot.Width = newWidth;
-									dockItemControl.IndicatorDot.Height = newWidth;
-								} else if (width2 != 4.5) {
-									dockItemControl.IndicatorDot.Width = 4.5;
-									dockItemControl.IndicatorDot.Height = 4.5;
-								}
-							}
-						}
-					} catch {}
+
 
 					double num12 = 0.0;
 					try {
