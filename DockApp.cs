@@ -36757,12 +36757,72 @@ namespace MacStyleDock
 			return "";
 		}
 
+		private void FetchOnlineImageForWebCard (string query, System.Windows.Controls.Image imageControl, Border imageContainer)
+		{
+			if (string.IsNullOrEmpty (query) || imageControl == null || imageContainer == null) return;
+			System.Threading.ThreadPool.QueueUserWorkItem (delegate {
+				try {
+					string cleanQuery = query.Replace ("Search for", "").Replace ("Google", "").Replace ("Search", "").Trim ();
+					if (cleanQuery.Length == 0) return;
+
+					string apiUrl = "https://en.wikipedia.org/api/rest_v1/page/summary/" + Uri.EscapeDataString (cleanQuery);
+					using (System.Net.WebClient client = new System.Net.WebClient ()) {
+						client.Headers.Add ("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+						string json = client.DownloadString (apiUrl);
+						if (!string.IsNullOrEmpty (json) && json.Contains ("\"source\":\"")) {
+							int idx = json.IndexOf ("\"source\":\"");
+							if (idx > 0) {
+								int start = idx + "\"source\":\"".Length;
+								int end = json.IndexOf ("\"", start);
+								if (end > start) {
+									string imgUrl = json.Substring (start, end - start).Replace ("\\/", "/");
+									if (!string.IsNullOrEmpty (imgUrl) && (imgUrl.EndsWith (".jpg") || imgUrl.EndsWith (".png") || imgUrl.EndsWith (".jpeg") || imgUrl.Contains ("upload.wikimedia.org"))) {
+										Dispatcher.Invoke (() => {
+											try {
+												BitmapImage bmp = new BitmapImage ();
+												bmp.BeginInit ();
+												bmp.UriSource = new Uri (imgUrl, UriKind.Absolute);
+												bmp.CacheOption = BitmapCacheOption.OnLoad;
+												bmp.EndInit ();
+
+												imageControl.Source = bmp;
+												imageContainer.Visibility = Visibility.Visible;
+											} catch {}
+										});
+									}
+								}
+							}
+						}
+					}
+				} catch {}
+			});
+		}
+
 		private void RenderWebCard (SearchResultItem item, System.Windows.Media.Brush textBrush, System.Windows.Media.Brush subTextBrush)
 		{
 			if (previewPanel == null) return;
 			previewPanel.Children.Clear ();
 
-			Border badgeBorder = new Border {
+			Border imageContainer = new Border {
+				Height = 170.0,
+				Width = 180.0,
+				CornerRadius = new CornerRadius (12.0),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				Margin = new Thickness (0, 10, 0, 12),
+				ClipToBounds = true,
+				Visibility = Visibility.Collapsed
+			};
+
+			System.Windows.Controls.Image webImage = new System.Windows.Controls.Image {
+				Height = 170.0,
+				Width = 180.0,
+				Stretch = System.Windows.Media.Stretch.UniformToFill
+			};
+			RenderOptions.SetBitmapScalingMode (webImage, BitmapScalingMode.HighQuality);
+			imageContainer.Child = webImage;
+			previewPanel.Children.Add (imageContainer);
+
+			Border defaultBadge = new Border {
 				Width = 64.0,
 				Height = 64.0,
 				CornerRadius = new CornerRadius (32.0),
@@ -36771,7 +36831,7 @@ namespace MacStyleDock
 				Margin = new Thickness (0, 15, 0, 12)
 			};
 
-			badgeBorder.Child = new TextBlock {
+			defaultBadge.Child = new TextBlock {
 				Text = "\uE12A",
 				FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
 				FontSize = 30.0,
@@ -36779,7 +36839,9 @@ namespace MacStyleDock
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 				VerticalAlignment = VerticalAlignment.Center
 			};
-			previewPanel.Children.Add (badgeBorder);
+
+			string searchQuery = item.Name != null ? item.Name : "";
+			FetchOnlineImageForWebCard (searchQuery, webImage, imageContainer);
 
 			TextBlock titleBlock = new TextBlock {
 				Text = item.Name,
@@ -36802,14 +36864,14 @@ namespace MacStyleDock
 				FontWeight = FontWeights.SemiBold,
 				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Text, Segoe UI, sans-serif"),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				Margin = new Thickness (0, 0, 0, 20)
+				Margin = new Thickness (0, 0, 0, 16)
 			};
 			previewPanel.Children.Add (subBlock);
 
 			Border btn = new Border {
-				Width = 160.0,
-				Height = 32.0,
-				CornerRadius = new CornerRadius (6.0),
+				Width = 170.0,
+				Height = 34.0,
+				CornerRadius = new CornerRadius (8.0),
 				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 120, 255)),
 				Cursor = System.Windows.Input.Cursors.Hand,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
@@ -36862,21 +36924,39 @@ namespace MacStyleDock
 			string matchedTeam = null;
 			string matchedTeamLogo = null;
 
-			if (targetSearch.Contains ("verstappen") || targetSearch.Contains ("max")) { matchedDriver = "Max Verstappen"; matchedTeam = "Red Bull Racing"; matchedTeamLogo = "Redbull F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("hamilton") || targetSearch.Contains ("lewis")) { matchedDriver = "Lewis Hamilton"; matchedTeam = "Scuderia Ferrari"; matchedTeamLogo = "Ferrari F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("leclerc") || targetSearch.Contains ("charles")) { matchedDriver = "Charles Leclerc"; matchedTeam = "Scuderia Ferrari"; matchedTeamLogo = "Ferrari F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("norris") || targetSearch.Contains ("lando")) { matchedDriver = "Lando Norris"; matchedTeam = "McLaren F1 Team"; matchedTeamLogo = "McLaren F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("sainz") || targetSearch.Contains ("carlos")) { matchedDriver = "Carlos Sainz"; matchedTeam = "Williams Racing"; matchedTeamLogo = "Williams F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("piastri") || targetSearch.Contains ("oscar")) { matchedDriver = "Oscar Piastri"; matchedTeam = "McLaren F1 Team"; matchedTeamLogo = "McLaren F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("russell") || targetSearch.Contains ("george")) { matchedDriver = "George Russell"; matchedTeam = "Mercedes-AMG PETRONAS"; matchedTeamLogo = "Mercedes AMG Petronas F1 Team logo.png"; }
-			else if (targetSearch.Contains ("antonelli") || targetSearch.Contains ("kimi")) { matchedDriver = "Kimi Antonelli"; matchedTeam = "Mercedes-AMG PETRONAS"; matchedTeamLogo = "Mercedes AMG Petronas F1 Team logo.png"; }
-			else if (targetSearch.Contains ("alonso") || targetSearch.Contains ("fernando")) { matchedDriver = "Fernando Alonso"; matchedTeam = "Aston Martin Aramco"; matchedTeamLogo = "Aston Martin F1 Team logo-Photoroom.png"; }
-			else if (targetSearch.Contains ("albon") || targetSearch.Contains ("alex")) { matchedDriver = "Alexander Albon"; matchedTeam = "Williams Racing"; matchedTeamLogo = "Williams F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("gasly") || targetSearch.Contains ("pierre")) { matchedDriver = "Pierre Gasly"; matchedTeam = "Alpine F1 Team"; matchedTeamLogo = "Alpine F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("ocon") || targetSearch.Contains ("esteban")) { matchedDriver = "Esteban Ocon"; matchedTeam = "Haas F1 Team"; matchedTeamLogo = "TGR Haas F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("tsunoda") || targetSearch.Contains ("yuki")) { matchedDriver = "Yuki Tsunoda"; matchedTeam = "Visa Cash App RB"; matchedTeamLogo = "Visa RB F1 Team Logo.png"; }
-			else if (targetSearch.Contains ("stroll") || targetSearch.Contains ("lance")) { matchedDriver = "Lance Stroll"; matchedTeam = "Aston Martin Aramco"; matchedTeamLogo = "Aston Martin F1 Team logo-Photoroom.png"; }
-			else if (targetSearch.Contains ("hulkenberg") || targetSearch.Contains ("nico")) { matchedDriver = "Nico Hulkenberg"; matchedTeam = "Kick Sauber / Audi"; matchedTeamLogo = "Audi F1 Team Logopng.png"; }
+			if (isF1Action || targetSearch.Contains ("f1") || targetSearch.Contains ("formula 1") || targetSearch.Contains ("formula1") || targetSearch.Contains ("grand prix")) {
+				if (targetSearch.Contains ("verstappen")) { matchedDriver = "Max Verstappen"; matchedTeam = "Red Bull Racing"; matchedTeamLogo = "Redbull F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("hamilton")) { matchedDriver = "Lewis Hamilton"; matchedTeam = "Scuderia Ferrari"; matchedTeamLogo = "Ferrari F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("leclerc")) { matchedDriver = "Charles Leclerc"; matchedTeam = "Scuderia Ferrari"; matchedTeamLogo = "Ferrari F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("norris")) { matchedDriver = "Lando Norris"; matchedTeam = "McLaren F1 Team"; matchedTeamLogo = "McLaren F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("sainz")) { matchedDriver = "Carlos Sainz"; matchedTeam = "Williams Racing"; matchedTeamLogo = "Williams F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("piastri")) { matchedDriver = "Oscar Piastri"; matchedTeam = "McLaren F1 Team"; matchedTeamLogo = "McLaren F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("russell")) { matchedDriver = "George Russell"; matchedTeam = "Mercedes-AMG PETRONAS"; matchedTeamLogo = "Mercedes AMG Petronas F1 Team logo.png"; }
+				else if (targetSearch.Contains ("antonelli")) { matchedDriver = "Kimi Antonelli"; matchedTeam = "Mercedes-AMG PETRONAS"; matchedTeamLogo = "Mercedes AMG Petronas F1 Team logo.png"; }
+				else if (targetSearch.Contains ("alonso")) { matchedDriver = "Fernando Alonso"; matchedTeam = "Aston Martin Aramco"; matchedTeamLogo = "Aston Martin F1 Team logo-Photoroom.png"; }
+				else if (targetSearch.Contains ("albon")) { matchedDriver = "Alexander Albon"; matchedTeam = "Williams Racing"; matchedTeamLogo = "Williams F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("gasly")) { matchedDriver = "Pierre Gasly"; matchedTeam = "Alpine F1 Team"; matchedTeamLogo = "Alpine F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("ocon")) { matchedDriver = "Esteban Ocon"; matchedTeam = "Haas F1 Team"; matchedTeamLogo = "TGR Haas F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("tsunoda")) { matchedDriver = "Yuki Tsunoda"; matchedTeam = "Visa Cash App RB"; matchedTeamLogo = "Visa RB F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("stroll")) { matchedDriver = "Lance Stroll"; matchedTeam = "Aston Martin Aramco"; matchedTeamLogo = "Aston Martin F1 Team logo-Photoroom.png"; }
+				else if (targetSearch.Contains ("hulkenberg")) { matchedDriver = "Nico Hulkenberg"; matchedTeam = "Kick Sauber / Audi"; matchedTeamLogo = "Audi F1 Team Logopng.png"; }
+			} else {
+				if (targetSearch.Contains ("verstappen")) { matchedDriver = "Max Verstappen"; matchedTeam = "Red Bull Racing"; matchedTeamLogo = "Redbull F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("hamilton")) { matchedDriver = "Lewis Hamilton"; matchedTeam = "Scuderia Ferrari"; matchedTeamLogo = "Ferrari F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("leclerc")) { matchedDriver = "Charles Leclerc"; matchedTeam = "Scuderia Ferrari"; matchedTeamLogo = "Ferrari F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("norris")) { matchedDriver = "Lando Norris"; matchedTeam = "McLaren F1 Team"; matchedTeamLogo = "McLaren F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("sainz")) { matchedDriver = "Carlos Sainz"; matchedTeam = "Williams Racing"; matchedTeamLogo = "Williams F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("piastri")) { matchedDriver = "Oscar Piastri"; matchedTeam = "McLaren F1 Team"; matchedTeamLogo = "McLaren F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("russell")) { matchedDriver = "George Russell"; matchedTeam = "Mercedes-AMG PETRONAS"; matchedTeamLogo = "Mercedes AMG Petronas F1 Team logo.png"; }
+				else if (targetSearch.Contains ("antonelli")) { matchedDriver = "Kimi Antonelli"; matchedTeam = "Mercedes-AMG PETRONAS"; matchedTeamLogo = "Mercedes AMG Petronas F1 Team logo.png"; }
+				else if (targetSearch.Contains ("alonso")) { matchedDriver = "Fernando Alonso"; matchedTeam = "Aston Martin Aramco"; matchedTeamLogo = "Aston Martin F1 Team logo-Photoroom.png"; }
+				else if (targetSearch.Contains ("albon")) { matchedDriver = "Alexander Albon"; matchedTeam = "Williams Racing"; matchedTeamLogo = "Williams F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("gasly")) { matchedDriver = "Pierre Gasly"; matchedTeam = "Alpine F1 Team"; matchedTeamLogo = "Alpine F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("ocon")) { matchedDriver = "Esteban Ocon"; matchedTeam = "Haas F1 Team"; matchedTeamLogo = "TGR Haas F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("tsunoda")) { matchedDriver = "Yuki Tsunoda"; matchedTeam = "Visa Cash App RB"; matchedTeamLogo = "Visa RB F1 Team Logo.png"; }
+				else if (targetSearch.Contains ("stroll")) { matchedDriver = "Lance Stroll"; matchedTeam = "Aston Martin Aramco"; matchedTeamLogo = "Aston Martin F1 Team logo-Photoroom.png"; }
+				else if (targetSearch.Contains ("hulkenberg")) { matchedDriver = "Nico Hulkenberg"; matchedTeam = "Kick Sauber / Audi"; matchedTeamLogo = "Audi F1 Team Logopng.png"; }
+			}
 
 			if (isF1Action || matchedDriver != null) {
 				RenderF1DriverCard (matchedDriver ?? "Lewis Hamilton", matchedTeam ?? "Scuderia Ferrari", matchedTeamLogo ?? "Ferrari F1 Team Logo.png", textBrush, subTextBrush);
