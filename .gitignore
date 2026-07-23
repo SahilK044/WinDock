@@ -124,17 +124,17 @@ practice.txt
 quali.txt
 
 # =============================================
-# Old/Legacy binaries and resources
+# WinDock build binaries and resources
 # =============================================
-MacDock*.exe
-MacDock*.pdb
-MacDock.ico
-MacDock.exe.config
-macdock.ico
-macdock_logo.png
-MacDock_Release.zip
-MacDock_Source.zip
-MacDock_Installer.exe
+WinDock*.exe
+WinDock*.pdb
+WinDock.ico
+WinDock.exe.config
+windock.ico
+windock_logo.png
+WinDock_Release.zip
+WinDock_Source.zip
+WinDock_Setup.exe
 System.Collections.Immutable.zip
 Decompile.exe
 Decompile7.exe
