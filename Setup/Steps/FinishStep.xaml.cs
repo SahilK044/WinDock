@@ -142,7 +142,32 @@ namespace WinDockSetup.Steps
             MainWindow mainWindow = (MainWindow)Window.GetWindow(this);
             bool isUninstall = mainWindow.IsUninstallMode;
 
-            if (!isUninstall && LaunchCheckBox.IsChecked == true)
+            if (isUninstall)
+            {
+                try
+                {
+                    string installPath = mainWindow.InstallPath;
+                    string currentExe = Process.GetCurrentProcess().MainModule.FileName;
+                    if (!string.IsNullOrEmpty(currentExe) && currentExe.StartsWith(installPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        bool keepConfig = mainWindow.KeepConfig;
+                        string cmdArgs = $"/c timeout /t 2 /nobreak > NUL & del /f /q \"{currentExe}\"";
+                        if (!keepConfig || !File.Exists(Path.Combine(installPath, "config.json")))
+                        {
+                            cmdArgs += $" & rmdir /s /q \"{installPath}\"";
+                        }
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = cmdArgs,
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        });
+                    }
+                }
+                catch { }
+            }
+            else if (LaunchCheckBox.IsChecked == true)
             {
                 try
                 {

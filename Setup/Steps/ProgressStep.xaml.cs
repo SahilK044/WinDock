@@ -86,6 +86,17 @@ namespace WinDockSetup.Steps
             bool createDesktopShortcut = mainWindow.CreateDesktopShortcut;
             bool launchOnStartup = mainWindow.LaunchOnStartup;
 
+            // Kill running processes first
+            try
+            {
+                foreach (var proc in System.Diagnostics.Process.GetProcessesByName("WinDock").Concat(System.Diagnostics.Process.GetProcessesByName("WinDockConsole")))
+                {
+                    try { proc.Kill(); } catch { }
+                }
+                await Task.Delay(400);
+            }
+            catch { }
+
             // Step 1: Preparing directory
             UpdateStatus("Preparing installation directory...", "PREPARING", "0% · Init", 5, mainWindow);
             if (!Directory.Exists(installPath))
@@ -146,11 +157,15 @@ namespace WinDockSetup.Steps
 
             // Step 7: Copying uninstaller
             UpdateStatus("Copying uninstaller...", "UNINSTALLER", "95% · Finalizing", 95, mainWindow);
-            string currentExe = Assembly.GetExecutingAssembly().Location;
+            string currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
             string uninstallExe = Path.Combine(installPath, "Uninstall.exe");
             if (File.Exists(currentExe) && !string.Equals(currentExe, uninstallExe, StringComparison.OrdinalIgnoreCase))
             {
-                File.Copy(currentExe, uninstallExe, true);
+                try
+                {
+                    File.Copy(currentExe, uninstallExe, true);
+                }
+                catch { }
             }
             await Task.Delay(400);
 
@@ -161,12 +176,27 @@ namespace WinDockSetup.Steps
         {
             string installPath = mainWindow.InstallPath;
 
+            // Kill any running WinDock processes first
+            try
+            {
+                foreach (var proc in System.Diagnostics.Process.GetProcessesByName("WinDock").Concat(System.Diagnostics.Process.GetProcessesByName("WinDockConsole")))
+                {
+                    try { proc.Kill(); } catch { }
+                }
+                await Task.Delay(400);
+            }
+            catch { }
+
             UpdateStatus("Removing startup entry...", "STARTUP", "20% · Registry", 20, mainWindow);
             using (RegistryKey key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true))
             {
                 if (key != null && key.GetValue("WinDock") != null)
                 {
-                    key.DeleteValue("WinDock");
+                    try
+                    {
+                        key.DeleteValue("WinDock");
+                    }
+                    catch { }
                 }
             }
             await Task.Delay(400);
@@ -175,7 +205,7 @@ namespace WinDockSetup.Steps
             string startMenuLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDock.lnk");
             if (File.Exists(startMenuLink))
             {
-                File.Delete(startMenuLink);
+                try { File.Delete(startMenuLink); } catch { }
             }
             await Task.Delay(400);
 
@@ -183,7 +213,7 @@ namespace WinDockSetup.Steps
             string desktopLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "WinDock.lnk");
             if (File.Exists(desktopLink))
             {
-                File.Delete(desktopLink);
+                try { File.Delete(desktopLink); } catch { }
             }
             await Task.Delay(400);
 
@@ -191,6 +221,8 @@ namespace WinDockSetup.Steps
             if (Directory.Exists(installPath))
             {
                 bool keepConfig = mainWindow.KeepConfig;
+                string currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+
                 foreach (string file in Directory.GetFiles(installPath))
                 {
                     string name = Path.GetFileName(file);
@@ -198,18 +230,29 @@ namespace WinDockSetup.Steps
                     {
                         continue; // Preserve config.json
                     }
-                    File.Delete(file);
+                    if (!string.IsNullOrEmpty(currentExe) && string.Equals(file, currentExe, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue; // Skip currently running uninstaller binary
+                    }
+                    try { File.Delete(file); } catch { }
                 }
                 
                 foreach (string dir in Directory.GetDirectories(installPath))
                 {
-                    Directory.Delete(dir, true);
+                    try { Directory.Delete(dir, true); } catch { }
                 }
 
-                // Only delete the folder if config.json was deleted (meaning no files left)
+                // Only delete the folder if config.json was deleted and uninstaller is not running inside it
                 if (!keepConfig || !File.Exists(Path.Combine(installPath, "config.json")))
                 {
-                    Directory.Delete(installPath);
+                    try
+                    {
+                        if (string.IsNullOrEmpty(currentExe) || !currentExe.StartsWith(installPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Directory.Delete(installPath, true);
+                        }
+                    }
+                    catch { }
                 }
             }
             await Task.Delay(400);
