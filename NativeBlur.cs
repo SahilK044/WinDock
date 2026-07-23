@@ -30,10 +30,14 @@ namespace WinDock.Shared
         {
             try
             {
-                IntPtr hRgn = CreateRoundRectRgn(left, top, right, bottom, cornerWidth, cornerHeight);
+                IntPtr hRgn = IntPtr.Zero;
+                if (right > left && bottom > top && cornerWidth > 0 && cornerHeight > 0)
+                {
+                    hRgn = CreateRoundRectRgn(left, top, right, bottom, cornerWidth, cornerHeight);
+                }
                 DWM_BLURBEHIND bb = new DWM_BLURBEHIND
                 {
-                    dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION,
+                    dwFlags = DWM_BB_ENABLE | (hRgn != IntPtr.Zero ? DWM_BB_BLURREGION : 0),
                     fEnable = true,
                     hRgnBlur = hRgn
                 };

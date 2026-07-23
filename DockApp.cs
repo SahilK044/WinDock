@@ -35569,37 +35569,7 @@ namespace MacStyleDock
 				IntPtr handle = new WindowInteropHelper (this).Handle;
 				if (handle != IntPtr.Zero) {
 					if (enable) {
-						double dpiX = 1.0;
-						double dpiY = 1.0;
-						var source = PresentationSource.FromVisual (this);
-						if (source != null && source.CompositionTarget != null) {
-							dpiX = source.CompositionTarget.TransformToDevice.M11;
-							dpiY = source.CompositionTarget.TransformToDevice.M22;
-						}
-
-						int left = (int)(40 * dpiX);
-						int top = (int)(28 * dpiY);
-						
-						double pillWidth = searchPill.ActualWidth;
-						double pillHeight = searchPill.ActualHeight;
-						
-						if (pillWidth <= 0 || pillHeight <= 0) {
-							pillWidth = SpotlightPanelWidth;
-							pillHeight = SpotlightSearchHeight;
-						}
-						
-						int right = (int)((40 + pillWidth) * dpiX);
-						int bottom = (int)((28 + pillHeight) * dpiY);
-						
-						left = (int)(40 * dpiX) - (int)Math.Ceiling (2.0 * dpiX);
-						top = (int)(28 * dpiY) - (int)Math.Ceiling (2.0 * dpiY);
-						right = (int)((40 + pillWidth) * dpiX) + (int)Math.Ceiling (2.0 * dpiX);
-						bottom = (int)((28 + pillHeight) * dpiY) + (int)Math.Ceiling (2.0 * dpiY);
-						
-						int cornerWidth = (int)(48 * dpiX);
-						int cornerHeight = (int)(48 * dpiY);
-
-						WinDock.Shared.NativeBlur.ApplyBlur(handle, left, top, right, bottom, cornerWidth, cornerHeight);
+						WinDock.Shared.NativeBlur.ApplyBlur(handle, 0, 0, 0, 0, 0, 0);
 					} else {
 						WinDock.Shared.NativeBlur.DisableBlur(handle);
 					}
@@ -36582,6 +36552,239 @@ namespace MacStyleDock
 			UpdatePreviewPane ();
 		}
 
+		private void RenderF1DriverCard (string driverName, string teamName, string teamLogoFile, System.Windows.Media.Brush textBrush, System.Windows.Media.Brush subTextBrush)
+		{
+			if (previewPanel == null) return;
+			previewPanel.Children.Clear ();
+
+			string headshotPath = F1OverlayWindow.ResolveAssetPath ("Headshots", driverName + ".png");
+			if (!File.Exists (headshotPath)) {
+				headshotPath = F1OverlayWindow.ResolveAssetPath ("Drivers", driverName + ".png");
+			}
+
+			Border avatarBorder = new Border {
+				Width = 120.0,
+				Height = 120.0,
+				CornerRadius = new CornerRadius (60.0),
+				BorderThickness = new Thickness (2.0),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (80, 255, 255, 255)),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				Margin = new Thickness (0, 10, 0, 12),
+				ClipToBounds = true
+			};
+
+			if (File.Exists (headshotPath)) {
+				try {
+					BitmapImage img = new BitmapImage ();
+					img.BeginInit ();
+					img.UriSource = new Uri (headshotPath, UriKind.Absolute);
+					img.CacheOption = BitmapCacheOption.OnLoad;
+					img.EndInit ();
+
+					System.Windows.Controls.Image headshotImg = new System.Windows.Controls.Image {
+						Source = img,
+						Width = 120.0,
+						Height = 120.0,
+						Stretch = System.Windows.Media.Stretch.UniformToFill
+					};
+					RenderOptions.SetBitmapScalingMode (headshotImg, BitmapScalingMode.HighQuality);
+					avatarBorder.Child = headshotImg;
+				} catch {}
+			} else {
+				avatarBorder.Child = new TextBlock {
+					Text = "🏎️",
+					FontSize = 48.0,
+					HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+					VerticalAlignment = VerticalAlignment.Center
+				};
+			}
+
+			previewPanel.Children.Add (avatarBorder);
+
+			TextBlock nameBlock = new TextBlock {
+				Text = driverName,
+				Foreground = textBrush,
+				FontSize = 22.0,
+				FontWeight = FontWeights.Bold,
+				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				TextAlignment = TextAlignment.Center,
+				Margin = new Thickness (0, 0, 0, 4)
+			};
+			previewPanel.Children.Add (nameBlock);
+
+			StackPanel teamPanel = new StackPanel {
+				Orientation = System.Windows.Controls.Orientation.Horizontal,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				Margin = new Thickness (0, 0, 0, 14)
+			};
+
+			string logoPath = F1OverlayWindow.ResolveAssetPath ("Team Logos", teamLogoFile);
+			if (File.Exists (logoPath)) {
+				try {
+					BitmapImage logoImg = new BitmapImage ();
+					logoImg.BeginInit ();
+					logoImg.UriSource = new Uri (logoPath, UriKind.Absolute);
+					logoImg.CacheOption = BitmapCacheOption.OnLoad;
+					logoImg.EndInit ();
+
+					System.Windows.Controls.Image logoControl = new System.Windows.Controls.Image {
+						Source = logoImg,
+						Width = 24.0,
+						Height = 24.0,
+						Stretch = System.Windows.Media.Stretch.Uniform,
+						Margin = new Thickness (0, 0, 8, 0)
+					};
+					RenderOptions.SetBitmapScalingMode (logoControl, BitmapScalingMode.HighQuality);
+					teamPanel.Children.Add (logoControl);
+				} catch {}
+			}
+
+			TextBlock teamText = new TextBlock {
+				Text = teamName,
+				Foreground = subTextBrush,
+				FontSize = 13.0,
+				FontWeight = FontWeights.SemiBold,
+				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Text, Segoe UI, sans-serif"),
+				VerticalAlignment = VerticalAlignment.Center
+			};
+			teamPanel.Children.Add (teamText);
+			previewPanel.Children.Add (teamPanel);
+
+			string numberPath = F1OverlayWindow.ResolveAssetPath ("Driver Number", driverName + " Number.png");
+			if (File.Exists (numberPath)) {
+				try {
+					BitmapImage numImg = new BitmapImage ();
+					numImg.BeginInit ();
+					numImg.UriSource = new Uri (numberPath, UriKind.Absolute);
+					numImg.CacheOption = BitmapCacheOption.OnLoad;
+					numImg.EndInit ();
+
+					System.Windows.Controls.Image numControl = new System.Windows.Controls.Image {
+						Source = numImg,
+						Height = 40.0,
+						Stretch = System.Windows.Media.Stretch.Uniform,
+						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+						Margin = new Thickness (0, 0, 0, 16)
+					};
+					RenderOptions.SetBitmapScalingMode (numControl, BitmapScalingMode.HighQuality);
+					previewPanel.Children.Add (numControl);
+				} catch {}
+			}
+
+			Border btn = new Border {
+				Width = 180.0,
+				Height = 34.0,
+				CornerRadius = new CornerRadius (8.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (225, 6, 0)),
+				Cursor = System.Windows.Input.Cursors.Hand,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				Margin = new Thickness (0, 5, 0, 5)
+			};
+			btn.Child = new TextBlock {
+				Text = "Open F1 Standings Overlay",
+				Foreground = System.Windows.Media.Brushes.White,
+				FontSize = 12.0,
+				FontWeight = FontWeights.Bold,
+				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center
+			};
+			btn.MouseEnter += (s, e) => {
+				btn.Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (245, 20, 10));
+			};
+			btn.MouseLeave += (s, e) => {
+				btn.Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (225, 6, 0));
+			};
+			btn.PreviewMouseLeftButtonDown += delegate {
+				try {
+					if (ownerWindow != null) {
+						ownerWindow.ShowF1Overlay ();
+					}
+				} catch {}
+			};
+			previewPanel.Children.Add (btn);
+		}
+
+		private void RenderWebCard (SearchResultItem item, System.Windows.Media.Brush textBrush, System.Windows.Media.Brush subTextBrush)
+		{
+			if (previewPanel == null) return;
+			previewPanel.Children.Clear ();
+
+			Border badgeBorder = new Border {
+				Width = 64.0,
+				Height = 64.0,
+				CornerRadius = new CornerRadius (32.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 0, 120, 255)),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				Margin = new Thickness (0, 15, 0, 12)
+			};
+
+			badgeBorder.Child = new TextBlock {
+				Text = "\uE12A",
+				FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
+				FontSize = 30.0,
+				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 140, 255)),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center
+			};
+			previewPanel.Children.Add (badgeBorder);
+
+			TextBlock titleBlock = new TextBlock {
+				Text = item.Name,
+				Foreground = textBrush,
+				FontSize = 18.0,
+				FontWeight = FontWeights.Bold,
+				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
+				TextWrapping = TextWrapping.Wrap,
+				TextTrimming = TextTrimming.CharacterEllipsis,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				TextAlignment = TextAlignment.Center,
+				Margin = new Thickness (0, 0, 0, 4)
+			};
+			previewPanel.Children.Add (titleBlock);
+
+			TextBlock subBlock = new TextBlock {
+				Text = "Safari & Google Web Search",
+				Foreground = subTextBrush,
+				FontSize = 12.0,
+				FontWeight = FontWeights.SemiBold,
+				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Text, Segoe UI, sans-serif"),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				Margin = new Thickness (0, 0, 0, 20)
+			};
+			previewPanel.Children.Add (subBlock);
+
+			Border btn = new Border {
+				Width = 160.0,
+				Height = 32.0,
+				CornerRadius = new CornerRadius (6.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 120, 255)),
+				Cursor = System.Windows.Input.Cursors.Hand,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				Margin = new Thickness (0, 5, 0, 5)
+			};
+			btn.Child = new TextBlock {
+				Text = "Search Web on Google",
+				Foreground = System.Windows.Media.Brushes.White,
+				FontSize = 12.0,
+				FontWeight = FontWeights.Bold,
+				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center
+			};
+			btn.MouseEnter += (s, e) => {
+				btn.Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (20, 140, 255));
+			};
+			btn.MouseLeave += (s, e) => {
+				btn.Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 120, 255));
+			};
+			btn.PreviewMouseLeftButtonDown += delegate {
+				ExecuteItem (item);
+			};
+			previewPanel.Children.Add (btn);
+		}
+
 		private void UpdatePreviewPane ()
 		{
 			if (previewPanel == null) return;
@@ -36596,6 +36799,43 @@ namespace MacStyleDock
 			bool isDark = (effectiveTheme == "dark" || effectiveTheme == "tahoe");
 			System.Windows.Media.Brush textBrush = isDark ? System.Windows.Media.Brushes.White : new SolidColorBrush (System.Windows.Media.Color.FromRgb (40, 40, 40));
 			System.Windows.Media.Brush subTextBrush = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromRgb (170, 175, 185)) : new SolidColorBrush (System.Windows.Media.Color.FromRgb (120, 125, 135));
+
+			string queryText = searchBox != null ? searchBox.Text.Trim ().ToLower () : "";
+			string itemPathLower = item.Path != null ? item.Path.ToLower () : "";
+			string itemNameLower = item.Name != null ? item.Name.ToLower () : "";
+
+			bool isF1Action = item.IsAction && item.Path.StartsWith ("action://f1_query?");
+			string targetSearch = isF1Action ? item.Path.Substring ("action://f1_query?".Length).Trim ().ToLower () : (queryText.Length > 0 ? queryText : itemNameLower);
+
+			string matchedDriver = null;
+			string matchedTeam = null;
+			string matchedTeamLogo = null;
+
+			if (targetSearch.Contains ("verstappen") || targetSearch.Contains ("max")) { matchedDriver = "Max Verstappen"; matchedTeam = "Red Bull Racing"; matchedTeamLogo = "Redbull F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("hamilton") || targetSearch.Contains ("lewis")) { matchedDriver = "Lewis Hamilton"; matchedTeam = "Scuderia Ferrari"; matchedTeamLogo = "Ferrari F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("leclerc") || targetSearch.Contains ("charles")) { matchedDriver = "Charles Leclerc"; matchedTeam = "Scuderia Ferrari"; matchedTeamLogo = "Ferrari F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("norris") || targetSearch.Contains ("lando")) { matchedDriver = "Lando Norris"; matchedTeam = "McLaren F1 Team"; matchedTeamLogo = "McLaren F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("sainz") || targetSearch.Contains ("carlos")) { matchedDriver = "Carlos Sainz"; matchedTeam = "Williams Racing"; matchedTeamLogo = "Williams F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("piastri") || targetSearch.Contains ("oscar")) { matchedDriver = "Oscar Piastri"; matchedTeam = "McLaren F1 Team"; matchedTeamLogo = "McLaren F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("russell") || targetSearch.Contains ("george")) { matchedDriver = "George Russell"; matchedTeam = "Mercedes-AMG PETRONAS"; matchedTeamLogo = "Mercedes AMG Petronas F1 Team logo.png"; }
+			else if (targetSearch.Contains ("antonelli") || targetSearch.Contains ("kimi")) { matchedDriver = "Kimi Antonelli"; matchedTeam = "Mercedes-AMG PETRONAS"; matchedTeamLogo = "Mercedes AMG Petronas F1 Team logo.png"; }
+			else if (targetSearch.Contains ("alonso") || targetSearch.Contains ("fernando")) { matchedDriver = "Fernando Alonso"; matchedTeam = "Aston Martin Aramco"; matchedTeamLogo = "Aston Martin F1 Team logo-Photoroom.png"; }
+			else if (targetSearch.Contains ("albon") || targetSearch.Contains ("alex")) { matchedDriver = "Alexander Albon"; matchedTeam = "Williams Racing"; matchedTeamLogo = "Williams F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("gasly") || targetSearch.Contains ("pierre")) { matchedDriver = "Pierre Gasly"; matchedTeam = "Alpine F1 Team"; matchedTeamLogo = "Alpine F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("ocon") || targetSearch.Contains ("esteban")) { matchedDriver = "Esteban Ocon"; matchedTeam = "Haas F1 Team"; matchedTeamLogo = "TGR Haas F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("tsunoda") || targetSearch.Contains ("yuki")) { matchedDriver = "Yuki Tsunoda"; matchedTeam = "Visa Cash App RB"; matchedTeamLogo = "Visa RB F1 Team Logo.png"; }
+			else if (targetSearch.Contains ("stroll") || targetSearch.Contains ("lance")) { matchedDriver = "Lance Stroll"; matchedTeam = "Aston Martin Aramco"; matchedTeamLogo = "Aston Martin F1 Team logo-Photoroom.png"; }
+			else if (targetSearch.Contains ("hulkenberg") || targetSearch.Contains ("nico")) { matchedDriver = "Nico Hulkenberg"; matchedTeam = "Kick Sauber / Audi"; matchedTeamLogo = "Audi F1 Team Logopng.png"; }
+
+			if (isF1Action || matchedDriver != null) {
+				RenderF1DriverCard (matchedDriver ?? "Lewis Hamilton", matchedTeam ?? "Scuderia Ferrari", matchedTeamLogo ?? "Ferrari F1 Team Logo.png", textBrush, subTextBrush);
+				return;
+			}
+
+			if (item.IsWebSuggestion || (item.IsAction && (item.Path.StartsWith ("action://google") || item.Path.StartsWith ("action://bing")))) {
+				RenderWebCard (item, textBrush, subTextBrush);
+				return;
+			}
 
 			Border iconBorder = new Border {
 				Width = 80.0,
