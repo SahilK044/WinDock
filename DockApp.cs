@@ -2829,7 +2829,7 @@ namespace MacStyleDock
 
 
 
-		private void ShowF1Overlay (DockItemControl targetItem)
+		internal void ShowF1Overlay (DockItemControl targetItem = null)
 
 		{
 
@@ -35555,6 +35555,8 @@ namespace MacStyleDock
 		private Border verticalSeparator;
 		private Border previewBorder;
 		private StackPanel previewPanel;
+		private Border _heroResultBadge;
+		private TextBlock _heroResultText;
 		private const double SpotlightOuterWidth = 704.0;
 		private const double SpotlightPanelWidth = 620.0;
 		private const double SpotlightSearchHeight = 52.0;
@@ -35718,6 +35720,126 @@ namespace MacStyleDock
 				}
 			} catch {}
 			return suggestions;
+		}
+
+		private void EvaluateHeroCalculation (string query)
+		{
+			if (_heroResultBadge == null || _heroResultText == null) return;
+			query = query.Trim ();
+
+			if (string.IsNullOrWhiteSpace (query) || query.Length < 2) {
+				HideHeroBadge ();
+				return;
+			}
+
+			// 1. Pure Math expression
+			if (System.Text.RegularExpressions.Regex.IsMatch (query, @"^[0-9\s\+\-\*\/\(\)\.]+$") && 
+				System.Text.RegularExpressions.Regex.IsMatch (query, @"[0-9]") &&
+				System.Text.RegularExpressions.Regex.IsMatch (query, @"[\+\-\*\/]")) {
+				try {
+					var dt = new System.Data.DataTable ();
+					var res = dt.Compute (query, null);
+					double d = Convert.ToDouble (res);
+					ShowHeroBadge ("= " + (d % 1 == 0 ? d.ToString ("N0") : d.ToString ("N2")));
+					return;
+				} catch {}
+			}
+
+			// 2. Direct unit conversion e.g. "100 usd to eur", "50 kg to lbs", "32 c to f"
+			var matchConv = System.Text.RegularExpressions.Regex.Match (query, @"^(\d+(?:\.\d+)?)\s*([a-zA-Z\$€£¥°]+)\s+(?:to|in|=|->)\s+([a-zA-Z\$€£¥°]+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+			if (matchConv.Success) {
+				double value = double.Parse (matchConv.Groups [1].Value);
+				string fromUnit = matchConv.Groups [2].Value.ToLower ();
+				string toUnit = matchConv.Groups [3].Value.ToLower ();
+
+				string resultStr = CalculateUnitConversion (value, fromUnit, toUnit);
+				if (!string.IsNullOrEmpty (resultStr)) {
+					ShowHeroBadge ("= " + resultStr);
+					return;
+				}
+			}
+
+			// 3. Currency symbol / simple shortcut e.g. "$100", "100usd", "32c"
+			var matchSymbol = System.Text.RegularExpressions.Regex.Match (query, @"^(?:([\$€£¥])\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*([a-zA-Z\$€£¥°]+))$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+			if (matchSymbol.Success) {
+				double val = 0;
+				string unit = "";
+				bool parsed = false;
+				if (!string.IsNullOrEmpty (matchSymbol.Groups [1].Value)) {
+					unit = matchSymbol.Groups [1].Value;
+					parsed = double.TryParse (matchSymbol.Groups [2].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out val);
+				} else {
+					parsed = double.TryParse (matchSymbol.Groups [3].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out val);
+					unit = matchSymbol.Groups [4].Value;
+				}
+
+				if (parsed && !string.IsNullOrEmpty (unit)) {
+					unit = unit.ToLower ();
+					if (unit == "c" || unit == "°c") {
+						ShowHeroBadge ("= " + (val * 9.0 / 5.0 + 32.0).ToString ("N1") + " °F");
+						return;
+					} else if (unit == "f" || unit == "°f") {
+						ShowHeroBadge ("= " + ((val - 32.0) * 5.0 / 9.0).ToString ("N1") + " °C");
+						return;
+					} else if (unit == "usd" || unit == "$") {
+						ShowHeroBadge ("= €" + (val * 0.92).ToString ("N2") + " / ₹" + (val * 83.5).ToString ("N2"));
+						return;
+					} else if (unit == "eur" || unit == "€") {
+						ShowHeroBadge ("= $" + (val * 1.08).ToString ("N2"));
+						return;
+					} else if (unit == "inr" || unit == "₹" || unit == "rs") {
+						ShowHeroBadge ("= $" + (val / 83.5).ToString ("N2"));
+						return;
+					}
+				}
+			}
+
+			HideHeroBadge ();
+		}
+
+		private string CalculateUnitConversion (double value, string fromUnit, string toUnit)
+		{
+			if ((fromUnit == "kg" || fromUnit == "kilogram" || fromUnit == "kilograms") && (toUnit == "lbs" || toUnit == "lb" || toUnit == "pounds")) return (value * 2.20462).ToString ("N2") + " lbs";
+			if ((fromUnit == "lbs" || fromUnit == "lb" || fromUnit == "pounds") && (toUnit == "kg" || toUnit == "kilogram" || toUnit == "kilograms")) return (value / 2.20462).ToString ("N2") + " kg";
+			if ((fromUnit == "miles" || fromUnit == "mile" || fromUnit == "mi") && (toUnit == "km" || toUnit == "kilometers" || toUnit == "kilometer")) return (value * 1.60934).ToString ("N2") + " km";
+			if ((fromUnit == "km" || fromUnit == "kilometers" || fromUnit == "kilometer") && (toUnit == "miles" || toUnit == "mile" || toUnit == "mi")) return (value / 1.60934).ToString ("N2") + " miles";
+			if ((fromUnit == "c" || fromUnit == "°c" || fromUnit == "celsius") && (toUnit == "f" || toUnit == "°f" || toUnit == "fahrenheit")) return (value * 9.0 / 5.0 + 32.0).ToString ("N2") + " °F";
+			if ((fromUnit == "f" || fromUnit == "°f" || fromUnit == "fahrenheit") && (toUnit == "c" || toUnit == "°c" || toUnit == "celsius")) return ((value - 32.0) * 5.0 / 9.0).ToString ("N2") + " °C";
+			if ((fromUnit == "inches" || fromUnit == "in" || fromUnit == "inch") && (toUnit == "cm" || toUnit == "centimeters")) return (value * 2.54).ToString ("N2") + " cm";
+			if ((fromUnit == "cm" || fromUnit == "centimeters") && (toUnit == "inches" || toUnit == "in" || toUnit == "inch")) return (value / 2.54).ToString ("N2") + " inches";
+			if ((fromUnit == "usd" || fromUnit == "$") && (toUnit == "eur" || toUnit == "€")) return "€" + (value * 0.92).ToString ("N2");
+			if ((fromUnit == "usd" || fromUnit == "$") && (toUnit == "inr" || toUnit == "₹" || toUnit == "rs")) return "₹" + (value * 83.5).ToString ("N2");
+			if ((fromUnit == "eur" || fromUnit == "€") && (toUnit == "usd" || toUnit == "$")) return "$" + (value * 1.08).ToString ("N2");
+			if ((fromUnit == "gbp" || fromUnit == "£") && (toUnit == "usd" || toUnit == "$")) return "$" + (value * 1.28).ToString ("N2");
+			if ((fromUnit == "inr" || fromUnit == "₹" || fromUnit == "rs") && (toUnit == "usd" || toUnit == "$")) return "$" + (value / 83.5).ToString ("N2");
+			return "";
+		}
+
+		private void ShowHeroBadge (string text)
+		{
+			if (_heroResultBadge == null || _heroResultText == null) return;
+			_heroResultText.Text = text;
+			if (_heroResultBadge.Visibility != Visibility.Visible) {
+				_heroResultBadge.Visibility = Visibility.Visible;
+				DoubleAnimation opacityAnim = new DoubleAnimation (0.0, 1.0, TimeSpan.FromMilliseconds (180)) {
+					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+				};
+				_heroResultBadge.BeginAnimation (UIElement.OpacityProperty, opacityAnim);
+			}
+		}
+
+		private void HideHeroBadge ()
+		{
+			if (_heroResultBadge == null) return;
+			if (_heroResultBadge.Visibility == Visibility.Visible) {
+				DoubleAnimation opacityAnim = new DoubleAnimation (1.0, 0.0, TimeSpan.FromMilliseconds (120)) {
+					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+				};
+				opacityAnim.Completed += (s, e) => {
+					_heroResultBadge.Visibility = Visibility.Collapsed;
+				};
+				_heroResultBadge.BeginAnimation (UIElement.OpacityProperty, opacityAnim);
+			}
 		}
 
 		private static FrameworkElement CreateVectorWebIcon ()
@@ -35975,6 +36097,12 @@ namespace MacStyleDock
 				}
 			}
 			
+			if (_heroResultBadge != null && _heroResultText != null) {
+				_heroResultBadge.Background = new SolidColorBrush (isDark ? System.Windows.Media.Color.FromArgb (55, 0, 140, 255) : System.Windows.Media.Color.FromArgb (45, 0, 120, 255));
+				_heroResultBadge.BorderBrush = new SolidColorBrush (isDark ? System.Windows.Media.Color.FromArgb (110, 0, 160, 255) : System.Windows.Media.Color.FromArgb (90, 0, 120, 255));
+				_heroResultText.Foreground = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromRgb (100, 190, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 102, 204));
+			}
+
 			for (int j = 0; j < _tahoeCapsules.Count; j++) {
 				Border cap = _tahoeCapsules [j];
 				TextBlock t = cap.Child as TextBlock;
@@ -36847,6 +36975,120 @@ namespace MacStyleDock
 					ExecuteItem (item);
 				};
 				previewPanel.Children.Add (btn);
+			} else if (item.IsAction && item.Path.StartsWith ("action://f1_query?")) {
+				string f1Param = item.Path.Substring ("action://f1_query?".Length).Trim ();
+				string f1Lower = f1Param.ToLower ();
+
+				string driverName = "";
+				string teamName = "";
+				if (f1Lower.Contains ("verstappen")) { driverName = "Max Verstappen"; teamName = "Redbull Racing"; }
+				else if (f1Lower.Contains ("hamilton")) { driverName = "Lewis Hamilton"; teamName = "Ferrari"; }
+				else if (f1Lower.Contains ("leclerc")) { driverName = "Charles Leclerc"; teamName = "Ferrari"; }
+				else if (f1Lower.Contains ("norris")) { driverName = "Lando Norris"; teamName = "McLaren"; }
+				else if (f1Lower.Contains ("piastri")) { driverName = "Oscar Piastri"; teamName = "McLaren"; }
+				else if (f1Lower.Contains ("sainz")) { driverName = "Carlos Sainz"; teamName = "Williams"; }
+				else if (f1Lower.Contains ("albon")) { driverName = "Alex Albon"; teamName = "Williams"; }
+				else if (f1Lower.Contains ("antonelli") || f1Lower.Contains ("kimi")) { driverName = "Kimi Antonelli"; teamName = "Mercedes"; }
+				else if (f1Lower.Contains ("russell")) { driverName = "George Russell"; teamName = "Mercedes"; }
+				else if (f1Lower.Contains ("perez")) { driverName = "Sergio Perez"; teamName = "Redbull Racing"; }
+				else if (f1Lower.Contains ("hulkenberg")) { driverName = "Nico Hulkenberg"; teamName = "Sauber"; }
+				else if (f1Lower.Contains ("alonso")) { driverName = "Fernando Alonso"; teamName = "Aston Martin"; }
+				else if (f1Lower.Contains ("stroll")) { driverName = "Lance Stroll"; teamName = "Aston Martin"; }
+				else if (f1Lower.Contains ("gasly")) { driverName = "Pierre Gasly"; teamName = "Alpine"; }
+				else if (f1Lower.Contains ("ocon")) { driverName = "Esteban Ocon"; teamName = "Haas"; }
+
+				if (!string.IsNullOrEmpty (driverName)) {
+					string headshotPath = F1OverlayWindow.ResolveAssetPath ("Headshots", driverName + ".png");
+
+					Grid f1Card = new Grid { Height = 180.0, Margin = new Thickness (0, 10, 0, 10) };
+					LinearGradientBrush grad = new LinearGradientBrush { StartPoint = new System.Windows.Point (0, 0), EndPoint = new System.Windows.Point (1, 1) };
+					grad.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (220, 24, 25, 30), 0.0));
+					grad.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (220, 200, 20, 30), 1.0));
+					Border cardBg = new Border { Background = grad, CornerRadius = new CornerRadius (12.0) };
+					f1Card.Children.Add (cardBg);
+
+					StackPanel f1Stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = System.Windows.HorizontalAlignment.Center };
+
+					if (!string.IsNullOrEmpty (headshotPath) && File.Exists (headshotPath)) {
+						System.Windows.Controls.Image headshot = new System.Windows.Controls.Image {
+							Source = new BitmapImage (new Uri (headshotPath, UriKind.Absolute)),
+							Height = 80.0,
+							Stretch = Stretch.Uniform,
+							Margin = new Thickness (0, 0, 0, 6)
+						};
+						RenderOptions.SetBitmapScalingMode (headshot, BitmapScalingMode.HighQuality);
+						f1Stack.Children.Add (headshot);
+					}
+
+					f1Stack.Children.Add (new TextBlock {
+						Text = driverName.ToUpper (),
+						Foreground = System.Windows.Media.Brushes.White,
+						FontSize = 16.0,
+						FontWeight = FontWeights.Black,
+						FontFamily = SpotlightFont,
+						HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+					});
+
+					f1Stack.Children.Add (new TextBlock {
+						Text = teamName,
+						Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (255, 60, 60)),
+						FontSize = 12.0,
+						FontWeight = FontWeights.Bold,
+						FontFamily = SpotlightFont,
+						HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+					});
+
+					f1Card.Children.Add (f1Stack);
+					previewPanel.Children.Add (f1Card);
+
+					Border openF1Btn = new Border {
+						Width = 160.0, Height = 30.0, CornerRadius = new CornerRadius (7.0),
+						Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (225, 6, 0)),
+						Cursor = System.Windows.Input.Cursors.Hand,
+						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+						Margin = new Thickness (0, 6, 0, 0)
+					};
+					openF1Btn.Child = new TextBlock {
+						Text = "Open F1 Widget Overlay",
+						Foreground = System.Windows.Media.Brushes.White,
+						FontSize = 11.5, FontWeight = FontWeights.Bold,
+						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+						VerticalAlignment = VerticalAlignment.Center
+					};
+					openF1Btn.PreviewMouseLeftButtonDown += (s, e) => {
+						ownerWindow.ShowF1Overlay ();
+						Hide ();
+					};
+					previewPanel.Children.Add (openF1Btn);
+				} else {
+					TextBlock title = new TextBlock {
+						Text = "🏎️ Formula 1 Live Standings",
+						Foreground = textBrush, FontSize = 16.0, FontWeight = FontWeights.Bold,
+						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+						Margin = new Thickness (0, 15, 0, 10)
+					};
+					previewPanel.Children.Add (title);
+
+					Border openF1Btn = new Border {
+						Width = 160.0, Height = 32.0, CornerRadius = new CornerRadius (8.0),
+						Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (225, 6, 0)),
+						Cursor = System.Windows.Input.Cursors.Hand,
+						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+						Margin = new Thickness (0, 15, 0, 0)
+					};
+					openF1Btn.Child = new TextBlock {
+						Text = "Launch F1 Overlay",
+						Foreground = System.Windows.Media.Brushes.White,
+						FontSize = 12.0, FontWeight = FontWeights.Bold,
+						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+						VerticalAlignment = VerticalAlignment.Center
+					};
+					openF1Btn.PreviewMouseLeftButtonDown += (s, e) => {
+						ownerWindow.ShowF1Overlay ();
+						Hide ();
+					};
+					previewPanel.Children.Add (openF1Btn);
+				}
 			}
 		}
 
@@ -37294,6 +37536,8 @@ namespace MacStyleDock
 				RepeatBehavior = RepeatBehavior.Forever
 			};
 
+			Grid col1Grid = new Grid ();
+
 			placeholderText = new TextBlock {
 				Text = "Search",
 				Foreground = _shimmerBrush,
@@ -37305,10 +37549,7 @@ namespace MacStyleDock
 				IsHitTestVisible = false,
 				Margin = new Thickness (4.0, 0.0, 20.0, 1.0)
 			};
-			Grid.SetColumn (placeholderText, 1);
-			searchRow.Children.Add (placeholderText);
-
-			_shimmerTransform.BeginAnimation (TranslateTransform.XProperty, _shimmerAnimation);
+			col1Grid.Children.Add (placeholderText);
 
 			searchBox = new System.Windows.Controls.TextBox {
 				Background = System.Windows.Media.Brushes.Transparent,
@@ -37320,8 +37561,33 @@ namespace MacStyleDock
 				CaretBrush = System.Windows.Media.Brushes.Black,
 				Margin = new Thickness (4.0, 0.0, 20.0, 1.0)
 			};
-			Grid.SetColumn (searchBox, 1);
-			searchRow.Children.Add (searchBox);
+			col1Grid.Children.Add (searchBox);
+
+			_heroResultBadge = new Border {
+				CornerRadius = new CornerRadius (7.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (45, 0, 120, 255)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (90, 0, 120, 255)),
+				BorderThickness = new Thickness (1.0),
+				Padding = new Thickness (8.0, 3.0, 8.0, 3.0),
+				Margin = new Thickness (0.0, 0.0, 12.0, 0.0),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+				VerticalAlignment = VerticalAlignment.Center,
+				Visibility = Visibility.Collapsed,
+				Opacity = 0.0,
+				IsHitTestVisible = false
+			};
+			_heroResultText = new TextBlock {
+				Text = "",
+				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
+				FontSize = 13.5,
+				FontWeight = FontWeights.Bold,
+				FontFamily = SpotlightFont
+			};
+			_heroResultBadge.Child = _heroResultText;
+			col1Grid.Children.Add (_heroResultBadge);
+
+			Grid.SetColumn (col1Grid, 1);
+			searchRow.Children.Add (col1Grid);
 
 			StackPanel tahoeButtonsPanel = new StackPanel {
 				Orientation = System.Windows.Controls.Orientation.Horizontal,
@@ -37329,8 +37595,8 @@ namespace MacStyleDock
 				Margin = new Thickness (8.0, 0.0, 12.0, 0.0)
 			};
 
-			string[] tahoeLabels = { "Apps", "Files", "Actions", "Clipboard" };
-			string[] tahoeTooltips = { "Applications (Ctrl+1)", "Files & Folders (Ctrl+2)", "Quick Actions (Ctrl+3)", "Clipboard History (Ctrl+4)" };
+			string[] tahoeLabels = { "Apps", "Files", "Actions", "F1", "Clipboard" };
+			string[] tahoeTooltips = { "Applications (Ctrl+1)", "Files & Folders (Ctrl+2)", "Quick Actions (Ctrl+3)", "Formula 1 (Ctrl+4)", "Clipboard History (Ctrl+5)" };
 
 			_tahoeCapsules.Clear ();
 			for (int i = 0; i < tahoeLabels.Length; i++) {
@@ -37515,6 +37781,7 @@ namespace MacStyleDock
 						_shimmerTransform.BeginAnimation (TranslateTransform.XProperty, null);
 					}
 				}
+				EvaluateHeroCalculation (searchBox.Text);
 				_searchDebounceTimer.Stop ();
 				if (isEmpty) {
 					TriggerSearch ("");
@@ -37541,7 +37808,54 @@ namespace MacStyleDock
 						ToggleTahoeFilterByIndex (3, _tahoeCapsules);
 						e.Handled = true;
 						return;
+					} else if (e.Key == Key.D5 || e.Key == Key.NumPad5) {
+						ToggleTahoeFilterByIndex (4, _tahoeCapsules);
+						e.Handled = true;
+						return;
+					} else if (e.Key == Key.Enter) {
+						if (_selectedIndex >= 0 && _selectedIndex < _displayedItems.Count) {
+							SearchResultItem sel = _displayedItems [_selectedIndex];
+							if (!sel.IsWebSuggestion && !sel.IsAction && !sel.IsClipboard && !string.IsNullOrEmpty (sel.Path)) {
+								try {
+									if (File.Exists (sel.Path) || Directory.Exists (sel.Path)) {
+										Process.Start ("explorer.exe", "/select,\"" + sel.Path + "\"");
+										Hide ();
+										e.Handled = true;
+										return;
+									}
+								} catch {}
+							}
+						}
+					} else if (e.Key == Key.C) {
+						if (_selectedIndex >= 0 && _selectedIndex < _displayedItems.Count) {
+							SearchResultItem sel = _displayedItems [_selectedIndex];
+							try {
+								System.Windows.Clipboard.SetText (sel.IsWebSuggestion || sel.IsAction ? sel.Name : sel.Path);
+								e.Handled = true;
+								return;
+							} catch {}
+						}
 					}
+				}
+
+				if (e.Key == Key.Tab) {
+					int currentIdx = -1;
+					for (int i = 0; i < _tahoeCapsules.Count; i++) {
+						TextBlock t = _tahoeCapsules [i].Child as TextBlock;
+						if (t != null && t.Text == _activeFilter) {
+							currentIdx = i;
+							break;
+						}
+					}
+					int nextIdx = (currentIdx + 1) % (_tahoeCapsules.Count + 1);
+					if (nextIdx == _tahoeCapsules.Count) {
+						_activeFilter = "All";
+						ApplyTheme ();
+					} else {
+						ToggleTahoeFilterByIndex (nextIdx, _tahoeCapsules);
+					}
+					e.Handled = true;
+					return;
 				}
 
 				if (e.Key == Key.Escape) {
@@ -37841,6 +38155,25 @@ namespace MacStyleDock
 							matches.Add (new SearchResultItem {
 								Name = flightInfo,
 								Path = "action://flight_" + query.ToUpper (),
+								IsAction = true
+							});
+						}
+
+						// 3b. F1 Queries & Driver/Team Standings
+						string qLower = query.ToLower ();
+						if (qLower.Contains ("f1") || qLower.Contains ("formula 1") ||
+							qLower.Contains ("verstappen") || qLower.Contains ("hamilton") || qLower.Contains ("leclerc") ||
+							qLower.Contains ("norris") || qLower.Contains ("sainz") || qLower.Contains ("piastri") ||
+							qLower.Contains ("albon") || qLower.Contains ("antonelli") || qLower.Contains ("perez") ||
+							qLower.Contains ("hulkenberg") || qLower.Contains ("alonso") || qLower.Contains ("russell") ||
+							qLower.Contains ("gasly") || qLower.Contains ("ocon") || qLower.Contains ("ferrari") ||
+							qLower.Contains ("red bull") || qLower.Contains ("mclaren") || qLower.Contains ("mercedes") ||
+							qLower.Contains ("aston martin") || qLower.Contains ("williams") || qLower.Contains ("alpine") ||
+							qLower.Contains ("haas") || qLower.Contains ("sauber") || qLower.Contains ("audi") || qLower.Contains ("racing bulls")) {
+
+							matches.Add (new SearchResultItem {
+								Name = "F1 Standings & Stats: " + query,
+								Path = "action://f1_query?" + query,
 								IsAction = true
 							});
 						}
@@ -38157,7 +38490,18 @@ namespace MacStyleDock
 			} else if (_activeFilter == "Files") {
 				filteredMatches = matches.FindAll (m => (m.IsDirectory || (!m.IsApp && !m.IsDirectory)) && !m.IsWebSuggestion && !m.IsAction && !m.IsClipboard);
 			} else if (_activeFilter == "Actions") {
-				filteredMatches = matches.FindAll (m => m.IsAction);
+				filteredMatches = matches.FindAll (m => m.IsAction && !m.Path.StartsWith ("action://f1_query?"));
+			} else if (_activeFilter == "F1") {
+				filteredMatches = matches.FindAll (m => m.IsAction && m.Path.StartsWith ("action://f1_query?"));
+				if (filteredMatches.Count == 0) {
+					filteredMatches = new List<SearchResultItem> {
+						new SearchResultItem {
+							Name = "Formula 1 Live Standings & Stats",
+							Path = "action://f1_query?f1",
+							IsAction = true
+						}
+					};
+				}
 			} else if (_activeFilter == "Clipboard") {
 				filteredMatches = matches.FindAll (m => m.IsClipboard);
 			} else {
