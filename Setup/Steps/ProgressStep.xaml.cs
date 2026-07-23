@@ -38,6 +38,10 @@ namespace WinDockSetup.Steps
                 _logs.RemoveAt(0);
             }
             LogText.Text = string.Join(Environment.NewLine, _logs);
+            if (LogScrollViewer != null)
+            {
+                LogScrollViewer.ScrollToEnd();
+            }
         }
 
         private async Task RunProcessAsync()
@@ -217,6 +221,20 @@ namespace WinDockSetup.Steps
         {
             StatusText.Text = message;
             Log(message);
+            PercentText.Text = percent + "%";
+
+            if (ProgressTrackContainer != null && ProgressTrackContainer.ActualWidth > 0)
+            {
+                double targetWidth = Math.Max(0, (ProgressTrackContainer.ActualWidth * percent) / 100.0);
+                DoubleAnimation widthAnim = new DoubleAnimation
+                {
+                    To = targetWidth,
+                    Duration = TimeSpan.FromMilliseconds(250),
+                    EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
+                };
+                ProgressBarFill.BeginAnimation(FrameworkElement.WidthProperty, widthAnim);
+            }
+
             mainWindow.UpdateTelemetry(action, detail, percent);
         }
 
@@ -264,8 +282,14 @@ namespace WinDockSetup.Steps
                         }
 
                         mainWindow.UpdateTelemetry("EXTRACTING", $"{(int)pct}% · {entry.Name}", (int)pct);
+                        PercentText.Text = (int)pct + "%";
+
+                        if (ProgressTrackContainer != null && ProgressTrackContainer.ActualWidth > 0)
+                        {
+                            double targetWidth = Math.Max(0, (ProgressTrackContainer.ActualWidth * pct) / 100.0);
+                            ProgressBarFill.Width = targetWidth;
+                        }
                         
-                        // Small delay to allow UI updates and make telemetry visible
                         if (current % 5 == 0)
                         {
                             await Task.Delay(10);
