@@ -38953,6 +38953,107 @@ namespace MacStyleDock
 		}
 	}
 
+	public static class StackPinManager
+	{
+		private static string GetConfigPath ()
+		{
+			string dir = System.IO.Path.Combine (System.Environment.GetFolderPath (System.Environment.SpecialFolder.LocalApplicationData), "WinDock");
+			if (!Directory.Exists (dir)) Directory.CreateDirectory (dir);
+			return System.IO.Path.Combine (dir, "pinned_stacks.txt");
+		}
+
+		public static List<string> GetPinnedItems (string folderPath)
+		{
+			List<string> list = new List<string> ();
+			try {
+				string file = GetConfigPath ();
+				if (!File.Exists (file)) return list;
+				string key = "[" + (folderPath ?? "").TrimEnd ('\\', '/').ToLowerInvariant () + "]";
+				bool reading = false;
+				foreach (string line in File.ReadAllLines (file)) {
+					string trimmed = line.Trim ();
+					if (trimmed.StartsWith ("[")) {
+						reading = string.Equals (trimmed, key, StringComparison.OrdinalIgnoreCase);
+					} else if (reading && !string.IsNullOrEmpty (trimmed)) {
+						if (File.Exists (trimmed) || Directory.Exists (trimmed)) {
+							list.Add (trimmed);
+						}
+					}
+				}
+			} catch { }
+			return list;
+		}
+
+		public static bool IsPinned (string folderPath, string itemPath)
+		{
+			if (string.IsNullOrEmpty (folderPath) || string.IsNullOrEmpty (itemPath)) return false;
+			List<string> pinned = GetPinnedItems (folderPath);
+			return pinned.Any (p => string.Equals (p, itemPath, StringComparison.OrdinalIgnoreCase));
+		}
+
+		public static void PinItem (string folderPath, string itemPath)
+		{
+			try {
+				if (string.IsNullOrEmpty (folderPath) || string.IsNullOrEmpty (itemPath)) return;
+				string key = folderPath.TrimEnd ('\\', '/').ToLowerInvariant ();
+				Dictionary<string, List<string>> all = LoadAll ();
+				if (!all.ContainsKey (key)) all [key] = new List<string> ();
+				if (!all [key].Any (p => string.Equals (p, itemPath, StringComparison.OrdinalIgnoreCase))) {
+					all [key].Add (itemPath);
+					SaveAll (all);
+				}
+			} catch { }
+		}
+
+		public static void UnpinItem (string folderPath, string itemPath)
+		{
+			try {
+				if (string.IsNullOrEmpty (folderPath) || string.IsNullOrEmpty (itemPath)) return;
+				string key = folderPath.TrimEnd ('\\', '/').ToLowerInvariant ();
+				Dictionary<string, List<string>> all = LoadAll ();
+				if (all.ContainsKey (key)) {
+					all [key].RemoveAll (p => string.Equals (p, itemPath, StringComparison.OrdinalIgnoreCase));
+					SaveAll (all);
+				}
+			} catch { }
+		}
+
+		private static Dictionary<string, List<string>> LoadAll ()
+		{
+			Dictionary<string, List<string>> dict = new Dictionary<string, List<string>> ();
+			try {
+				string file = GetConfigPath ();
+				if (!File.Exists (file)) return dict;
+				string currentKey = null;
+				foreach (string line in File.ReadAllLines (file)) {
+					string trimmed = line.Trim ();
+					if (trimmed.StartsWith ("[") && trimmed.EndsWith ("]")) {
+						currentKey = trimmed.Substring (1, trimmed.Length - 2).ToLowerInvariant ();
+						if (!dict.ContainsKey (currentKey)) dict [currentKey] = new List<string> ();
+					} else if (!string.IsNullOrEmpty (currentKey) && !string.IsNullOrEmpty (trimmed)) {
+						dict [currentKey].Add (trimmed);
+					}
+				}
+			} catch { }
+			return dict;
+		}
+
+		private static void SaveAll (Dictionary<string, List<string>> dict)
+		{
+			try {
+				List<string> lines = new List<string> ();
+				foreach (var kvp in dict) {
+					if (kvp.Value == null || kvp.Value.Count == 0) continue;
+					lines.Add ("[" + kvp.Key + "]");
+					foreach (string item in kvp.Value) {
+						lines.Add (item);
+					}
+				}
+				File.WriteAllLines (GetConfigPath (), lines);
+			} catch { }
+		}
+	}
+
 	public class StackOverlayWindow : Window
 	{
 		private DockWindow parent;
@@ -39071,30 +39172,45 @@ namespace MacStyleDock
 		{
 			items.Clear ();
 			try {
+				List<string> pinned = StackPinManager.GetPinnedItems (folderPath);
+				foreach (string p in pinned) {
+					if ((File.Exists (p) || Directory.Exists (p)) && !items.Contains (p)) {
+						items.Add (p);
+					}
+				}
+
 				if (string.IsNullOrEmpty (folderPath) || !Directory.Exists (folderPath)) return;
 
+				List<string> unpinnedDirs = new List<string> ();
 				string[] directories = Directory.GetDirectories (folderPath);
 				foreach (string d in directories) {
 					try {
-						if ((File.GetAttributes (d) & FileAttributes.Hidden) == 0) {
-							items.Add (d);
-							if (items.Count >= 60) break;
+						if ((File.GetAttributes (d) & FileAttributes.Hidden) == 0 && !items.Contains (d)) {
+							unpinnedDirs.Add (d);
 						}
 					} catch { }
 				}
+				unpinnedDirs.Sort ((a, b) => string.Compare (System.IO.Path.GetFileName (a), System.IO.Path.GetFileName (b), StringComparison.OrdinalIgnoreCase));
 
-				if (items.Count < 60) {
-					string[] files = Directory.GetFiles (folderPath);
-					foreach (string f in files) {
-						try {
-							if ((File.GetAttributes (f) & FileAttributes.Hidden) == 0) {
-								items.Add (f);
-								if (items.Count >= 60) break;
-							}
-						} catch { }
-					}
+				List<string> unpinnedFiles = new List<string> ();
+				string[] files = Directory.GetFiles (folderPath);
+				foreach (string f in files) {
+					try {
+						if ((File.GetAttributes (f) & FileAttributes.Hidden) == 0 && !items.Contains (f)) {
+							unpinnedFiles.Add (f);
+						}
+					} catch { }
 				}
-				items.Sort ((a, b) => string.Compare (System.IO.Path.GetFileName (a), System.IO.Path.GetFileName (b), StringComparison.OrdinalIgnoreCase));
+				unpinnedFiles.Sort ((a, b) => string.Compare (System.IO.Path.GetFileName (a), System.IO.Path.GetFileName (b), StringComparison.OrdinalIgnoreCase));
+
+				foreach (string d in unpinnedDirs) {
+					if (items.Count >= 60) break;
+					items.Add (d);
+				}
+				foreach (string f in unpinnedFiles) {
+					if (items.Count >= 60) break;
+					items.Add (f);
+				}
 			} catch { }
 		}
 
@@ -39154,10 +39270,10 @@ namespace MacStyleDock
 				base.Width = 340.0;
 				base.Height = Math.Max (180.0, 52.0 + maxShow * 42.0);
 			} else {
-				// Fan view: sized to fit the arc of items
-				int maxShow = Math.Min (items.Count, 10);
-				base.Width = 320.0 + maxShow * 28.0;
-				base.Height = 220.0 + maxShow * 18.0;
+				// Fan view: sized to fit vertical pill fan items cleanly
+				int maxShow = Math.Min (items.Count, 12);
+				base.Width = 320.0;
+				base.Height = Math.Max (140.0, 80.0 + maxShow * 46.0);
 			}
 
 			base.Width = Math.Min (base.Width, screenW - 24.0);
@@ -39245,90 +39361,131 @@ namespace MacStyleDock
 			});
 		}
 
-		// ═══ macOS Tahoe Fan Stack (true arc layout) ═══
+		// ═══ macOS Tahoe Fan Stack (vertical fan tower with horizontal pill cards & pinning) ═══
 		private void BuildTahoeFanStack ()
 		{
 			Canvas canvas = new Canvas ();
 			mainGrid.Children.Add (canvas);
 			_entranceTarget = canvas;
 
-			int maxShow = Math.Min (items.Count, 10);
+			int maxShow = Math.Min (items.Count, 12);
 			if (maxShow == 0) return;
 
-			// Anchor point in canvas coords (bottom center, where dock icon sits)
 			double anchorX = base.Width / 2.0;
-			double anchorY = base.Height - 20.0;
-
-			double radius = 90.0 + maxShow * 14.0;
-			double spreadDeg = Math.Min (140.0, 20.0 + maxShow * 14.0);
-			double startAngle = -90.0 - spreadDeg / 2.0;
+			double startY = base.Height - 48.0;
 
 			for (int i = 0; i < maxShow; i++) {
 				string path = items [i];
 				string fileName = System.IO.Path.GetFileName (path);
 				if (string.IsNullOrEmpty (fileName)) fileName = path;
+				bool isPinned = StackPinManager.IsPinned (folderPath, path);
 
-				double angleDeg = (maxShow == 1) ? -90.0 : startAngle + (spreadDeg * i / (double)(maxShow - 1));
-				double angleRad = angleDeg * Math.PI / 180.0;
-				double x = anchorX + Math.Cos (angleRad) * radius;
-				double y = anchorY + Math.Sin (angleRad) * radius * 0.65;
-
-				// Container for icon + label
-				StackPanel tile = new StackPanel {
-					HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-					Width = 72
+				Border tile = new Border {
+					Width = 260.0,
+					Height = 42.0,
+					CornerRadius = new CornerRadius (14.0),
+					Background = System.Windows.Media.Brushes.Transparent,
+					Cursor = System.Windows.Input.Cursors.Hand,
+					ToolTip = path,
+					Padding = new Thickness (8, 0, 10, 0)
 				};
 
-				// Icon
+				Grid rowGrid = new Grid ();
+				rowGrid.ColumnDefinitions.Add (new ColumnDefinition { Width = GridLength.Auto });
+				rowGrid.ColumnDefinitions.Add (new ColumnDefinition { Width = new GridLength (1.0, GridUnitType.Star) });
+				rowGrid.ColumnDefinitions.Add (new ColumnDefinition { Width = GridLength.Auto });
+
 				Border iconWrap = new Border {
-					Width = 48.0, Height = 48.0,
-					CornerRadius = new CornerRadius (10.0),
-					Background = isDark
-						? new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 255, 255, 255))
-						: new SolidColorBrush (System.Windows.Media.Color.FromArgb (20, 0, 0, 0)),
-					HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+					Width = 32.0, Height = 32.0,
+					CornerRadius = new CornerRadius (6.0),
+					Background = System.Windows.Media.Brushes.Transparent,
+					VerticalAlignment = VerticalAlignment.Center,
+					Margin = new Thickness (0, 0, 10, 0),
 					ClipToBounds = true
 				};
 				System.Windows.Controls.Image img = new System.Windows.Controls.Image {
 					Stretch = Stretch.Uniform,
-					Width = 36.0, Height = 36.0,
-					Margin = new Thickness (6)
+					Width = 28.0, Height = 28.0
 				};
 				iconWrap.Child = img;
+				Grid.SetColumn (iconWrap, 0);
+				rowGrid.Children.Add (iconWrap);
 				QueueItemIcon (path, img);
 
-				// Label
 				TextBlock label = new TextBlock {
 					Text = fileName,
 					Foreground = GetFg (),
-					FontSize = 9.5,
+					FontSize = 12.0,
 					FontWeight = FontWeights.Medium,
-					FontFamily = new System.Windows.Media.FontFamily ("SF Pro Text, Segoe UI, sans-serif"),
+					FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
 					TextTrimming = TextTrimming.CharacterEllipsis,
-					TextAlignment = TextAlignment.Center,
-					MaxWidth = 68.0,
-					Margin = new Thickness (0, 4, 0, 0)
+					VerticalAlignment = VerticalAlignment.Center,
+					Margin = new Thickness (0, 0, 6, 0)
 				};
+				if (!isDark) {
+					label.Effect = new DropShadowEffect { BlurRadius = 4.0, ShadowDepth = 1.0, Opacity = 0.25, Color = Colors.Black };
+				} else {
+					label.Effect = new DropShadowEffect { BlurRadius = 6.0, ShadowDepth = 1.0, Opacity = 0.6, Color = Colors.Black };
+				}
+				Grid.SetColumn (label, 1);
+				rowGrid.Children.Add (label);
 
-				tile.Children.Add (iconWrap);
-				tile.Children.Add (label);
+				if (isPinned) {
+					TextBlock pinBadge = new TextBlock {
+						Text = "📌",
+						FontSize = 11.0,
+						VerticalAlignment = VerticalAlignment.Center,
+						Margin = new Thickness (4, 0, 0, 0),
+						ToolTip = "Pinned Item"
+					};
+					Grid.SetColumn (pinBadge, 2);
+					rowGrid.Children.Add (pinBadge);
+				}
 
-				// Hover scale
+				tile.Child = rowGrid;
+
+				System.Windows.Controls.ContextMenu menu = new System.Windows.Controls.ContextMenu ();
+				System.Windows.Controls.MenuItem pinMenu = new System.Windows.Controls.MenuItem { Header = isPinned ? "📌 Unpin from Stack" : "📌 Pin to Top of Stack" };
+				string targetItemPath = path;
+				pinMenu.Click += delegate {
+					try {
+						if (StackPinManager.IsPinned (folderPath, targetItemPath)) {
+							StackPinManager.UnpinItem (folderPath, targetItemPath);
+						} else {
+							StackPinManager.PinItem (folderPath, targetItemPath);
+						}
+						LoadDirectoryContents ();
+						RebuildStackUI (animateEntrance: false);
+					} catch { }
+				};
+				menu.Items.Add (pinMenu);
+
+				System.Windows.Controls.MenuItem openLocMenu = new System.Windows.Controls.MenuItem { Header = "📂 Show in File Explorer" };
+				openLocMenu.Click += delegate {
+					try { System.Diagnostics.Process.Start ("explorer.exe", "/select,\"" + targetItemPath + "\""); } catch { }
+				};
+				menu.Items.Add (openLocMenu);
+				tile.ContextMenu = menu;
+
 				ScaleTransform tScale = new ScaleTransform (1.0, 1.0);
 				tile.RenderTransformOrigin = new System.Windows.Point (0.5, 0.5);
 				tile.RenderTransform = tScale;
 
 				tile.MouseEnter += delegate {
 					try {
-						tScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.0, 1.12, TimeSpan.FromMilliseconds (120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
-						tScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.0, 1.12, TimeSpan.FromMilliseconds (120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+						tile.Background = isDark
+							? new SolidColorBrush (System.Windows.Media.Color.FromArgb (80, 255, 255, 255))
+							: new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 0, 0, 0));
+						tScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.0, 1.04, TimeSpan.FromMilliseconds (120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+						tScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.0, 1.04, TimeSpan.FromMilliseconds (120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						Canvas.SetZIndex (tile, 100);
 					} catch { }
 				};
 				tile.MouseLeave += delegate {
 					try {
-						tScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.12, 1.0, TimeSpan.FromMilliseconds (150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
-						tScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.12, 1.0, TimeSpan.FromMilliseconds (150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+						tile.Background = System.Windows.Media.Brushes.Transparent;
+						tScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.04, 1.0, TimeSpan.FromMilliseconds (150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+						tScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.04, 1.0, TimeSpan.FromMilliseconds (150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						Canvas.SetZIndex (tile, i);
 					} catch { }
 				};
@@ -39339,26 +39496,78 @@ namespace MacStyleDock
 					try { CloseAnimated (); } catch { Close (); }
 				};
 
-				// Position (center the tile on the calculated point)
-				Canvas.SetLeft (tile, x - 36.0);
-				Canvas.SetTop (tile, y - 32.0);
+				double yOffset = startY - i * 46.0;
+				double xOffset = anchorX - 130.0 + Math.Sin (i * 0.4) * 12.0;
+
+				Canvas.SetLeft (tile, xOffset);
+				Canvas.SetTop (tile, yOffset);
 				Canvas.SetZIndex (tile, i);
 				canvas.Children.Add (tile);
 
-				// Stagger entrance
 				try {
 					if (parent == null || parent.settings == null || !parent.settings.PerformanceMode) {
 						tile.Opacity = 0.0;
-						tile.BeginAnimation (UIElement.OpacityProperty, new DoubleAnimation (0.0, 1.0, TimeSpan.FromMilliseconds (180)) { BeginTime = TimeSpan.FromMilliseconds (i * 25) });
+						tile.BeginAnimation (UIElement.OpacityProperty, new DoubleAnimation (0.0, 1.0, TimeSpan.FromMilliseconds (180)) { BeginTime = TimeSpan.FromMilliseconds (i * 22) });
 					}
 				} catch { }
 			}
 
-			// "Open in Explorer" pill at bottom center
+			StackPanel actionPills = new StackPanel {
+				Orientation = System.Windows.Controls.Orientation.Horizontal,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+			};
+
 			Border openPill = CreateOpenPill ();
-			Canvas.SetLeft (openPill, anchorX - 60.0);
-			Canvas.SetTop (openPill, base.Height - 36.0);
-			canvas.Children.Add (openPill);
+			actionPills.Children.Add (openPill);
+
+			Border addPinPill = CreateAddPinPill ();
+			addPinPill.Margin = new Thickness (8, 0, 0, 0);
+			actionPills.Children.Add (addPinPill);
+
+			Canvas.SetLeft (actionPills, anchorX - 110.0);
+			Canvas.SetTop (actionPills, startY - maxShow * 46.0 - 10.0);
+			canvas.Children.Add (actionPills);
+		}
+
+		private Border CreateAddPinPill ()
+		{
+			Border pill = new Border {
+				Height = 28.0,
+				CornerRadius = new CornerRadius (14.0),
+				Background = isDark
+					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, 45, 45, 50))
+					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (200, 230, 230, 235)),
+				BorderBrush = GetCardBorder (),
+				BorderThickness = new Thickness (1.0),
+				Padding = new Thickness (10.0, 0, 10.0, 0),
+				Cursor = System.Windows.Input.Cursors.Hand,
+				ToolTip = "Pin a file or app to this Stack"
+			};
+
+			StackPanel sp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+			sp.Children.Add (new TextBlock {
+				Text = "➕ Pin File",
+				Foreground = GetFg (),
+				FontSize = 11.0,
+				FontWeight = FontWeights.SemiBold,
+				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
+				VerticalAlignment = VerticalAlignment.Center
+			});
+			pill.Child = sp;
+
+			pill.MouseLeftButtonDown += delegate {
+				try {
+					Microsoft.Win32.OpenFileDialog ofd = new Microsoft.Win32.OpenFileDialog ();
+					ofd.Title = "Select File or Application to Pin to Stack";
+					ofd.Filter = "All Files (*.*)|*.*|Applications (*.exe)|*.exe";
+					if (ofd.ShowDialog () == true && !string.IsNullOrEmpty (ofd.FileName)) {
+						StackPinManager.PinItem (folderPath, ofd.FileName);
+						LoadDirectoryContents ();
+						RebuildStackUI (animateEntrance: false);
+					}
+				} catch { }
+			};
+			return pill;
 		}
 
 		private Border CreateOpenPill ()
