@@ -39348,16 +39348,54 @@ namespace MacStyleDock
 			} catch { }
 		}
 
+		private static ImageSource _defaultFolderIcon = null;
+		private static ImageSource _defaultFileIcon = null;
+
+		private ImageSource GetFallbackIcon (string path)
+		{
+			try {
+				if (Directory.Exists (path)) {
+					if (_defaultFolderIcon == null) {
+						string windir = System.Environment.GetFolderPath (System.Environment.SpecialFolder.Windows);
+						string shell32 = System.IO.Path.Combine (windir, "System32", "shell32.dll");
+						_defaultFolderIcon = IconExtractor.GetHighQualityIcon (shell32, 48);
+					}
+					if (_defaultFolderIcon != null) return _defaultFolderIcon;
+				} else {
+					if (_defaultFileIcon == null) {
+						string windir = System.Environment.GetFolderPath (System.Environment.SpecialFolder.Windows);
+						string imageres = System.IO.Path.Combine (windir, "System32", "imageres.dll");
+						_defaultFileIcon = IconExtractor.GetHighQualityIcon (imageres, 48);
+					}
+					if (_defaultFileIcon != null) return _defaultFileIcon;
+				}
+			} catch { }
+			return null;
+		}
+
 		private void QueueItemIcon (string path, System.Windows.Controls.Image target)
 		{
 			string closurePath = path;
 			System.Windows.Controls.Image closureImg = target;
+
+			try {
+				ImageSource syncIcon = IconExtractor.GetHighQualityIcon (closurePath, 48)
+					?? IconExtractor.GetJumboIcon (closurePath);
+				if (syncIcon != null) {
+					closureImg.Source = syncIcon;
+					return;
+				}
+			} catch { }
+
 			ThreadPool.QueueUserWorkItem (delegate {
 				ImageSource icon = null;
-				try { icon = IconExtractor.GetShellItemIcon (closurePath); } catch { }
-				try {
-					base.Dispatcher.BeginInvoke ((Action)delegate { if (icon != null) closureImg.Source = icon; });
-				} catch { }
+				try { icon = IconExtractor.GetHighQualityIcon (closurePath, 48) ?? IconExtractor.GetJumboIcon (closurePath) ?? IconExtractor.GetShellItemIcon (closurePath); } catch { }
+				if (icon == null) icon = GetFallbackIcon (closurePath);
+				if (icon != null) {
+					try {
+						base.Dispatcher.BeginInvoke ((Action)delegate { closureImg.Source = icon; });
+					} catch { }
+				}
 			});
 		}
 
@@ -39382,12 +39420,19 @@ namespace MacStyleDock
 
 				Border tile = new Border {
 					Width = 260.0,
-					Height = 42.0,
-					CornerRadius = new CornerRadius (14.0),
-					Background = System.Windows.Media.Brushes.Transparent,
+					Height = 44.0,
+					CornerRadius = new CornerRadius (12.0),
+					Background = isDark
+						? new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 30, 30, 36))
+						: new SolidColorBrush (System.Windows.Media.Color.FromArgb (230, 242, 242, 247)),
+					BorderBrush = isDark
+						? new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 255, 255, 255))
+						: new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 0, 0, 0)),
+					BorderThickness = new Thickness (1.0),
+					Effect = new DropShadowEffect { BlurRadius = 12.0, ShadowDepth = 3.0, Opacity = 0.35, Color = Colors.Black },
 					Cursor = System.Windows.Input.Cursors.Hand,
 					ToolTip = path,
-					Padding = new Thickness (8, 0, 10, 0)
+					Padding = new Thickness (10, 0, 10, 0)
 				};
 
 				Grid rowGrid = new Grid ();
@@ -39474,8 +39519,8 @@ namespace MacStyleDock
 				tile.MouseEnter += delegate {
 					try {
 						tile.Background = isDark
-							? new SolidColorBrush (System.Windows.Media.Color.FromArgb (80, 255, 255, 255))
-							: new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 0, 0, 0));
+							? new SolidColorBrush (System.Windows.Media.Color.FromArgb (250, 55, 55, 65))
+							: new SolidColorBrush (System.Windows.Media.Color.FromArgb (255, 255, 255, 255));
 						tScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.0, 1.04, TimeSpan.FromMilliseconds (120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						tScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.0, 1.04, TimeSpan.FromMilliseconds (120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						Canvas.SetZIndex (tile, 100);
@@ -39483,7 +39528,9 @@ namespace MacStyleDock
 				};
 				tile.MouseLeave += delegate {
 					try {
-						tile.Background = System.Windows.Media.Brushes.Transparent;
+						tile.Background = isDark
+							? new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 30, 30, 36))
+							: new SolidColorBrush (System.Windows.Media.Color.FromArgb (230, 242, 242, 247));
 						tScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.04, 1.0, TimeSpan.FromMilliseconds (150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						tScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.04, 1.0, TimeSpan.FromMilliseconds (150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						Canvas.SetZIndex (tile, i);
