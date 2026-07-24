@@ -343,7 +343,7 @@
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
                                             <TextBlock Text="Magnification Range" Style="{StaticResource CardText}"/>
-                                            <Slider x:Name="MagRange" Minimum="1" Maximum="10" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                            <Slider x:Name="MagRange" Minimum="80" Maximum="260" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                         </Grid>
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
@@ -370,6 +370,11 @@
                                         <Grid Margin="15,10">
                                             <TextBlock Text="Automatically hide and show the Dock" Style="{StaticResource CardText}"/>
                                             <CheckBox x:Name="AutoHide" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Hide Dock in Fullscreen" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="HideOnFullscreen" Template="{StaticResource MacToggle}"/>
                                         </Grid>
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
@@ -419,6 +424,11 @@
                                 <TextBlock Text="Effects" Foreground="#8E8E93" FontSize="12" Margin="15,15,0,5" FontFamily="{StaticResource MacFont}"/>
                                 <Border Style="{StaticResource MacCard}">
                                     <StackPanel>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Authentic macOS Liquid Glass" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="LiquidGlass" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
                                             <TextBlock Text="Enable Launch Glow" Style="{StaticResource CardText}"/>
                                             <CheckBox x:Name="LaunchGlow" Template="{StaticResource MacToggle}"/>

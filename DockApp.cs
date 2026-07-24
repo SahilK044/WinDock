@@ -589,6 +589,18 @@ namespace MacStyleDock
 
 		[DataMember]
 
+		public bool HideOnFullscreen { get; set; } = true;
+
+
+
+		[DataMember]
+
+		public bool EnableLiquidGlass { get; set; } = true;
+
+
+
+		[DataMember]
+
 		public string Position { get; set; }
 
 
@@ -962,9 +974,9 @@ namespace MacStyleDock
 			}
 
 			try {
-
-				new System.Windows.Application ().Run (new DockWindow ());
-
+				System.Windows.Application app = new System.Windows.Application ();
+				app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+				app.Run (new DockWindow ());
 			} catch (Exception ex) {
 
 				try {
@@ -1679,7 +1691,7 @@ namespace MacStyleDock
 
 
 
-		private double range => settings.Range;
+		private double range => (settings == null || settings.Range <= 40.0 || double.IsNaN (settings.Range)) ? 160.0 : settings.Range;
 
 
 
@@ -2225,6 +2237,10 @@ namespace MacStyleDock
 
 		private IntPtr HwndHook (IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
 		{
+			if (msg == 0x0021) {
+				handled = true;
+				return (IntPtr)3;
+			}
 			if (msg == 786) {
 				int hotkeyId = wParam.ToInt32 ();
 				if (hotkeyId == 9009) {
@@ -3870,16 +3886,63 @@ namespace MacStyleDock
 
 
 
-		public DockWindow ()
+		private DispatcherTimer _fullscreenTimer;
+		private bool _wasFullscreenHidden = false;
 
+		private void SetupFullscreenWatcher ()
 		{
+			_fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (500.0) };
+			_fullscreenTimer.Tick += delegate {
+				if (settings == null || !settings.HideOnFullscreen) return;
+				IntPtr dockHwnd = new WindowInteropHelper (this).Handle;
+				bool isFS = FullscreenDetector.IsFullscreenOnDockMonitor (dockHwnd);
+				if (isFS && !isDockHidden) {
+					_wasFullscreenHidden = true;
+					HideDock ();
+				} else if (!isFS && _wasFullscreenHidden && !settings.AutoHide) {
+					_wasFullscreenHidden = false;
+					ShowDock ();
+				}
+			};
+			_fullscreenTimer.Start ();
+		}
 
+		private System.Windows.Rect? ResolveIconRect (IntPtr targetHwnd)
+		{
+			if (dockPanel == null || targetHwnd == IntPtr.Zero) return null;
+			try {
+				uint targetProcId = 0;
+				GetWindowThreadProcessId (targetHwnd, out targetProcId);
+
+				foreach (UIElement child in dockPanel.Children) {
+					if (child is DockItemControl dic) {
+						if (dic.TargetHwnd == targetHwnd) {
+							System.Windows.Point p = dic.TransformToAncestor (this).Transform (new System.Windows.Point (0, 0));
+							System.Windows.Point screenP = PointToScreen (p);
+							return new System.Windows.Rect (screenP.X, screenP.Y, dic.ActualWidth, dic.ActualHeight);
+						}
+
+						if (dic.TargetHwnd != IntPtr.Zero && targetProcId != 0) {
+							GetWindowThreadProcessId (dic.TargetHwnd, out uint dicProcId);
+							if (dicProcId != 0 && dicProcId == targetProcId) {
+								System.Windows.Point p = dic.TransformToAncestor (this).Transform (new System.Windows.Point (0, 0));
+								System.Windows.Point screenP = PointToScreen (p);
+								return new System.Windows.Rect (screenP.X, screenP.Y, dic.ActualWidth, dic.ActualHeight);
+							}
+						}
+					}
+				}
+			} catch {
+			}
+			return null;
+		}
+
+		public DockWindow ()
+		{
 			Instance = this;
 
 			base.SourceInitialized += delegate {
-
 				IntPtr handle2 = new WindowInteropHelper (this).Handle;
-
 				HwndSource.FromHwnd (handle2).AddHook (HwndHook);
 
 				RegisterHotKey (handle2, 9009, 16390u, 65u);
@@ -3888,25 +3951,20 @@ namespace MacStyleDock
 				RegisterHotKey (handle2, 9012, 16384u, 115u);
 
 				_isPresentationSourceValid = true;
-
+				GenieEffect.Initialize (this, ResolveIconRect);
+				SetupFullscreenWatcher ();
 			};
 
 			base.Closed += delegate {
-
 				_isPresentationSourceValid = false;
-
+				GenieEffect.Shutdown ();
 			};
 
 			base.AllowsTransparency = true;
-
 			base.WindowStyle = WindowStyle.None;
-
 			base.Background = System.Windows.Media.Brushes.Transparent;
-
 			base.Topmost = true;
-
 			base.ShowInTaskbar = false;
-
 			base.Title = "MacStyleDock";
 
 			LoadSettings ();
@@ -4018,6 +4076,22 @@ namespace MacStyleDock
 			dockBorder.Padding = new Thickness (12.0, 6.0, 12.0, 6.0);
 
 
+
+			dockBorder.SizeChanged += (s, e) => {
+				if (dockBorder.Effect is LiquidGlassEffect glassEffect) {
+					glassEffect.DockSize = new System.Windows.Size (e.NewSize.Width, e.NewSize.Height);
+				}
+			};
+
+			dockBorder.MouseMove += (s, e) => {
+				if (dockBorder.Effect is LiquidGlassEffect glassEffect) {
+					System.Windows.Point pos = e.GetPosition (dockBorder);
+					System.Windows.Point center = new System.Windows.Point (dockBorder.ActualWidth / 2.0, dockBorder.ActualHeight / 2.0);
+					glassEffect.LightAngle = Math.Atan2 (pos.Y - center.Y, pos.X - center.X);
+					glassEffect.RefractionStrength = 9.0;
+					glassEffect.SpecularIntensity = 0.70;
+				}
+			};
 
 			dockSlideTransform = new TranslateTransform ();
 
@@ -7743,8 +7817,10 @@ namespace MacStyleDock
 
 			}
 
+			if (settings != null && settings.EnableLiquidGlass) {
+				ApplyLiquidGlassTint ();
+			}
 			Update3DShelf ();
-
 		}
 
 		private Polygon _shelfPolygon;
@@ -7755,6 +7831,10 @@ namespace MacStyleDock
 		public void Update3DShelf ()
 		{
 			if (dockBorder == null) return;
+			if (dockBorder.Effect is LiquidGlassEffect glassEffect) {
+				glassEffect.RefractionStrength += (6.0 - glassEffect.RefractionStrength) * 0.12;
+				glassEffect.SpecularIntensity += (0.35 - glassEffect.SpecularIntensity) * 0.12;
+			}
 			Grid grid2 = dockBorder.Child as Grid;
 			if (grid2 == null) return;
 
@@ -11501,42 +11581,62 @@ namespace MacStyleDock
 
 
 
-		private void ApplyLiquidGlassTint ()
-
+		public void ApplyLiquidGlassTint ()
 		{
-
 			try {
+				if (dockBorder == null) return;
+				if (settings != null && settings.EnableLiquidGlass) {
+					LiquidGlassEffect glassEffect = dockBorder.Effect as LiquidGlassEffect;
+					if (glassEffect == null) {
+						glassEffect = new LiquidGlassEffect {
+							CornerRadius = dockBorder.CornerRadius.TopLeft > 0 ? dockBorder.CornerRadius.TopLeft : 22.0,
+							RefractionStrength = 6.0,
+							TintOpacity = 0.08,
+							SpecularIntensity = 0.35,
+							DockSize = new System.Windows.Size (dockBorder.ActualWidth > 0 ? dockBorder.ActualWidth : 500.0, dockBorder.ActualHeight > 0 ? dockBorder.ActualHeight : 80.0)
+						};
+						dockBorder.Effect = glassEffect;
+					}
 
-				if (dockBorder.Background is LinearGradientBrush linearGradientBrush && linearGradientBrush.GradientStops.Count >= 2 && !linearGradientBrush.IsFrozen) {
+					dockBorder.Background = new LinearGradientBrush (
+						new GradientStopCollection {
+							new GradientStop (System.Windows.Media.Color.FromArgb (165, 255, 255, 255), 0.0),
+							new GradientStop (System.Windows.Media.Color.FromArgb (115, 242, 245, 250), 0.35),
+							new GradientStop (System.Windows.Media.Color.FromArgb (145, 255, 255, 255), 1.0)
+						},
+						new System.Windows.Point (0.0, 0.0),
+						new System.Windows.Point (0.0, 1.0)
+					);
 
-					System.Windows.Media.Color color = linearGradientBrush.GradientStops [0].Color;
+					dockBorder.BorderBrush = new LinearGradientBrush (
+						new GradientStopCollection {
+							new GradientStop (System.Windows.Media.Color.FromArgb (240, 255, 255, 255), 0.0),
+							new GradientStop (System.Windows.Media.Color.FromArgb (160, 255, 255, 255), 0.4),
+							new GradientStop (System.Windows.Media.Color.FromArgb (200, 255, 255, 255), 1.0)
+						},
+						new System.Windows.Point (0.0, 0.0),
+						new System.Windows.Point (1.0, 1.0)
+					);
+					dockBorder.BorderThickness = new Thickness (1.5);
 
-					double effectiveStrength = liquidTintStrength * settings.BlurAmount;
-
-					byte r = (byte)((double)(int)color.R * (1.0 - 0.15 * effectiveStrength) + (double)(int)liquidGlassTintColor.R * 0.15 * effectiveStrength);
-
-					byte g = (byte)((double)(int)color.G * (1.0 - 0.15 * effectiveStrength) + (double)(int)liquidGlassTintColor.G * 0.15 * effectiveStrength);
-
-					byte b = (byte)((double)(int)color.B * (1.0 - 0.15 * effectiveStrength) + (double)(int)liquidGlassTintColor.B * 0.15 * effectiveStrength);
-
-					ColorAnimation animation = new ColorAnimation (System.Windows.Media.Color.FromArgb (color.A, r, g, b), TimeSpan.FromMilliseconds (800.0)) {
-
-						EasingFunction = new CubicEase {
-
-							EasingMode = EasingMode.EaseOut
-
-						}
-
-					};
-
-					linearGradientBrush.GradientStops [0].BeginAnimation (GradientStop.ColorProperty, animation);
-
+					if (_shimmerOverlay != null) {
+						_shimmerOverlay.CornerRadius = dockBorder.CornerRadius;
+						_shimmerOverlay.Opacity = 0.75;
+						_shimmerOverlay.Background = new LinearGradientBrush (
+							new GradientStopCollection {
+								new GradientStop (System.Windows.Media.Color.FromArgb (70, 255, 255, 255), 0.0),
+								new GradientStop (System.Windows.Media.Color.FromArgb (0, 255, 255, 255), 0.5),
+								new GradientStop (System.Windows.Media.Color.FromArgb (40, 255, 255, 255), 1.0)
+							},
+							new System.Windows.Point (0.2, 0.0),
+							new System.Windows.Point (0.8, 1.0)
+						);
+					}
+				} else {
+					ApplyTheme ();
 				}
-
 			} catch {
-
 			}
-
 		}
 
 
@@ -12509,6 +12609,14 @@ namespace MacStyleDock
 
 		public Grid ReflectionGrid { get; private set; }
 
+		public void UpdateReflectionVisibility ()
+		{
+			if (ReflectionGrid == null) return;
+			bool isHorizontal = DockWindow.Instance == null || DockWindow.Instance.settings == null || 
+				(DockWindow.Instance.settings.Position.ToLower () != "left" && DockWindow.Instance.settings.Position.ToLower () != "right");
+			ReflectionGrid.Visibility = isHorizontal ? Visibility.Visible : Visibility.Collapsed;
+		}
+
 
 
 		public TranslateTransform WaveTransform { get; private set; }
@@ -12713,6 +12821,8 @@ namespace MacStyleDock
 			};
 
 			ReflectionGrid.OpacityMask = opacityMask;
+
+			UpdateReflectionVisibility ();
 
 			base.Children.Add (ReflectionGrid);
 
@@ -13325,6 +13435,7 @@ namespace MacStyleDock
 				ReflectionGrid.Width = newBaseSize;
 				ReflectionGrid.Height = newBaseSize * 0.4;
 				ReflectionGrid.Margin = new Thickness (0.0, 0.0, 0.0, (0.0 - newBaseSize) * 0.38);
+				UpdateReflectionVisibility ();
 			}
 
 			if (IndicatorDot != null) {
@@ -14917,21 +15028,15 @@ namespace MacStyleDock
 				try {
 
 					if (DockWindow.GetForegroundWindow () == TargetHwnd) {
-
-						DockWindow.ShowWindow (TargetHwnd, 6);
-
+						GenieEffect.PlayMinimizeAnimation (TargetHwnd);
 						return;
-
 					}
 
 					if (DockWindow.IsIconic (TargetHwnd)) {
-
-						DockWindow.ShowWindow (TargetHwnd, 9);
-
+						GenieEffect.PlayRestoreAnimation (TargetHwnd);
+					} else {
+						DockWindow.SetForegroundWindow (TargetHwnd);
 					}
-
-					DockWindow.SetForegroundWindow (TargetHwnd);
-
 					return;
 
 				} catch {
@@ -17020,20 +17125,23 @@ namespace MacStyleDock
 			});
 
 			Slider MagRange = root.FindName ("MagRange") as Slider;
-
 			if (MagRange != null) {
-
-				MagRange.Value = settings.Range;
-
+				MagRange.Value = Math.Max (80.0, Math.Min (260.0, settings.Range));
 				MagRange.ValueChanged += delegate {
-
-					settings.Range = MagRange.Value;
-
+					settings.Range = Math.Max (80.0, Math.Min (260.0, MagRange.Value));
 					ownerWindow.ApplySettings (settings);
-
 				};
-
 			}
+
+			BindToggle ("HideOnFullscreen", settings.HideOnFullscreen, delegate(bool v) {
+				settings.HideOnFullscreen = v;
+			});
+
+			BindToggle ("LiquidGlass", settings.EnableLiquidGlass, delegate(bool v) {
+				settings.EnableLiquidGlass = v;
+				ownerWindow.ApplyLiquidGlassTint ();
+				ownerWindow.ApplySettings (settings);
+			});
 
 			Slider AutoHideDelay = root.FindName ("AutoHideDelay") as Slider;
 
@@ -23728,87 +23836,66 @@ namespace MacStyleDock
 			}
 
 			try {
+				TransformGroup tg = mainBorder.RenderTransform as TransformGroup;
+				ScaleTransform scaleTransform = (tg != null && tg.Children.Count > 0) ? tg.Children [0] as ScaleTransform : null;
+				TranslateTransform translateTransform = (tg != null && tg.Children.Count > 1) ? tg.Children [1] as TranslateTransform : null;
 
-				ScaleTransform scaleTransform = ((TransformGroup)mainBorder.RenderTransform).Children [0] as ScaleTransform;
-
-				TranslateTransform translateTransform = ((TransformGroup)mainBorder.RenderTransform).Children [1] as TranslateTransform;
-
-				scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, null);
-
-				scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, null);
-
-				translateTransform.BeginAnimation (TranslateTransform.YProperty, null);
-
+				if (scaleTransform != null) {
+					scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, null);
+					scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, null);
+				}
+				if (translateTransform != null) {
+					translateTransform.BeginAnimation (TranslateTransform.YProperty, null);
+				}
 				mainBorder.BeginAnimation (UIElement.OpacityProperty, null);
 
 				if (ownerWindow.settings != null && ownerWindow.settings.PerformanceMode) {
-
-					scaleTransform.ScaleX = 1.0;
-
-					scaleTransform.ScaleY = 1.0;
-
-					translateTransform.Y = 0.0;
-
+					if (scaleTransform != null) {
+						scaleTransform.ScaleX = 1.0;
+						scaleTransform.ScaleY = 1.0;
+					}
+					if (translateTransform != null) {
+						translateTransform.Y = 0.0;
+					}
 					mainBorder.Opacity = 1.0;
-
 					return;
-
 				}
 
 				DoubleAnimation animation = new DoubleAnimation (0.85, 1.0, TimeSpan.FromMilliseconds (280.0)) {
-
 					EasingFunction = new BackEase {
-
 						EasingMode = EasingMode.EaseOut,
-
 						Amplitude = 0.2
-
 					}
-
 				};
 
 				DoubleAnimation animation2 = new DoubleAnimation (0.85, 1.0, TimeSpan.FromMilliseconds (280.0)) {
-
 					EasingFunction = new BackEase {
-
 						EasingMode = EasingMode.EaseOut,
-
 						Amplitude = 0.2
-
 					}
-
 				};
 
 				DoubleAnimation animation3 = new DoubleAnimation (15.0, 0.0, TimeSpan.FromMilliseconds (280.0)) {
-
 					EasingFunction = new CubicEase {
-
 						EasingMode = EasingMode.EaseOut
-
 					}
-
 				};
 
 				DoubleAnimation animation4 = new DoubleAnimation (mainBorder.Opacity, 1.0, TimeSpan.FromMilliseconds (240.0)) {
-
 					EasingFunction = new CubicEase {
-
 						EasingMode = EasingMode.EaseOut
-
 					}
-
 				};
 
-				scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, animation);
-
-				scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, animation2);
-
-				translateTransform.BeginAnimation (TranslateTransform.YProperty, animation3);
-
+				if (scaleTransform != null) {
+					scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, animation);
+					scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, animation2);
+				}
+				if (translateTransform != null) {
+					translateTransform.BeginAnimation (TranslateTransform.YProperty, animation3);
+				}
 				mainBorder.BeginAnimation (UIElement.OpacityProperty, animation4);
-
 			} catch {
-
 			}
 
 		}
@@ -23898,101 +23985,72 @@ namespace MacStyleDock
 
 
 		public void HidePreview ()
-
 		{
-
 			try {
+				TransformGroup tg = mainBorder.RenderTransform as TransformGroup;
+				ScaleTransform scaleTransform = (tg != null && tg.Children.Count > 0) ? tg.Children [0] as ScaleTransform : null;
+				TranslateTransform translateTransform = (tg != null && tg.Children.Count > 1) ? tg.Children [1] as TranslateTransform : null;
 
 				if (ownerWindow.settings != null && ownerWindow.settings.PerformanceMode) {
-
-					ScaleTransform obj = ((TransformGroup)mainBorder.RenderTransform).Children [0] as ScaleTransform;
-
-					TranslateTransform translateTransform = ((TransformGroup)mainBorder.RenderTransform).Children [1] as TranslateTransform;
-
-					obj.BeginAnimation (ScaleTransform.ScaleXProperty, null);
-
-					obj.BeginAnimation (ScaleTransform.ScaleYProperty, null);
-
-					translateTransform.BeginAnimation (TranslateTransform.YProperty, null);
-
+					if (scaleTransform != null) {
+						scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, null);
+						scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, null);
+					}
+					if (translateTransform != null) {
+						translateTransform.BeginAnimation (TranslateTransform.YProperty, null);
+					}
 					mainBorder.BeginAnimation (UIElement.OpacityProperty, null);
-
 					mainBorder.Opacity = 0.0;
-
 					UnregisterActiveThumbnail ();
-
 					Hide ();
-
 					return;
-
 				}
 
-				ScaleTransform scaleTransform = ((TransformGroup)mainBorder.RenderTransform).Children [0] as ScaleTransform;
-
-				TranslateTransform translateTransform2 = ((TransformGroup)mainBorder.RenderTransform).Children [1] as TranslateTransform;
-
-				scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, null);
-
-				scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, null);
-
-				translateTransform2.BeginAnimation (TranslateTransform.YProperty, null);
-
+				if (scaleTransform != null) {
+					scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, null);
+					scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, null);
+				}
+				if (translateTransform != null) {
+					translateTransform.BeginAnimation (TranslateTransform.YProperty, null);
+				}
 				mainBorder.BeginAnimation (UIElement.OpacityProperty, null);
 
-				DoubleAnimation animation = new DoubleAnimation ((mainBorder.Opacity > 0.0) ? scaleTransform.ScaleX : 1.0, 0.88, TimeSpan.FromMilliseconds (160.0)) {
-
+				DoubleAnimation animation = new DoubleAnimation ((mainBorder.Opacity > 0.0 && scaleTransform != null) ? scaleTransform.ScaleX : 1.0, 0.88, TimeSpan.FromMilliseconds (160.0)) {
 					EasingFunction = new CubicEase {
-
 						EasingMode = EasingMode.EaseIn
-
 					}
-
 				};
 
-				DoubleAnimation animation2 = new DoubleAnimation ((mainBorder.Opacity > 0.0) ? scaleTransform.ScaleY : 1.0, 0.88, TimeSpan.FromMilliseconds (160.0)) {
-
+				DoubleAnimation animation2 = new DoubleAnimation ((mainBorder.Opacity > 0.0 && scaleTransform != null) ? scaleTransform.ScaleY : 1.0, 0.88, TimeSpan.FromMilliseconds (160.0)) {
 					EasingFunction = new CubicEase {
-
 						EasingMode = EasingMode.EaseIn
-
 					}
-
 				};
 
-				DoubleAnimation animation3 = new DoubleAnimation ((mainBorder.Opacity > 0.0) ? translateTransform2.Y : 0.0, 12.0, TimeSpan.FromMilliseconds (160.0)) {
-
+				DoubleAnimation animation3 = new DoubleAnimation ((mainBorder.Opacity > 0.0 && translateTransform != null) ? translateTransform.Y : 0.0, 12.0, TimeSpan.FromMilliseconds (160.0)) {
 					EasingFunction = new CubicEase {
-
 						EasingMode = EasingMode.EaseIn
-
 					}
-
 				};
 
 				DoubleAnimation doubleAnimation = new DoubleAnimation (mainBorder.Opacity, 0.0, TimeSpan.FromMilliseconds (140.0)) {
-
 					EasingFunction = new CubicEase {
-
 						EasingMode = EasingMode.EaseIn
-
 					}
-
 				};
 
 				doubleAnimation.Completed += delegate {
-
 					UnregisterActiveThumbnail ();
-
 					Hide ();
-
 				};
 
-				scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, animation);
-
-				scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, animation2);
-
-				translateTransform2.BeginAnimation (TranslateTransform.YProperty, animation3);
-
+				if (scaleTransform != null) {
+					scaleTransform.BeginAnimation (ScaleTransform.ScaleXProperty, animation);
+					scaleTransform.BeginAnimation (ScaleTransform.ScaleYProperty, animation2);
+				}
+				if (translateTransform != null) {
+					translateTransform.BeginAnimation (TranslateTransform.YProperty, animation3);
+				}
 				mainBorder.BeginAnimation (UIElement.OpacityProperty, doubleAnimation);
 
 			} catch {
@@ -32716,16 +32774,10 @@ namespace MacStyleDock
 
 				grid.MouseLeave += delegate {
 
-					if (driverImg != null) {
-
-						ScaleTransform obj = (ScaleTransform)driverImg.RenderTransform;
-
+					if (driverImg != null && driverImg.RenderTransform is ScaleTransform obj) {
 						DoubleAnimation animation = new DoubleAnimation (1.08, 1.0, TimeSpan.FromMilliseconds (200.0));
-
 						obj.BeginAnimation (ScaleTransform.ScaleXProperty, animation);
-
 						obj.BeginAnimation (ScaleTransform.ScaleYProperty, animation);
-
 					}
 
 					cardBorder.Background = gradient;
@@ -33510,16 +33562,10 @@ namespace MacStyleDock
 
 				grid.MouseLeave += delegate {
 
-					if (driverImg != null) {
-
-						ScaleTransform obj = (ScaleTransform)driverImg.RenderTransform;
-
+					if (driverImg != null && driverImg.RenderTransform is ScaleTransform obj) {
 						DoubleAnimation animation = new DoubleAnimation (1.08, 1.0, TimeSpan.FromMilliseconds (200.0));
-
 						obj.BeginAnimation (ScaleTransform.ScaleXProperty, animation);
-
 						obj.BeginAnimation (ScaleTransform.ScaleYProperty, animation);
-
 					}
 
 					cardBorder.Background = gradient;
@@ -35510,7 +35556,7 @@ namespace MacStyleDock
 				searchBox.Foreground = System.Windows.Media.Brushes.White;
 				searchBox.CaretBrush = System.Windows.Media.Brushes.White;
 				
-				placeholderText.Foreground = _shimmerBrush != null ? (System.Windows.Media.Brush)_shimmerBrush : new SolidColorBrush (System.Windows.Media.Color.FromRgb (130, 135, 145));
+				placeholderText.Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (150, 235, 238, 245));
 				if (_searchIcon != null) {
 					_searchIcon.Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (180, 185, 195));
 				}
@@ -37254,7 +37300,7 @@ namespace MacStyleDock
 
 			double targetOpacity = show ? 1.0 : 0.0;
 			double targetHeight = 0.0;
-			double targetWindowHeight = show ? (28.0 + SpotlightSearchHeight + 1.0 + SpotlightResultsHeight + 36.0) : (28.0 + SpotlightSearchHeight + 36.0);
+			double targetWindowHeight = show ? (24.0 + SpotlightSearchHeight + 1.0 + SpotlightResultsHeight + 44.0) : 140.0;
 
 			resultsShadowWrapper.BeginAnimation (FrameworkElement.HeightProperty, null);
 			resultsShadowWrapper.BeginAnimation (UIElement.OpacityProperty, null);
@@ -37329,16 +37375,21 @@ namespace MacStyleDock
 			base.Background = System.Windows.Media.Brushes.Transparent;
 			base.Width = SpotlightOuterWidth;
 			base.SizeToContent = SizeToContent.Manual;
-			base.Height = 116.0;
-			base.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+			base.Height = 140.0;
+			base.WindowStartupLocation = WindowStartupLocation.Manual;
+			Rect workArea = SystemParameters.WorkArea;
+			base.Left = workArea.Left + (workArea.Width - SpotlightOuterWidth) / 2.0;
+			base.Top = workArea.Top + workArea.Height * 0.22;
 			base.UseLayoutRounding = true;
 			base.SnapsToDevicePixels = true;
+			base.ClipToBounds = false;
 
 			StackPanel mainStack = new StackPanel {
 				Orientation = System.Windows.Controls.Orientation.Vertical,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 				VerticalAlignment = VerticalAlignment.Top,
-				Margin = new Thickness (40.0, 28.0, 40.0, 36.0)
+				Margin = new Thickness (40.0, 24.0, 40.0, 44.0),
+				ClipToBounds = false
 			};
 			base.Content = mainStack;
 
@@ -37378,7 +37429,8 @@ namespace MacStyleDock
 				BorderThickness = new Thickness (0.8),
 				Width = SpotlightPanelWidth,
 				UseLayoutRounding = true,
-				SnapsToDevicePixels = true
+				SnapsToDevicePixels = true,
+				ClipToBounds = false
 			};
 
 			StackPanel unifiedStack = new StackPanel {

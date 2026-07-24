@@ -18,6 +18,7 @@
     <Resource Include="weather_cloudy.png" />
     <Resource Include="weather_rain.png" />
     <Resource Include="weather_thunderstorm.png" />
+    <Resource Include="Effects\LiquidGlass.ps" />
     <EmbeddedResource Include="MacSettings.txt" />
   </ItemGroup>
   <ItemGroup>
@@ -27,12 +28,9 @@
     <Reference Include="System.Management" />
     <Reference Include="Microsoft.CSharp" />
     <None Include="MacSettings.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="f1_logo.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="f1_logo_cropped.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="f1_logo_white.png">
@@ -65,7 +63,7 @@
     <None Include="Team Logos\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Cars\**\*">
+    <None Include="F1 Cars\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Track\**\*">
