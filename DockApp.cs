@@ -15841,6 +15841,43 @@ namespace MacStyleDock
 
 		}
 
+		public static ImageSource GetShellItemIcon (string path)
+		{
+			try {
+				if (Directory.Exists (path)) {
+					SHFILEINFO psfi = default(SHFILEINFO);
+					if (SHGetFileInfo (path, 0u, ref psfi, (uint)Marshal.SizeOf (psfi), 16384u) != IntPtr.Zero) {
+						int iIcon = psfi.iIcon;
+						Guid riid = new Guid ("46EB2DE8-BE82-11D1-8A3A-00C04FC2978D");
+						if (SHGetImageList (4, ref riid, out var ppv) == 0 && ppv != null) {
+							IntPtr picon = IntPtr.Zero;
+							if (ppv.GetIcon (iIcon, 1, ref picon) == 0 && picon != IntPtr.Zero) {
+								try {
+									BitmapSource bitmapSource = Imaging.CreateBitmapSourceFromHIcon (picon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions ());
+									bitmapSource.Freeze ();
+									return bitmapSource;
+								} finally {
+									DestroyIcon (picon);
+								}
+							}
+						}
+					}
+				} else if (File.Exists (path)) {
+					ImageSource jumbo = GetJumboIcon (path);
+					if (jumbo != null) return jumbo;
+
+					using (System.Drawing.Icon ico = System.Drawing.Icon.ExtractAssociatedIcon (path)) {
+						if (ico != null) {
+							BitmapSource bs = Imaging.CreateBitmapSourceFromHIcon (ico.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions ());
+							bs.Freeze ();
+							return bs;
+						}
+					}
+				}
+			} catch { }
+			return GetIcon (path);
+		}
+
 
 
 		public static ImageSource GetIcon (string path)
@@ -39076,21 +39113,21 @@ namespace MacStyleDock
 			Border glassContainer = new Border {
 				CornerRadius = new CornerRadius (20.0),
 				Background = isDark 
-					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 28, 28, 30))
-					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 245, 245, 247)),
+					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 24, 24, 26))
+					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 248, 248, 250)),
 				BorderBrush = isDark
-					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (80, 255, 255, 255))
-					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 0, 0, 0)),
+					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (70, 255, 255, 255))
+					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (50, 0, 0, 0)),
 				BorderThickness = new Thickness (1.2),
 				Padding = new Thickness (16.0),
-				Margin = new Thickness (10.0)
+				Margin = new Thickness (0.0)
 			};
 
 			if (parent == null || parent.settings == null || !parent.settings.PerformanceMode) {
 				glassContainer.Effect = new DropShadowEffect {
-					BlurRadius = 30.0,
-					ShadowDepth = 8.0,
-					Opacity = 0.45,
+					BlurRadius = 24.0,
+					ShadowDepth = 6.0,
+					Opacity = 0.35,
 					Color = Colors.Black
 				};
 			}
@@ -39137,7 +39174,7 @@ namespace MacStyleDock
 
 			// Items View
 			ScrollViewer scrollViewer = new ScrollViewer {
-				VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+				VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
 				HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
 			};
 			Grid.SetRow (scrollViewer, 1);
@@ -39191,16 +39228,13 @@ namespace MacStyleDock
 				ThreadPool.QueueUserWorkItem (delegate {
 					ImageSource icon = null;
 					try {
-						icon = IconExtractor.GetJumboIcon (closurePath);
-						if (icon == null) icon = IconExtractor.GetIcon (closurePath);
+						icon = IconExtractor.GetShellItemIcon (closurePath);
 					} catch { }
 
 					try {
 						base.Dispatcher.BeginInvoke ((Action)delegate {
 							if (icon != null) {
 								closureImg.Source = icon;
-							} else {
-								closureImg.Source = IconExtractor.CreateFallbackIcon (System.IO.Path.GetFileName (closurePath));
 							}
 						});
 					} catch { }
