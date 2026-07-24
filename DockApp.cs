@@ -39063,7 +39063,6 @@ namespace MacStyleDock
 			};
 
 			base.Loaded += delegate {
-				EnableBlur (true);
 			};
 
 			mainGrid = new Grid ();
@@ -39109,231 +39108,206 @@ namespace MacStyleDock
 			bool isDark = (parent == null || parent.settings == null || parent.settings.Theme.ToLower () != "light");
 			bool isLiquidGlass = (parent != null && parent.settings != null && parent.settings.EnableLiquidGlass);
 
-			System.Windows.Media.Brush glassBg;
-			System.Windows.Media.Brush glassBorder;
+			System.Windows.Media.Brush pillBg = isDark
+				? (isLiquidGlass ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 30, 30, 34)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 24, 24, 26)))
+				: (isLiquidGlass ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (230, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (240, 245, 245, 247)));
 
-			if (isLiquidGlass) {
-				if (isDark) {
-					LinearGradientBrush darkGlass = new LinearGradientBrush {
-						StartPoint = new System.Windows.Point (0.0, 0.0),
-						EndPoint = new System.Windows.Point (0.0, 1.0)
-					};
-					darkGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (210, 32, 32, 36), 0.0));
-					darkGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (185, 20, 20, 24), 0.5));
-					darkGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (200, 28, 28, 32), 1.0));
-					glassBg = darkGlass;
-
-					LinearGradientBrush darkBorder = new LinearGradientBrush {
-						StartPoint = new System.Windows.Point (0.0, 0.0),
-						EndPoint = new System.Windows.Point (0.0, 1.0)
-					};
-					darkBorder.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (160, 255, 255, 255), 0.0));
-					darkBorder.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (60, 255, 255, 255), 1.0));
-					glassBorder = darkBorder;
-				} else {
-					LinearGradientBrush lightGlass = new LinearGradientBrush {
-						StartPoint = new System.Windows.Point (0.0, 0.0),
-						EndPoint = new System.Windows.Point (0.0, 1.0)
-					};
-					lightGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (220, 255, 255, 255), 0.0));
-					lightGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (190, 240, 243, 248), 0.5));
-					lightGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (210, 255, 255, 255), 1.0));
-					glassBg = lightGlass;
-
-					LinearGradientBrush lightBorder = new LinearGradientBrush {
-						StartPoint = new System.Windows.Point (0.0, 0.0),
-						EndPoint = new System.Windows.Point (0.0, 1.0)
-					};
-					lightBorder.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (220, 255, 255, 255), 0.0));
-					lightBorder.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (80, 0, 0, 0), 1.0));
-					glassBorder = lightBorder;
-				}
-			} else {
-				glassBg = isDark 
-					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 24, 24, 26))
-					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 248, 248, 250));
-				glassBorder = isDark
-					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (70, 255, 255, 255))
-					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (50, 0, 0, 0));
-			}
+			System.Windows.Media.Brush pillBorder = isDark
+				? new SolidColorBrush (System.Windows.Media.Color.FromArgb (90, 255, 255, 255))
+				: new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 0, 0, 0));
 
 			System.Windows.Media.Brush foreground = isDark ? System.Windows.Media.Brushes.White : System.Windows.Media.Brushes.Black;
-			System.Windows.Media.Brush subForeground = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 0, 0, 0));
 
-			Border glassContainer = new Border {
-				CornerRadius = new CornerRadius (22.0),
-				Background = glassBg,
-				BorderBrush = glassBorder,
-				BorderThickness = new Thickness (1.2),
-				Padding = new Thickness (16.0),
-				Margin = new Thickness (0.0),
-				ClipToBounds = true
+			Canvas canvas = new Canvas ();
+			mainGrid.Children.Add (canvas);
+
+			int maxShow = Math.Min (items.Count, 12);
+			base.Width = 380.0;
+			base.Height = Math.Max (240.0, 80.0 + maxShow * 52.0);
+
+			// Top Action Pill: "Open in Explorer"
+			Border openActionPill = new Border {
+				Height = 36.0,
+				CornerRadius = new CornerRadius (18.0),
+				Background = pillBg,
+				BorderBrush = pillBorder,
+				BorderThickness = new Thickness (1.0),
+				Padding = new Thickness (14.0, 0, 10.0, 0),
+				Cursor = System.Windows.Input.Cursors.Hand
 			};
 
 			if (parent == null || parent.settings == null || !parent.settings.PerformanceMode) {
-				glassContainer.Effect = new DropShadowEffect {
-					BlurRadius = 28.0,
-					ShadowDepth = 6.0,
+				openActionPill.Effect = new DropShadowEffect {
+					BlurRadius = 14.0,
+					ShadowDepth = 3.0,
 					Opacity = 0.35,
 					Color = Colors.Black
 				};
 			}
 
-			Grid rootLayout = new Grid ();
-			rootLayout.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto });
-			rootLayout.RowDefinitions.Add (new RowDefinition { Height = new GridLength (1.0, GridUnitType.Star) });
-
-			// Header Bar
-			Grid headerGrid = new Grid { Margin = new Thickness (0, 0, 0, 12) };
-			string folderName = System.IO.Path.GetFileName (folderPath);
-			if (string.IsNullOrEmpty (folderName)) folderName = folderPath;
-
-			TextBlock titleText = new TextBlock {
-				Text = folderName,
+			StackPanel actionStack = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+			TextBlock actionText = new TextBlock {
+				Text = "Open in Explorer",
 				Foreground = foreground,
-				FontSize = 15.0,
+				FontSize = 12.5,
 				FontWeight = FontWeights.SemiBold,
 				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
+				VerticalAlignment = VerticalAlignment.Center,
+				Margin = new Thickness (0, 0, 8, 0)
+			};
+			actionStack.Children.Add (actionText);
+
+			// Action Arrow Circle Badge
+			Border arrowCircle = new Border {
+				Width = 22.0,
+				Height = 22.0,
+				CornerRadius = new CornerRadius (11.0),
+				Background = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (40, 0, 0, 0)),
 				VerticalAlignment = VerticalAlignment.Center
 			};
-
-			Border badge = new Border {
-				CornerRadius = new CornerRadius (10.0),
-				Background = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (40, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 0, 0, 0)),
-				Padding = new Thickness (8, 2, 8, 2),
-				HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+			System.Windows.Shapes.Path arrowPath = new System.Windows.Shapes.Path {
+				Data = System.Windows.Media.Geometry.Parse ("M 3,8 L 8,3 L 13,8 M 8,3 L 8,13"),
+				Stroke = foreground,
+				StrokeThickness = 2.0,
+				StrokeLineJoin = PenLineJoin.Round,
+				StrokeEndLineCap = PenLineCap.Round,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 				VerticalAlignment = VerticalAlignment.Center
 			};
+			arrowCircle.Child = arrowPath;
+			actionStack.Children.Add (arrowCircle);
+			openActionPill.Child = actionStack;
 
-			TextBlock badgeText = new TextBlock {
-				Text = items.Count + " items",
-				Foreground = subForeground,
-				FontSize = 11.0,
-				FontWeight = FontWeights.Medium,
-				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Text, Segoe UI, sans-serif")
+			string targetFolderPath = folderPath;
+			openActionPill.MouseLeftButtonDown += delegate {
+				try { Process.Start ("explorer.exe", targetFolderPath); } catch { }
+				try { Close (); } catch { }
 			};
-			badge.Child = badgeText;
 
-			headerGrid.Children.Add (titleText);
-			headerGrid.Children.Add (badge);
-			Grid.SetRow (headerGrid, 0);
-			rootLayout.Children.Add (headerGrid);
+			double topY = 10.0;
+			double openLeft = base.Width - 180.0;
+			Canvas.SetLeft (openActionPill, openLeft);
+			Canvas.SetTop (openActionPill, topY);
+			canvas.Children.Add (openActionPill);
 
-			// Items View
-			ScrollViewer scrollViewer = new ScrollViewer {
-				VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
-				HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-			};
-			Grid.SetRow (scrollViewer, 1);
-
-			WrapPanel wrapPanel = new WrapPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
-			scrollViewer.Content = wrapPanel;
-			rootLayout.Children.Add (scrollViewer);
-			glassContainer.Child = rootLayout;
-			mainGrid.Children.Add (glassContainer);
-
-			for (int i = 0; i < items.Count; i++) {
+			// Render Curved Fan Items (Top to Bottom)
+			for (int i = 0; i < maxShow; i++) {
 				string path = items [i];
 				string fileName = System.IO.Path.GetFileName (path);
+				if (string.IsNullOrEmpty (fileName)) fileName = path;
 
-				Border itemCard = new Border {
-					Width = 110.0,
-					Height = 96.0,
-					Margin = new Thickness (5.0),
-					CornerRadius = new CornerRadius (12.0),
-					Background = System.Windows.Media.Brushes.Transparent,
+				Border fanRowPill = new Border {
+					Height = 46.0,
+					CornerRadius = new CornerRadius (14.0),
+					Background = pillBg,
+					BorderBrush = pillBorder,
+					BorderThickness = new Thickness (1.0),
+					Padding = new Thickness (12.0, 4.0, 6.0, 4.0),
 					Cursor = System.Windows.Input.Cursors.Hand,
-					ToolTip = fileName
+					ToolTip = path
 				};
 
-				StackPanel cardContent = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-				itemCard.Child = cardContent;
+				if (parent == null || parent.settings == null || !parent.settings.PerformanceMode) {
+					fanRowPill.Effect = new DropShadowEffect {
+						BlurRadius = 12.0,
+						ShadowDepth = 3.0,
+						Opacity = 0.3,
+						Color = Colors.Black
+					};
+				}
 
-				System.Windows.Controls.Image itemImg = new System.Windows.Controls.Image {
-					Width = 44.0,
-					Height = 44.0,
-					HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-					Margin = new Thickness (0, 0, 0, 6)
-				};
-				cardContent.Children.Add (itemImg);
+				Grid rowContent = new Grid ();
+				rowContent.ColumnDefinitions.Add (new ColumnDefinition { Width = new GridLength (1.0, GridUnitType.Star) });
+				rowContent.ColumnDefinitions.Add (new ColumnDefinition { Width = GridLength.Auto });
 
-				TextBlock itemLabel = new TextBlock {
+				TextBlock labelText = new TextBlock {
 					Text = fileName,
 					Foreground = foreground,
-					FontSize = 11.0,
+					FontSize = 12.0,
 					FontWeight = FontWeights.Medium,
 					FontFamily = new System.Windows.Media.FontFamily ("SF Pro Text, Segoe UI, sans-serif"),
 					TextTrimming = TextTrimming.CharacterEllipsis,
-					HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-					TextAlignment = TextAlignment.Center,
-					Margin = new Thickness (4, 0, 4, 0)
+					VerticalAlignment = VerticalAlignment.Center,
+					Margin = new Thickness (0, 0, 10, 0)
 				};
-				cardContent.Children.Add (itemLabel);
+				Grid.SetColumn (labelText, 0);
+				rowContent.Children.Add (labelText);
+
+				Border thumbBorder = new Border {
+					Width = 38.0,
+					Height = 38.0,
+					CornerRadius = new CornerRadius (8.0),
+					ClipToBounds = true,
+					VerticalAlignment = VerticalAlignment.Center
+				};
+				System.Windows.Controls.Image thumbImg = new System.Windows.Controls.Image {
+					Stretch = Stretch.UniformToFill
+				};
+				thumbBorder.Child = thumbImg;
+				Grid.SetColumn (thumbBorder, 1);
+				rowContent.Children.Add (thumbBorder);
+
+				fanRowPill.Child = rowContent;
 
 				string closurePath = path;
-				System.Windows.Controls.Image closureImg = itemImg;
+				System.Windows.Controls.Image closureImg = thumbImg;
 				ThreadPool.QueueUserWorkItem (delegate {
 					ImageSource icon = null;
-					try {
-						icon = IconExtractor.GetShellItemIcon (closurePath);
-					} catch { }
-
+					try { icon = IconExtractor.GetShellItemIcon (closurePath); } catch { }
 					try {
 						base.Dispatcher.BeginInvoke ((Action)delegate {
-							if (icon != null) {
-								closureImg.Source = icon;
-							}
+							if (icon != null) closureImg.Source = icon;
 						});
 					} catch { }
 				});
 
-				ScaleTransform cardScale = new ScaleTransform (1.0, 1.0);
-				itemCard.RenderTransformOrigin = new System.Windows.Point (0.5, 0.5);
-				itemCard.RenderTransform = cardScale;
+				ScaleTransform pillScale = new ScaleTransform (1.0, 1.0);
+				fanRowPill.RenderTransformOrigin = new System.Windows.Point (0.9, 0.5);
+				fanRowPill.RenderTransform = pillScale;
 
-				itemCard.MouseEnter += delegate {
-					itemCard.Background = isDark 
-						? new SolidColorBrush (System.Windows.Media.Color.FromArgb (50, 255, 255, 255))
-						: new SolidColorBrush (System.Windows.Media.Color.FromArgb (40, 0, 0, 0));
-					cardScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.0, 1.05, TimeSpan.FromMilliseconds (120)));
-					cardScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.0, 1.05, TimeSpan.FromMilliseconds (120)));
+				fanRowPill.MouseEnter += delegate {
+					fanRowPill.Background = isDark
+						? new SolidColorBrush (System.Windows.Media.Color.FromArgb (255, 45, 45, 52))
+						: new SolidColorBrush (System.Windows.Media.Color.FromArgb (255, 255, 255, 255));
+					pillScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.0, 1.04, TimeSpan.FromMilliseconds (120)));
+					pillScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.0, 1.04, TimeSpan.FromMilliseconds (120)));
 				};
 
-				itemCard.MouseLeave += delegate {
-					itemCard.Background = System.Windows.Media.Brushes.Transparent;
-					cardScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.05, 1.0, TimeSpan.FromMilliseconds (150)));
-					cardScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.05, 1.0, TimeSpan.FromMilliseconds (150)));
+				fanRowPill.MouseLeave += delegate {
+					fanRowPill.Background = pillBg;
+					pillScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.04, 1.0, TimeSpan.FromMilliseconds (150)));
+					pillScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.04, 1.0, TimeSpan.FromMilliseconds (150)));
 				};
 
 				string launchPath = path;
-				itemCard.MouseLeftButtonDown += delegate {
-					try {
-						Process.Start (new ProcessStartInfo (launchPath) { UseShellExecute = true });
-					} catch { }
+				fanRowPill.MouseLeftButtonDown += delegate {
+					try { Process.Start (new ProcessStartInfo (launchPath) { UseShellExecute = true }); } catch { }
 					try { Close (); } catch { }
 				};
 
-				wrapPanel.Children.Add (itemCard);
+				// Fan Positioning Math (Curving upward out of Dock)
+				double rowY = topY + 50.0 + (i * 50.0);
+				double rowX = base.Width - 280.0 + Math.Sin (i * 0.16) * 18.0;
+
+				Canvas.SetLeft (fanRowPill, rowX);
+				Canvas.SetTop (fanRowPill, rowY);
+				canvas.Children.Add (fanRowPill);
 			}
 
-			// Entrance Animation
-			ScaleTransform windowScale = new ScaleTransform (0.94, 0.94);
-			glassContainer.RenderTransformOrigin = new System.Windows.Point (0.5, 0.5);
-			glassContainer.RenderTransform = windowScale;
-			glassContainer.Opacity = 0.0;
+			// Staggered Fan Scale Entrance
+			ScaleTransform fanScale = new ScaleTransform (0.92, 0.92);
+			canvas.RenderTransformOrigin = new System.Windows.Point (0.8, 1.0);
+			canvas.RenderTransform = fanScale;
+			canvas.Opacity = 0.0;
 
 			if (parent == null || parent.settings == null || !parent.settings.PerformanceMode) {
-				glassContainer.BeginAnimation (UIElement.OpacityProperty, new DoubleAnimation (0.0, 1.0, TimeSpan.FromMilliseconds (180)));
-				windowScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (0.94, 1.0, TimeSpan.FromMilliseconds (240)) {
+				canvas.BeginAnimation (UIElement.OpacityProperty, new DoubleAnimation (0.0, 1.0, TimeSpan.FromMilliseconds (180)));
+				fanScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (0.92, 1.0, TimeSpan.FromMilliseconds (240)) {
 					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
 				});
-				windowScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (0.94, 1.0, TimeSpan.FromMilliseconds (240)) {
+				fanScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (0.92, 1.0, TimeSpan.FromMilliseconds (240)) {
 					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
 				});
-			} else {
-				glassContainer.Opacity = 1.0;
-				windowScale.ScaleX = 1.0;
-				windowScale.ScaleY = 1.0;
 			}
 		}
 
