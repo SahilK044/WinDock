@@ -3914,12 +3914,20 @@ namespace MacStyleDock
 				uint targetProcId = 0;
 				GetWindowThreadProcessId (targetHwnd, out targetProcId);
 
+				double dpiScaleX = 1.0;
+				double dpiScaleY = 1.0;
+				PresentationSource source = PresentationSource.FromVisual (this);
+				if (source != null && source.CompositionTarget != null) {
+					dpiScaleX = source.CompositionTarget.TransformToDevice.M11;
+					dpiScaleY = source.CompositionTarget.TransformToDevice.M22;
+				}
+
 				foreach (UIElement child in dockPanel.Children) {
 					if (child is DockItemControl dic) {
 						if (dic.TargetHwnd == targetHwnd) {
 							System.Windows.Point p = dic.TransformToAncestor (this).Transform (new System.Windows.Point (0, 0));
 							System.Windows.Point screenP = PointToScreen (p);
-							return new System.Windows.Rect (screenP.X, screenP.Y, dic.ActualWidth, dic.ActualHeight);
+							return new System.Windows.Rect (screenP.X, screenP.Y, dic.ActualWidth * dpiScaleX, dic.ActualHeight * dpiScaleY);
 						}
 
 						if (dic.TargetHwnd != IntPtr.Zero && targetProcId != 0) {
@@ -3927,7 +3935,7 @@ namespace MacStyleDock
 							if (dicProcId != 0 && dicProcId == targetProcId) {
 								System.Windows.Point p = dic.TransformToAncestor (this).Transform (new System.Windows.Point (0, 0));
 								System.Windows.Point screenP = PointToScreen (p);
-								return new System.Windows.Rect (screenP.X, screenP.Y, dic.ActualWidth, dic.ActualHeight);
+								return new System.Windows.Rect (screenP.X, screenP.Y, dic.ActualWidth * dpiScaleX, dic.ActualHeight * dpiScaleY);
 							}
 						}
 					}

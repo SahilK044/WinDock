@@ -10,7 +10,6 @@ public static class GenieEffect
     #region Win32 API Definitions
 
     private const uint EVENT_SYSTEM_MINIMIZESTART = 0x0016;
-    private const uint EVENT_SYSTEM_MINIMIZEEND = 0x0017;
     private const uint WINEVENT_OUTOFCONTEXT = 0x0000;
     private const uint WINEVENT_SKIPOWNPROCESS = 0x0002;
 
@@ -33,6 +32,9 @@ public static class GenieEffect
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmRegisterThumbnail(IntPtr hwndDestination, IntPtr hwndSource, out IntPtr phThumbnailId);
@@ -63,6 +65,24 @@ public static class GenieEffect
         public int Bottom;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WINDOWPLACEMENT
+    {
+        public int length;
+        public int flags;
+        public int showCmd;
+        public POINT ptMinPosition;
+        public POINT ptMaxPosition;
+        public RECT rcNormalPosition;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
     private const uint DWM_TNS_RECTDESTINATION = 0x00000001;
     private const uint DWM_TNS_OPACITY = 0x00000004;
     private const uint DWM_TNS_VISIBLE = 0x00000008;
@@ -84,7 +104,7 @@ public static class GenieEffect
         _winEventDelegate = new WinEventDelegate(WinEventCallback);
         _hook = SetWinEventHook(
             EVENT_SYSTEM_MINIMIZESTART,
-            EVENT_SYSTEM_MINIMIZEEND,
+            EVENT_SYSTEM_MINIMIZESTART,
             IntPtr.Zero,
             _winEventDelegate,
             0,
@@ -105,6 +125,42 @@ public static class GenieEffect
             try { _overlayWindow.Close(); } catch { }
             _overlayWindow = null;
         }
+    }
+
+    private static bool GetRealWindowRect(IntPtr hWnd, out RECT rect)
+    {
+        rect = default;
+        if (hWnd == IntPtr.Zero) return false;
+
+        if (IsIconic(hWnd))
+        {
+            WINDOWPLACEMENT wp = default;
+            wp.length = Marshal.SizeOf(typeof(WINDOWPLACEMENT));
+            if (GetWindowPlacement(hWnd, ref wp))
+            {
+                rect = wp.rcNormalPosition;
+                return (rect.Right - rect.Left > 20 && rect.Bottom - rect.Top > 20);
+            }
+        }
+
+        if (GetWindowRect(hWnd, out RECT r))
+        {
+            if (r.Left > -10000 && r.Right - r.Left > 20)
+            {
+                rect = r;
+                return true;
+            }
+        }
+
+        WINDOWPLACEMENT wpFallback = default;
+        wpFallback.length = Marshal.SizeOf(typeof(WINDOWPLACEMENT));
+        if (GetWindowPlacement(hWnd, ref wpFallback))
+        {
+            rect = wpFallback.rcNormalPosition;
+            return (rect.Right - rect.Left > 20 && rect.Bottom - rect.Top > 20);
+        }
+
+        return false;
     }
 
     private static Window EnsureOverlayWindow()
@@ -168,11 +224,17 @@ public static class GenieEffect
             onCompleted?.Invoke();
         }
 
-        if (!GetWindowRect(targetHwnd, out RECT winRect) || (winRect.Right - winRect.Left < 10))
+        if (!GetRealWindowRect(targetHwnd, out RECT winRect))
         {
             ShowWindow(targetHwnd, 6); // SW_MINIMIZE
             Finish();
             return;
+        }
+
+        // Temporarily ensure window composition surface is active for DWM
+        if (IsIconic(targetHwnd))
+        {
+            ShowWindow(targetHwnd, 4); // SW_SHOWNOACTIVATE
         }
 
         Rect? targetIconRect = _iconRectResolver?.Invoke(targetHwnd);
@@ -195,7 +257,7 @@ public static class GenieEffect
             DwmUpdateThumbnailProperties(hThumbnail, ref props);
 
             int elapsedMs = 0;
-            int durationMs = 240;
+            int durationMs = 260;
             DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
 
             timer.Tick += (s, e) =>
@@ -203,7 +265,7 @@ public static class GenieEffect
                 elapsedMs += 16;
                 double t = Math.Min(1.0, (double)elapsedMs / durationMs);
 
-                // Authentic macOS Genie curve equation (quadratic X, cubic Y for suction effect)
+                // Authentic macOS Genie curve (suction curve: quadratic X, cubic Y)
                 double easeY = t * t * t;
                 double easeX = t * t;
 
@@ -257,20 +319,20 @@ public static class GenieEffect
             onCompleted?.Invoke();
         }
 
-        Rect? targetIconRect = _iconRectResolver?.Invoke(targetHwnd);
-        Rect startIconRect = targetIconRect.HasValue
-            ? targetIconRect.Value
-            : new Rect(SystemParameters.PrimaryScreenWidth / 2.0 - 24, SystemParameters.PrimaryScreenHeight - 60, 48, 48);
-
-        ShowWindow(targetHwnd, 4); // SW_SHOWNOACTIVATE to unhide for DWM capture
-
-        if (!GetWindowRect(targetHwnd, out RECT finalWinRect))
+        if (!GetRealWindowRect(targetHwnd, out RECT finalWinRect))
         {
             ShowWindow(targetHwnd, 9); // SW_RESTORE
             SetForegroundWindow(targetHwnd);
             Finish();
             return;
         }
+
+        Rect? targetIconRect = _iconRectResolver?.Invoke(targetHwnd);
+        Rect startIconRect = targetIconRect.HasValue
+            ? targetIconRect.Value
+            : new Rect(SystemParameters.PrimaryScreenWidth / 2.0 - 24, SystemParameters.PrimaryScreenHeight - 60, 48, 48);
+
+        ShowWindow(targetHwnd, 4); // SW_SHOWNOACTIVATE to render surface for DWM capture
 
         Window overlay = EnsureOverlayWindow();
         IntPtr overlayHwnd = new WindowInteropHelper(overlay).Handle;
@@ -295,7 +357,7 @@ public static class GenieEffect
                 elapsedMs += 16;
                 double t = Math.Min(1.0, (double)elapsedMs / durationMs);
 
-                // Inverse ease out for restore expansion
+                // Inverse cubic ease out for restore expansion
                 double ease = 1.0 - Math.Pow(1.0 - t, 3);
 
                 int curLeft = (int)(startIconRect.Left + (finalWinRect.Left - startIconRect.Left) * ease);
