@@ -597,6 +597,10 @@ namespace MacStyleDock
 
 		public bool EnableLiquidGlass { get; set; } = true;
 
+		[DataMember]
+
+		public bool EnableGenieEffect { get; set; } = true;
+
 
 
 		[DataMember]
@@ -5483,6 +5487,8 @@ namespace MacStyleDock
 			SoundEffects.Volume = ((newSettings.SoundVolume > 0.0) ? newSettings.SoundVolume : 1.0);
 
 			SaveSettings ();
+
+			GenieEffect.IsEnabled = newSettings.EnableGenieEffect;
 
 			SetAutoStart (newSettings.AutoStart);
 
@@ -17051,6 +17057,18 @@ namespace MacStyleDock
 			BindToggle ("AnimationsEnabled", settings.AnimationsEnabled, delegate(bool v) {
 
 				settings.AnimationsEnabled = v;
+
+				ownerWindow.ApplySettings (settings);
+
+			});
+
+			BindToggle ("GenieEffect", settings.EnableGenieEffect, delegate(bool v) {
+
+				settings.EnableGenieEffect = v;
+
+				GenieEffect.IsEnabled = v;
+
+				ownerWindow.ApplySettings (settings);
 
 			});
 

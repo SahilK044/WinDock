@@ -415,6 +415,11 @@
                                         </Grid>
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
+                                            <TextBlock Text="Enable macOS Genie Effect" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="GenieEffect" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
                                             <TextBlock Text="Animation Speed (1-5)" Style="{StaticResource CardText}"/>
                                             <Slider x:Name="AnimationSpeed" Minimum="1" Maximum="5" TickFrequency="1" IsSnapToTickEnabled="True" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                         </Grid>
