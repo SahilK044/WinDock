@@ -5022,6 +5022,24 @@ namespace MacStyleDock
 
 						}
 
+						if (!text.Contains ("EnableLiquidGlass")) {
+
+							settings.EnableLiquidGlass = true;
+
+							flag = true;
+
+						}
+
+						if (!text.Contains ("EnableGenieEffect")) {
+
+							settings.EnableGenieEffect = true;
+
+							flag = true;
+
+						}
+
+						GenieEffect.IsEnabled = settings.EnableGenieEffect;
+
 						if (!settings.Items.Any ((DockItemConfig i) => i.FilePath == "action:search")) {
 
 							settings.Items.Insert (0, new DockItemConfig {
@@ -5095,6 +5113,25 @@ namespace MacStyleDock
 								FilePath = "action:controlcenter",
 
 								ProcessName = "ControlCenter"
+
+							});
+
+							flag = true;
+
+						}
+
+						string downloadsPath = System.Environment.GetFolderPath (System.Environment.SpecialFolder.UserProfile) + "\\Downloads";
+						if (!settings.Items.Any ((DockItemConfig i) => i.FilePath != null && i.FilePath.EndsWith ("Downloads"))) {
+
+							settings.Items.Add (new DockItemConfig {
+
+								Name = "Downloads",
+
+								FilePath = downloadsPath,
+
+								ProcessName = "Downloads",
+
+								Arguments = "Fan"
 
 							});
 
