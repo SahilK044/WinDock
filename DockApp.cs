@@ -16423,13 +16423,42 @@ namespace MacStyleDock
 				if (!File.Exists (urlFilePath)) return null;
 				string iconFile = null;
 				int iconIndex = 0;
+				string urlLine = null;
 				foreach (var line in File.ReadLines (urlFilePath)) {
 					if (line.StartsWith ("IconFile=", StringComparison.OrdinalIgnoreCase)) {
 						iconFile = line.Substring ("IconFile=".Length).Trim ();
 					} else if (line.StartsWith ("IconIndex=", StringComparison.OrdinalIgnoreCase)) {
 						int.TryParse (line.Substring ("IconIndex=".Length).Trim (), out iconIndex);
+					} else if (line.StartsWith ("URL=", StringComparison.OrdinalIgnoreCase)) {
+						urlLine = line.Substring ("URL=".Length).Trim ();
 					}
 				}
+
+				if (string.IsNullOrEmpty (iconFile) || !File.Exists (Environment.ExpandEnvironmentVariables (iconFile))) {
+					if (!string.IsNullOrEmpty (urlLine) && urlLine.StartsWith ("steam://", StringComparison.OrdinalIgnoreCase)) {
+						string gameId = urlLine.Replace ("steam://rungameid/", "").Trim ();
+						string[] uninstallPaths = {
+							@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App " + gameId,
+							@"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Steam App " + gameId
+						};
+						foreach (var regPath in uninstallPaths) {
+							try {
+								using (var baseKey = Microsoft.Win32.RegistryKey.OpenBaseKey (Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64)) {
+									using (var key = baseKey.OpenSubKey (regPath)) {
+										if (key != null) {
+											string displayIcon = key.GetValue ("DisplayIcon") as string;
+											if (!string.IsNullOrEmpty (displayIcon) && File.Exists (displayIcon)) {
+												iconFile = displayIcon;
+												break;
+											}
+										}
+									}
+								}
+							} catch { }
+						}
+					}
+				}
+
 				if (!string.IsNullOrEmpty (iconFile)) {
 					iconFile = Environment.ExpandEnvironmentVariables (iconFile);
 					if (File.Exists (iconFile)) {
@@ -16449,6 +16478,11 @@ namespace MacStyleDock
 						return GetJumboIcon (iconFile);
 					}
 				}
+
+				try {
+					var shIcon = GetShellItemIcon (urlFilePath);
+					if (shIcon != null) return shIcon;
+				} catch { }
 			} catch {}
 			return null;
 		}
@@ -39686,9 +39720,14 @@ namespace MacStyleDock
 			System.Windows.Controls.Image closureImg = target;
 
 			try {
-				ImageSource syncIcon = Directory.Exists (closurePath)
-					? IconExtractor.GetFolderShellIcon (closurePath)
-					: (IconExtractor.GetHighQualityIcon (closurePath, 48) ?? IconExtractor.GetJumboIcon (closurePath));
+				ImageSource syncIcon = null;
+				if (Directory.Exists (closurePath)) {
+					syncIcon = IconExtractor.GetFolderShellIcon (closurePath);
+				} else if (closurePath.EndsWith (".url", StringComparison.OrdinalIgnoreCase)) {
+					syncIcon = IconExtractor.ExtractIconFromUrlFile (closurePath) ?? IconExtractor.GetShellItemIcon (closurePath);
+				} else {
+					syncIcon = IconExtractor.GetHighQualityIcon (closurePath, 48) ?? IconExtractor.GetJumboIcon (closurePath) ?? IconExtractor.GetShellItemIcon (closurePath);
+				}
 				if (syncIcon != null) {
 					closureImg.Source = syncIcon;
 					return;
@@ -39698,9 +39737,13 @@ namespace MacStyleDock
 			ThreadPool.QueueUserWorkItem (delegate {
 				ImageSource icon = null;
 				try {
-					icon = Directory.Exists (closurePath)
-						? IconExtractor.GetFolderShellIcon (closurePath)
-						: (IconExtractor.GetHighQualityIcon (closurePath, 48) ?? IconExtractor.GetJumboIcon (closurePath) ?? IconExtractor.GetShellItemIcon (closurePath));
+					if (Directory.Exists (closurePath)) {
+						icon = IconExtractor.GetFolderShellIcon (closurePath);
+					} else if (closurePath.EndsWith (".url", StringComparison.OrdinalIgnoreCase)) {
+						icon = IconExtractor.ExtractIconFromUrlFile (closurePath) ?? IconExtractor.GetShellItemIcon (closurePath);
+					} else {
+						icon = IconExtractor.GetHighQualityIcon (closurePath, 48) ?? IconExtractor.GetJumboIcon (closurePath) ?? IconExtractor.GetShellItemIcon (closurePath);
+					}
 				} catch { }
 				if (icon == null) icon = GetFallbackIcon (closurePath);
 				if (icon != null) {
@@ -39751,22 +39794,19 @@ namespace MacStyleDock
 
 			for (int i = 0; i < maxShow; i++) {
 				string path = items [i];
-				string fileName = System.IO.Path.GetFileName (path);
-				if (string.IsNullOrEmpty (fileName)) fileName = path;
+				string rawFileName = System.IO.Path.GetFileName (path);
+				if (string.IsNullOrEmpty (rawFileName)) rawFileName = path;
+				string displayName = System.IO.Path.GetFileNameWithoutExtension (rawFileName);
+				if (string.IsNullOrEmpty (displayName)) displayName = rawFileName;
 				bool isPinned = StackPinManager.IsPinned (folderPath, path);
 
 				Border tile = new Border {
 					Width = 260.0,
 					Height = 44.0,
 					CornerRadius = new CornerRadius (12.0),
-					Background = isDark
-						? new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 30, 30, 36))
-						: new SolidColorBrush (System.Windows.Media.Color.FromArgb (230, 242, 242, 247)),
-					BorderBrush = isDark
-						? new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 255, 255, 255))
-						: new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 0, 0, 0)),
-					BorderThickness = new Thickness (1.0),
-					Effect = new DropShadowEffect { BlurRadius = 12.0, ShadowDepth = 3.0, Opacity = 0.35, Color = Colors.Black },
+					Background = System.Windows.Media.Brushes.Transparent,
+					BorderBrush = System.Windows.Media.Brushes.Transparent,
+					BorderThickness = new Thickness (0.0),
 					Cursor = System.Windows.Input.Cursors.Hand,
 					ToolTip = path,
 					Padding = new Thickness (10, 0, 10, 0)
@@ -39795,20 +39835,16 @@ namespace MacStyleDock
 				QueueItemIcon (path, img);
 
 				TextBlock label = new TextBlock {
-					Text = fileName,
+					Text = displayName,
 					Foreground = GetFg (),
-					FontSize = 12.0,
-					FontWeight = FontWeights.Medium,
+					FontSize = 13.0,
+					FontWeight = FontWeights.SemiBold,
 					FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
 					TextTrimming = TextTrimming.CharacterEllipsis,
 					VerticalAlignment = VerticalAlignment.Center,
 					Margin = new Thickness (0, 0, 6, 0)
 				};
-				if (!isDark) {
-					label.Effect = new DropShadowEffect { BlurRadius = 4.0, ShadowDepth = 1.0, Opacity = 0.25, Color = Colors.Black };
-				} else {
-					label.Effect = new DropShadowEffect { BlurRadius = 6.0, ShadowDepth = 1.0, Opacity = 0.6, Color = Colors.Black };
-				}
+				label.Effect = new DropShadowEffect { BlurRadius = 8.0, ShadowDepth = 1.5, Opacity = 0.85, Color = Colors.Black };
 				Grid.SetColumn (label, 1);
 				rowGrid.Children.Add (label);
 
@@ -39856,8 +39892,8 @@ namespace MacStyleDock
 				tile.MouseEnter += delegate {
 					try {
 						tile.Background = isDark
-							? new SolidColorBrush (System.Windows.Media.Color.FromArgb (250, 55, 55, 65))
-							: new SolidColorBrush (System.Windows.Media.Color.FromArgb (255, 255, 255, 255));
+							? new SolidColorBrush (System.Windows.Media.Color.FromArgb (80, 255, 255, 255))
+							: new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 0, 0, 0));
 						tScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.0, 1.04, TimeSpan.FromMilliseconds (120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						tScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.0, 1.04, TimeSpan.FromMilliseconds (120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						Canvas.SetZIndex (tile, 100);
@@ -39865,9 +39901,7 @@ namespace MacStyleDock
 				};
 				tile.MouseLeave += delegate {
 					try {
-						tile.Background = isDark
-							? new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 30, 30, 36))
-							: new SolidColorBrush (System.Windows.Media.Color.FromArgb (230, 242, 242, 247));
+						tile.Background = System.Windows.Media.Brushes.Transparent;
 						tScale.BeginAnimation (ScaleTransform.ScaleXProperty, new DoubleAnimation (1.04, 1.0, TimeSpan.FromMilliseconds (150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						tScale.BeginAnimation (ScaleTransform.ScaleYProperty, new DoubleAnimation (1.04, 1.0, TimeSpan.FromMilliseconds (150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
 						Canvas.SetZIndex (tile, i);
