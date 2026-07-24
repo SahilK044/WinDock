@@ -512,6 +512,16 @@
                                             <TextBlock Text="Enable Control Center" Style="{StaticResource CardText}"/>
                                             <CheckBox x:Name="ControlCenter" Template="{StaticResource MacToggle}"/>
                                         </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Dynamic Island / Top Notch Banner" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="DynamicIsland" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
+                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
+                                        <Grid Margin="15,10">
+                                            <TextBlock Text="Enable Dynamic Icon Download Progress Rings" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="DownloadProgressRing" Template="{StaticResource MacToggle}"/>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
 

@@ -754,13 +754,15 @@ namespace MacStyleDock
 
 
 		[DataMember]
-
 		public bool EnableControlCenter { get; set; }
 
-
+		[DataMember]
+		public bool EnableDynamicIsland { get; set; }
 
 		[DataMember]
+		public bool EnableDownloadProgressRing { get; set; }
 
+		[DataMember]
 		public bool EnableLiveWeather { get; set; }
 
 
@@ -914,7 +916,8 @@ namespace MacStyleDock
 			SpotifyWidgetArtBackground = true;
 
 			EnableControlCenter = true;
-
+			EnableDynamicIsland = true;
+			EnableDownloadProgressRing = true;
 			EnableLiveWeather = true;
 
 			EnableIconEffects = true;
@@ -1297,7 +1300,7 @@ namespace MacStyleDock
 
 		public ControlCenterWindow controlCenterOverlay;
 
-
+		public DynamicNotchWindow dynamicNotchOverlay;
 
 		public LaunchpadWindow launchpadOverlay;
 
@@ -3958,6 +3961,13 @@ namespace MacStyleDock
 				_isPresentationSourceValid = true;
 				GenieEffect.Initialize (this, ResolveIconRect);
 				SetupFullscreenWatcher ();
+
+				if (settings.EnableDynamicIsland) {
+					try {
+						dynamicNotchOverlay = new DynamicNotchWindow (this);
+						dynamicNotchOverlay.Show ();
+					} catch { }
+				}
 			};
 
 			base.Closed += delegate {
@@ -51700,6 +51710,149 @@ namespace MacStyleDock
 				}
 			}
 			return d[n, m];
+		}
+	}
+
+	public class DynamicNotchWindow : Window
+	{
+		private DockWindow parent;
+		private Border mainBorder;
+		private Grid notchGrid;
+		private StackPanel compactContent;
+		private StackPanel expandedContent;
+		private System.Windows.Controls.Image albumArtImage;
+		private TextBlock trackTitleText;
+		private TextBlock artistText;
+		private DispatcherTimer spectrumTimer;
+		private System.Windows.Shapes.Rectangle[] spectrumBars;
+		private bool isExpanded = false;
+		private Random rnd = new Random ();
+
+		public DynamicNotchWindow (DockWindow parentDock)
+		{
+			parent = parentDock;
+			base.WindowStyle = WindowStyle.None;
+			base.AllowsTransparency = true;
+			base.Background = System.Windows.Media.Brushes.Transparent;
+			base.Topmost = true;
+			base.ShowInTaskbar = false;
+			base.Title = "DynamicNotch";
+			base.Width = 200.0;
+			base.Height = 32.0;
+
+			double screenW = SystemParameters.PrimaryScreenWidth;
+			base.Left = (screenW - base.Width) / 2.0;
+			base.Top = 4.0;
+
+			mainBorder = new Border {
+				CornerRadius = new CornerRadius (16.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (230, 16, 16, 22)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 255, 255, 255)),
+				BorderThickness = new Thickness (1.0),
+				Effect = new DropShadowEffect { BlurRadius = 16.0, ShadowDepth = 3.0, Opacity = 0.5, Color = Colors.Black },
+				Cursor = System.Windows.Input.Cursors.Hand
+			};
+
+			notchGrid = new Grid ();
+			mainBorder.Child = notchGrid;
+
+			compactContent = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+			
+			Border camLens = new Border {
+				Width = 10.0, Height = 10.0, CornerRadius = new CornerRadius (5.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (200, 30, 30, 42)),
+				Margin = new Thickness (0, 0, 8, 0)
+			};
+			compactContent.Children.Add (camLens);
+
+			TextBlock compactTb = new TextBlock {
+				Text = "🎵 macOS Tahoe Notch",
+				Foreground = System.Windows.Media.Brushes.White,
+				FontSize = 11.0,
+				FontWeight = FontWeights.SemiBold,
+				VerticalAlignment = VerticalAlignment.Center,
+				Margin = new Thickness (0, 0, 8, 0)
+			};
+			compactContent.Children.Add (compactTb);
+
+			StackPanel specPanel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+			spectrumBars = new System.Windows.Shapes.Rectangle [4];
+			for (int b = 0; b < 4; b++) {
+				spectrumBars [b] = new System.Windows.Shapes.Rectangle {
+					Width = 2.5, Height = 10.0, Margin = new Thickness (1.0),
+					Fill = new SolidColorBrush (System.Windows.Media.Color.FromRgb (50, 215, 75)),
+					RadiusX = 1.0, RadiusY = 1.0
+				};
+				specPanel.Children.Add (spectrumBars [b]);
+			}
+			compactContent.Children.Add (specPanel);
+			notchGrid.Children.Add (compactContent);
+
+			expandedContent = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness (12, 8, 12, 8), Visibility = Visibility.Collapsed };
+			albumArtImage = new System.Windows.Controls.Image { Width = 40.0, Height = 40.0, Stretch = Stretch.UniformToFill };
+			Border artWrap = new Border { Width = 40.0, Height = 40.0, CornerRadius = new CornerRadius (8.0), ClipToBounds = true, Child = albumArtImage, Margin = new Thickness (0, 0, 12, 0) };
+			expandedContent.Children.Add (artWrap);
+
+			StackPanel textSp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+			trackTitleText = new TextBlock { Text = "macOS Tahoe Dynamic Island", Foreground = System.Windows.Media.Brushes.White, FontSize = 12.0, FontWeight = FontWeights.Bold };
+			artistText = new TextBlock { Text = "Click to expand / collapse", Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, 255, 255, 255)), FontSize = 10.0 };
+			textSp.Children.Add (trackTitleText);
+			textSp.Children.Add (artistText);
+			expandedContent.Children.Add (textSp);
+
+			notchGrid.Children.Add (expandedContent);
+			base.Content = mainBorder;
+
+			mainBorder.MouseLeftButtonDown += delegate {
+				ToggleExpand ();
+			};
+
+			spectrumTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (100) };
+			spectrumTimer.Tick += delegate {
+				for (int i = 0; i < spectrumBars.Length; i++) {
+					double h = 3.0 + rnd.NextDouble () * 10.0;
+					spectrumBars [i].Height = h;
+				}
+			};
+			spectrumTimer.Start ();
+		}
+
+		public void ToggleExpand ()
+		{
+			isExpanded = !isExpanded;
+			double targetW = isExpanded ? 340.0 : 200.0;
+			double targetH = isExpanded ? 64.0 : 32.0;
+
+			DoubleAnimation animW = new DoubleAnimation (targetW, TimeSpan.FromMilliseconds (220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+			DoubleAnimation animH = new DoubleAnimation (targetH, TimeSpan.FromMilliseconds (220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+
+			animW.Completed += delegate {
+				if (isExpanded) {
+					compactContent.Visibility = Visibility.Collapsed;
+					expandedContent.Visibility = Visibility.Visible;
+				} else {
+					compactContent.Visibility = Visibility.Visible;
+					expandedContent.Visibility = Visibility.Collapsed;
+				}
+			};
+
+			if (!isExpanded) {
+				compactContent.Visibility = Visibility.Visible;
+				expandedContent.Visibility = Visibility.Collapsed;
+			}
+
+			base.BeginAnimation (Window.WidthProperty, animW);
+			base.BeginAnimation (Window.HeightProperty, animH);
+			base.Left = (SystemParameters.PrimaryScreenWidth - targetW) / 2.0;
+		}
+
+		public void UpdateMediaInfo (string title, string artist, ImageSource art = null)
+		{
+			try {
+				trackTitleText.Text = title;
+				artistText.Text = artist;
+				if (art != null) albumArtImage.Source = art;
+			} catch { }
 		}
 	}
 }
