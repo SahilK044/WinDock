@@ -110,6 +110,7 @@ public static class GenieEffect
 
     #endregion
 
+    // 8 optimized slices with 1.5px overlap for seamless liquid S-curve warping
     private const int SLICE_COUNT = 8;
 
     private static IntPtr _hook;
@@ -390,15 +391,20 @@ public static class GenieEffect
 
             for (int i = 0; i < SLICE_COUNT; i++)
             {
-                double sliceNormalized = (double)i / (SLICE_COUNT - 1.0);
-                double lagDelay = (1.0 - sliceNormalized) * 0.24;
+                double v = (double)i / (SLICE_COUNT - 1.0); // 0.0 at top edge, 1.0 at bottom edge
+                double lagDelay = (1.0 - v) * 0.26;
                 double sliceT = Math.Min(1.0, Math.Max(0.0, (globalT - lagDelay) / (1.0 - lagDelay)));
 
+                // Smoothstep S-curve for vertical movement
                 double easeY = sliceT * sliceT * (3.0 - 2.0 * sliceT);
+                // Quadratic contraction for horizontal width
                 double easeX = sliceT * sliceT;
 
-                double curWidth = winWidth + (destIconRect.Width - winWidth) * easeX;
-                double curCenterX = origCenterX + (targetCenterX - origCenterX) * easeY;
+                // Concave siphon bowing (hourglass contraction near middle-to-bottom strips)
+                double siphonPinch = Math.Sin(v * Math.PI) * 0.22 * Math.Sin(globalT * Math.PI);
+
+                double curWidth = (winWidth + (destIconRect.Width - winWidth) * easeX) * (1.0 - siphonPinch);
+                double curCenterX = origCenterX + (targetCenterX - origCenterX) * (Math.Pow(easeY, 1.15));
 
                 double origSliceTop = winRect.Top + i * (winHeight / SLICE_COUNT);
                 double curTop = origSliceTop + (targetTop - origSliceTop) * easeY;
@@ -409,9 +415,10 @@ public static class GenieEffect
                     Left = (int)(curCenterX - curWidth / 2.0),
                     Top = (int)curTop,
                     Right = (int)(curCenterX + curWidth / 2.0),
-                    Bottom = (int)(curTop + curSliceHeight)
+                    // Add 1.5px overlap between adjacent strips for seamless liquid warping
+                    Bottom = (int)(curTop + curSliceHeight + 1.5)
                 };
-                sliceProps[i].opacity = (byte)(255 * (1.0 - easeY * 0.3));
+                sliceProps[i].opacity = (byte)(255 * (1.0 - easeY * 0.35));
                 DwmUpdateThumbnailProperties(thumbnails[i], ref sliceProps[i]);
             }
 
@@ -551,27 +558,30 @@ public static class GenieEffect
 
             for (int i = 0; i < SLICE_COUNT; i++)
             {
-                double sliceNormalized = (double)i / (SLICE_COUNT - 1.0);
-                double lagDelay = sliceNormalized * 0.22;
+                double v = (double)i / (SLICE_COUNT - 1.0);
+                double lagDelay = v * 0.24;
                 double sliceT = Math.Min(1.0, Math.Max(0.0, (globalT - lagDelay) / (1.0 - lagDelay)));
 
-                double ease = sliceT * sliceT * (3.0 - 2.0 * sliceT);
+                double easeY = sliceT * sliceT * (3.0 - 2.0 * sliceT);
+                double easeX = 1.0 - Math.Pow(1.0 - sliceT, 3);
 
-                double curWidth = startIconRect.Width + (winWidth - startIconRect.Width) * ease;
-                double curCenterX = startCenterX + (targetCenterX - startCenterX) * ease;
+                double siphonExpand = Math.Sin(v * Math.PI) * 0.18 * Math.Sin(globalT * Math.PI);
+
+                double curWidth = (startIconRect.Width + (winWidth - startIconRect.Width) * easeX) * (1.0 + siphonExpand);
+                double curCenterX = startCenterX + (targetCenterX - startCenterX) * (Math.Pow(easeY, 0.85));
 
                 double finalSliceTop = finalWinRect.Top + i * (winHeight / SLICE_COUNT);
-                double curTop = startTop + (finalSliceTop - startTop) * ease;
-                double curSliceHeight = 4.0 + ((winHeight / SLICE_COUNT) - 4.0) * ease;
+                double curTop = startTop + (finalSliceTop - startTop) * easeY;
+                double curSliceHeight = 4.0 + ((winHeight / SLICE_COUNT) - 4.0) * easeY;
 
                 sliceProps[i].rcDestination = new RECT
                 {
                     Left = (int)(curCenterX - curWidth / 2.0),
                     Top = (int)curTop,
                     Right = (int)(curCenterX + curWidth / 2.0),
-                    Bottom = (int)(curTop + curSliceHeight)
+                    Bottom = (int)(curTop + curSliceHeight + 1.5)
                 };
-                sliceProps[i].opacity = (byte)(180 + (255 - 180) * ease);
+                sliceProps[i].opacity = (byte)(180 + (255 - 180) * easeY);
                 DwmUpdateThumbnailProperties(thumbnails[i], ref sliceProps[i]);
             }
 
