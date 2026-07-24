@@ -39003,13 +39003,47 @@ namespace MacStyleDock
 					if (trimmed.StartsWith ("[")) {
 						reading = string.Equals (trimmed, key, StringComparison.OrdinalIgnoreCase);
 					} else if (reading && !string.IsNullOrEmpty (trimmed)) {
-						if (File.Exists (trimmed) || Directory.Exists (trimmed)) {
+						if (!trimmed.StartsWith ("ONLY_PINNED_MODE=") && (File.Exists (trimmed) || Directory.Exists (trimmed))) {
 							list.Add (trimmed);
 						}
 					}
 				}
 			} catch { }
 			return list;
+		}
+
+		public static bool IsOnlyPinnedMode (string folderPath)
+		{
+			try {
+				string file = GetConfigPath ();
+				if (!File.Exists (file)) return false;
+				string key = "[" + NormalizePath (folderPath) + "]";
+				bool reading = false;
+				foreach (string line in File.ReadAllLines (file)) {
+					string trimmed = line.Trim ();
+					if (trimmed.StartsWith ("[")) {
+						reading = string.Equals (trimmed, key, StringComparison.OrdinalIgnoreCase);
+					} else if (reading && string.Equals (trimmed, "ONLY_PINNED_MODE=1", StringComparison.OrdinalIgnoreCase)) {
+						return true;
+					}
+				}
+			} catch { }
+			return false;
+		}
+
+		public static void SetOnlyPinnedMode (string folderPath, bool enable)
+		{
+			try {
+				if (string.IsNullOrEmpty (folderPath)) return;
+				string key = NormalizePath (folderPath);
+				Dictionary<string, List<string>> all = LoadAll ();
+				if (!all.ContainsKey (key)) all [key] = new List<string> ();
+				all [key].RemoveAll (p => p.StartsWith ("ONLY_PINNED_MODE="));
+				if (enable) {
+					all [key].Add ("ONLY_PINNED_MODE=1");
+				}
+				SaveAll (all);
+			} catch { }
 		}
 
 		public static bool IsPinned (string folderPath, string itemPath)
@@ -39192,26 +39226,65 @@ namespace MacStyleDock
 			TabItem cleanTab = new TabItem { Header = "🧹 Stack Cleaner" };
 			StackPanel cleanPanel = new StackPanel { Margin = new Thickness (8) };
 
+			System.Windows.Controls.CheckBox cbOnlyPinned = new System.Windows.Controls.CheckBox {
+				Content = "🔒 Custom Pinned Mode (Hide default folder contents)",
+				Foreground = System.Windows.Media.Brushes.White,
+				FontWeight = FontWeights.SemiBold,
+				IsChecked = StackPinManager.IsOnlyPinnedMode (folderPath),
+				Margin = new Thickness (0, 4, 0, 12)
+			};
+			string fpKey = folderPath;
+			cbOnlyPinned.Checked += delegate {
+				StackPinManager.SetOnlyPinnedMode (fpKey, true);
+				if (overlayWindow != null) overlayWindow.ReloadStack ();
+			};
+			cbOnlyPinned.Unchecked += delegate {
+				StackPinManager.SetOnlyPinnedMode (fpKey, false);
+				if (overlayWindow != null) overlayWindow.ReloadStack ();
+			};
+			cleanPanel.Children.Add (cbOnlyPinned);
+
 			cleanStatusText = new TextBlock {
-				Text = "Scan folder for temporary, log, download, or 0-byte junk files.",
+				Text = "Clean unpinned default directory files and temporary junk files from this Stack view.",
 				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (200, 255, 255, 255)),
 				TextWrapping = TextWrapping.Wrap,
 				Margin = new Thickness (0, 0, 0, 12)
 			};
 			cleanPanel.Children.Add (cleanStatusText);
 
-			System.Windows.Controls.Button cleanBtn = new System.Windows.Controls.Button {
-				Content = "🧹 Scan & Clean Junk Files Now",
+			System.Windows.Controls.Button cleanCustomBtn = new System.Windows.Controls.Button {
+				Content = "🧹 Hide Default Files & Show Custom Pinned Only",
 				Height = 36.0,
 				FontWeight = FontWeights.Bold,
 				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (40, 120, 220)),
 				Foreground = System.Windows.Media.Brushes.White,
-				Margin = new Thickness (0, 8, 0, 0)
+				Margin = new Thickness (0, 4, 0, 6)
 			};
-			cleanBtn.Click += delegate {
+			cleanCustomBtn.Click += delegate {
+				StackPinManager.SetOnlyPinnedMode (fpKey, true);
+				cbOnlyPinned.IsChecked = true;
 				PerformClean ();
+				cleanStatusText.Text = "✨ Success! Default files hidden. Stack is now in Custom Pinned mode.";
 			};
-			cleanPanel.Children.Add (cleanBtn);
+			cleanPanel.Children.Add (cleanCustomBtn);
+
+			System.Windows.Controls.Button restoreDefaultBtn = new System.Windows.Controls.Button {
+				Content = "🔄 Restore Default Directory Files View",
+				Height = 30.0,
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (50, 50, 58)),
+				Foreground = System.Windows.Media.Brushes.White,
+				Margin = new Thickness (0, 4, 0, 0)
+			};
+			restoreDefaultBtn.Click += delegate {
+				StackPinManager.SetOnlyPinnedMode (fpKey, false);
+				cbOnlyPinned.IsChecked = false;
+				if (overlayWindow != null) overlayWindow.ReloadStack ();
+				cleanStatusText.Text = "🔄 Restored default folder listing.";
+			};
+			cleanPanel.Children.Add (restoreDefaultBtn);
+
+			cleanTab.Content = cleanPanel;
+			tabs.Items.Add (cleanTab);
 
 			mainPanel.Children.Add (tabs);
 
@@ -39420,6 +39493,10 @@ namespace MacStyleDock
 					if ((File.Exists (p) || Directory.Exists (p)) && !items.Contains (p)) {
 						items.Add (p);
 					}
+				}
+
+				if (StackPinManager.IsOnlyPinnedMode (folderPath)) {
+					return; // Custom pinned mode: hide unpinned directory files!
 				}
 
 				if (string.IsNullOrEmpty (folderPath) || !Directory.Exists (folderPath)) return;
@@ -39642,10 +39719,35 @@ namespace MacStyleDock
 			_entranceTarget = canvas;
 
 			int maxShow = Math.Min (items.Count, 10);
-			if (maxShow == 0) return;
-
 			double anchorX = base.Width / 2.0;
 			double startY = base.Height - 60.0;
+
+			if (maxShow == 0) {
+				Border emptyTile = new Border {
+					Width = 270.0,
+					Height = 44.0,
+					CornerRadius = new CornerRadius (12.0),
+					Background = isDark
+						? new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 30, 30, 36))
+						: new SolidColorBrush (System.Windows.Media.Color.FromArgb (230, 242, 242, 247)),
+					BorderBrush = isDark
+						? new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 255, 255, 255))
+						: new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 0, 0, 0)),
+					BorderThickness = new Thickness (1.0),
+					Padding = new Thickness (10, 0, 10, 0)
+				};
+				TextBlock emptyTb = new TextBlock {
+					Text = "📌 Custom Stack: Click '➕ Pin File' to add items",
+					Foreground = GetSubFg (),
+					FontSize = 11.0,
+					VerticalAlignment = VerticalAlignment.Center,
+					HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+				};
+				emptyTile.Child = emptyTb;
+				Canvas.SetLeft (emptyTile, anchorX - 135.0);
+				Canvas.SetTop (emptyTile, startY);
+				canvas.Children.Add (emptyTile);
+			}
 
 			for (int i = 0; i < maxShow; i++) {
 				string path = items [i];
