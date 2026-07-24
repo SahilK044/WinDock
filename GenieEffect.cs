@@ -98,10 +98,13 @@ public static class GenieEffect
     private const uint SPI_SETANIMATION = 0x0049;
 
     private const uint DWM_TNS_RECTDESTINATION = 0x00000001;
+    private const uint DWM_TNS_RECTSOURCE = 0x00000002;
     private const uint DWM_TNS_OPACITY = 0x00000004;
     private const uint DWM_TNS_VISIBLE = 0x00000008;
 
     #endregion
+
+    private const int SLICE_COUNT = 16;
 
     private static IntPtr _hook;
     private static WinEventDelegate _winEventDelegate;
@@ -278,7 +281,7 @@ public static class GenieEffect
         {
             ShowWindow(targetHwnd, 6); // SW_MINIMIZE
 
-            DispatcherTimer delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+            DispatcherTimer delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(450) };
             delayTimer.Tick += (s, e) =>
             {
                 delayTimer.Stop();
@@ -308,53 +311,107 @@ public static class GenieEffect
         Window overlay = EnsureOverlayWindow();
         IntPtr overlayHwnd = new WindowInteropHelper(overlay).Handle;
 
-        if (overlayHwnd != IntPtr.Zero && DwmRegisterThumbnail(overlayHwnd, targetHwnd, out IntPtr hThumbnail) == 0)
-        {
-            DWM_THUMBNAIL_PROPERTIES props = new DWM_THUMBNAIL_PROPERTIES
-            {
-                dwFlags = DWM_TNS_RECTDESTINATION | DWM_TNS_OPACITY | DWM_TNS_VISIBLE,
-                rcDestination = winRect,
-                opacity = 255,
-                fVisible = true
-            };
-            DwmUpdateThumbnailProperties(hThumbnail, ref props);
-
-            DateTime startTime = DateTime.Now;
-            const double durationMs = 220.0;
-
-            EventHandler renderingHandler = null;
-            renderingHandler = (s, e) =>
-            {
-                double elapsedMs = (DateTime.Now - startTime).TotalMilliseconds;
-                double t = Math.Min(1.0, elapsedMs / durationMs);
-
-                double easeY = t * t * t;
-                double easeX = t * t;
-
-                int curLeft = (int)(winRect.Left + (destIconRect.Left - winRect.Left) * easeX);
-                int curTop = (int)(winRect.Top + (destIconRect.Top - winRect.Top) * easeY);
-                int curRight = (int)(winRect.Right + (destIconRect.Right - winRect.Right) * easeX);
-                int curBottom = (int)(winRect.Bottom + (destIconRect.Bottom - winRect.Bottom) * easeY);
-
-                props.rcDestination = new RECT { Left = curLeft, Top = curTop, Right = curRight, Bottom = curBottom };
-                props.opacity = (byte)(255 * (1.0 - t * 0.3));
-                DwmUpdateThumbnailProperties(hThumbnail, ref props);
-
-                if (t >= 1.0)
-                {
-                    CompositionTarget.Rendering -= renderingHandler;
-                    DwmUnregisterThumbnail(hThumbnail);
-                    overlay.Hide();
-                    Finish();
-                }
-            };
-
-            CompositionTarget.Rendering += renderingHandler;
-        }
-        else
+        if (overlayHwnd == IntPtr.Zero)
         {
             Finish();
+            return;
         }
+
+        double winWidth = Math.Max(1.0, winRect.Right - winRect.Left);
+        double winHeight = Math.Max(1.0, winRect.Bottom - winRect.Top);
+        double origCenterX = winRect.Left + winWidth / 2.0;
+        double targetCenterX = destIconRect.Left + destIconRect.Width / 2.0;
+        double targetTop = destIconRect.Top;
+
+        IntPtr[] thumbnails = new IntPtr[SLICE_COUNT];
+        DWM_THUMBNAIL_PROPERTIES[] sliceProps = new DWM_THUMBNAIL_PROPERTIES[SLICE_COUNT];
+        bool allOk = true;
+
+        for (int i = 0; i < SLICE_COUNT; i++)
+        {
+            if (DwmRegisterThumbnail(overlayHwnd, targetHwnd, out thumbnails[i]) == 0)
+            {
+                int srcY1 = (int)(i * winHeight / SLICE_COUNT);
+                int srcY2 = (int)((i + 1) * winHeight / SLICE_COUNT);
+
+                sliceProps[i] = new DWM_THUMBNAIL_PROPERTIES
+                {
+                    dwFlags = DWM_TNS_RECTDESTINATION | DWM_TNS_RECTSOURCE | DWM_TNS_OPACITY | DWM_TNS_VISIBLE,
+                    rcSource = new RECT { Left = 0, Top = srcY1, Right = (int)winWidth, Bottom = srcY2 },
+                    rcDestination = new RECT { Left = winRect.Left, Top = winRect.Top + srcY1, Right = winRect.Right, Bottom = winRect.Top + srcY2 },
+                    opacity = 255,
+                    fVisible = true
+                };
+                DwmUpdateThumbnailProperties(thumbnails[i], ref sliceProps[i]);
+            }
+            else
+            {
+                allOk = false;
+                break;
+            }
+        }
+
+        if (!allOk)
+        {
+            for (int j = 0; j < SLICE_COUNT; j++)
+            {
+                if (thumbnails[j] != IntPtr.Zero) DwmUnregisterThumbnail(thumbnails[j]);
+            }
+            Finish();
+            return;
+        }
+
+        DateTime startTime = DateTime.Now;
+        const double durationMs = 280.0;
+
+        EventHandler renderingHandler = null;
+        renderingHandler = (s, e) =>
+        {
+            double elapsedMs = (DateTime.Now - startTime).TotalMilliseconds;
+            double globalT = Math.Min(1.0, elapsedMs / durationMs);
+
+            for (int i = 0; i < SLICE_COUNT; i++)
+            {
+                // Bottom slices (i -> SLICE_COUNT - 1) lead the suction; top slices lag behind
+                double sliceNormalized = (double)i / (SLICE_COUNT - 1.0);
+                double lagDelay = (1.0 - sliceNormalized) * 0.32;
+                double sliceT = Math.Min(1.0, Math.Max(0.0, (globalT - lagDelay) / (1.0 - lagDelay)));
+
+                // Authentic macOS Genie suction curve (cubic Y suction, quadratic X narrowing)
+                double easeY = sliceT * sliceT * sliceT;
+                double easeX = sliceT * sliceT;
+
+                double curWidth = winWidth + (destIconRect.Width - winWidth) * easeX;
+                double curCenterX = origCenterX + (targetCenterX - origCenterX) * easeY;
+
+                double origSliceTop = winRect.Top + i * (winHeight / SLICE_COUNT);
+                double curTop = origSliceTop + (targetTop - origSliceTop) * easeY;
+                double curSliceHeight = (winHeight / SLICE_COUNT) + (3.0 - (winHeight / SLICE_COUNT)) * easeY;
+
+                sliceProps[i].rcDestination = new RECT
+                {
+                    Left = (int)(curCenterX - curWidth / 2.0),
+                    Top = (int)curTop,
+                    Right = (int)(curCenterX + curWidth / 2.0),
+                    Bottom = (int)(curTop + curSliceHeight)
+                };
+                sliceProps[i].opacity = (byte)(255 * (1.0 - easeY * 0.35));
+                DwmUpdateThumbnailProperties(thumbnails[i], ref sliceProps[i]);
+            }
+
+            if (globalT >= 1.0)
+            {
+                CompositionTarget.Rendering -= renderingHandler;
+                for (int j = 0; j < SLICE_COUNT; j++)
+                {
+                    if (thumbnails[j] != IntPtr.Zero) DwmUnregisterThumbnail(thumbnails[j]);
+                }
+                overlay.Hide();
+                Finish();
+            }
+        };
+
+        CompositionTarget.Rendering += renderingHandler;
     }
 
     public static void PlayRestoreAnimation(IntPtr targetHwnd, Action onCompleted = null)
@@ -389,7 +446,7 @@ public static class GenieEffect
             ShowWindow(targetHwnd, 9); // SW_RESTORE
             SetForegroundWindow(targetHwnd);
 
-            DispatcherTimer delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+            DispatcherTimer delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(450) };
             delayTimer.Tick += (s, e) =>
             {
                 delayTimer.Stop();
@@ -416,51 +473,104 @@ public static class GenieEffect
         Window overlay = EnsureOverlayWindow();
         IntPtr overlayHwnd = new WindowInteropHelper(overlay).Handle;
 
-        if (overlayHwnd != IntPtr.Zero && DwmRegisterThumbnail(overlayHwnd, targetHwnd, out IntPtr hThumbnail) == 0)
-        {
-            DWM_THUMBNAIL_PROPERTIES props = new DWM_THUMBNAIL_PROPERTIES
-            {
-                dwFlags = DWM_TNS_RECTDESTINATION | DWM_TNS_OPACITY | DWM_TNS_VISIBLE,
-                rcDestination = new RECT { Left = (int)startIconRect.Left, Top = (int)startIconRect.Top, Right = (int)startIconRect.Right, Bottom = (int)startIconRect.Bottom },
-                opacity = 180,
-                fVisible = true
-            };
-            DwmUpdateThumbnailProperties(hThumbnail, ref props);
-
-            DateTime startTime = DateTime.Now;
-            const double durationMs = 200.0;
-
-            EventHandler renderingHandler = null;
-            renderingHandler = (s, e) =>
-            {
-                double elapsedMs = (DateTime.Now - startTime).TotalMilliseconds;
-                double t = Math.Min(1.0, elapsedMs / durationMs);
-
-                double ease = 1.0 - Math.Pow(1.0 - t, 3);
-
-                int curLeft = (int)(startIconRect.Left + (finalWinRect.Left - startIconRect.Left) * ease);
-                int curTop = (int)(startIconRect.Top + (finalWinRect.Top - startIconRect.Top) * ease);
-                int curRight = (int)(startIconRect.Right + (finalWinRect.Right - startIconRect.Right) * ease);
-                int curBottom = (int)(startIconRect.Bottom + (finalWinRect.Bottom - startIconRect.Bottom) * ease);
-
-                props.rcDestination = new RECT { Left = curLeft, Top = curTop, Right = curRight, Bottom = curBottom };
-                props.opacity = (byte)(180 + (255 - 180) * ease);
-                DwmUpdateThumbnailProperties(hThumbnail, ref props);
-
-                if (t >= 1.0)
-                {
-                    CompositionTarget.Rendering -= renderingHandler;
-                    DwmUnregisterThumbnail(hThumbnail);
-                    overlay.Hide();
-                    Finish();
-                }
-            };
-
-            CompositionTarget.Rendering += renderingHandler;
-        }
-        else
+        if (overlayHwnd == IntPtr.Zero)
         {
             Finish();
+            return;
         }
+
+        double winWidth = Math.Max(1.0, finalWinRect.Right - finalWinRect.Left);
+        double winHeight = Math.Max(1.0, finalWinRect.Bottom - finalWinRect.Top);
+        double targetCenterX = finalWinRect.Left + winWidth / 2.0;
+        double startCenterX = startIconRect.Left + startIconRect.Width / 2.0;
+        double startTop = startIconRect.Top;
+
+        IntPtr[] thumbnails = new IntPtr[SLICE_COUNT];
+        DWM_THUMBNAIL_PROPERTIES[] sliceProps = new DWM_THUMBNAIL_PROPERTIES[SLICE_COUNT];
+        bool allOk = true;
+
+        for (int i = 0; i < SLICE_COUNT; i++)
+        {
+            if (DwmRegisterThumbnail(overlayHwnd, targetHwnd, out thumbnails[i]) == 0)
+            {
+                int srcY1 = (int)(i * winHeight / SLICE_COUNT);
+                int srcY2 = (int)((i + 1) * winHeight / SLICE_COUNT);
+
+                sliceProps[i] = new DWM_THUMBNAIL_PROPERTIES
+                {
+                    dwFlags = DWM_TNS_RECTDESTINATION | DWM_TNS_RECTSOURCE | DWM_TNS_OPACITY | DWM_TNS_VISIBLE,
+                    rcSource = new RECT { Left = 0, Top = srcY1, Right = (int)winWidth, Bottom = srcY2 },
+                    rcDestination = new RECT { Left = (int)startIconRect.Left, Top = (int)startIconRect.Top, Right = (int)startIconRect.Right, Bottom = (int)startIconRect.Bottom },
+                    opacity = 180,
+                    fVisible = true
+                };
+                DwmUpdateThumbnailProperties(thumbnails[i], ref sliceProps[i]);
+            }
+            else
+            {
+                allOk = false;
+                break;
+            }
+        }
+
+        if (!allOk)
+        {
+            for (int j = 0; j < SLICE_COUNT; j++)
+            {
+                if (thumbnails[j] != IntPtr.Zero) DwmUnregisterThumbnail(thumbnails[j]);
+            }
+            Finish();
+            return;
+        }
+
+        DateTime startTime = DateTime.Now;
+        const double durationMs = 260.0;
+
+        EventHandler renderingHandler = null;
+        renderingHandler = (s, e) =>
+        {
+            double elapsedMs = (DateTime.Now - startTime).TotalMilliseconds;
+            double globalT = Math.Min(1.0, elapsedMs / durationMs);
+
+            for (int i = 0; i < SLICE_COUNT; i++)
+            {
+                // Top slices expand out first during restore, bottom slices follow
+                double sliceNormalized = (double)i / (SLICE_COUNT - 1.0);
+                double lagDelay = sliceNormalized * 0.28;
+                double sliceT = Math.Min(1.0, Math.Max(0.0, (globalT - lagDelay) / (1.0 - lagDelay)));
+
+                double ease = 1.0 - Math.Pow(1.0 - sliceT, 3);
+
+                double curWidth = startIconRect.Width + (winWidth - startIconRect.Width) * ease;
+                double curCenterX = startCenterX + (targetCenterX - startCenterX) * ease;
+
+                double finalSliceTop = finalWinRect.Top + i * (winHeight / SLICE_COUNT);
+                double curTop = startTop + (finalSliceTop - startTop) * ease;
+                double curSliceHeight = 3.0 + ((winHeight / SLICE_COUNT) - 3.0) * ease;
+
+                sliceProps[i].rcDestination = new RECT
+                {
+                    Left = (int)(curCenterX - curWidth / 2.0),
+                    Top = (int)curTop,
+                    Right = (int)(curCenterX + curWidth / 2.0),
+                    Bottom = (int)(curTop + curSliceHeight)
+                };
+                sliceProps[i].opacity = (byte)(180 + (255 - 180) * ease);
+                DwmUpdateThumbnailProperties(thumbnails[i], ref sliceProps[i]);
+            }
+
+            if (globalT >= 1.0)
+            {
+                CompositionTarget.Rendering -= renderingHandler;
+                for (int j = 0; j < SLICE_COUNT; j++)
+                {
+                    if (thumbnails[j] != IntPtr.Zero) DwmUnregisterThumbnail(thumbnails[j]);
+                }
+                overlay.Hide();
+                Finish();
+            }
+        };
+
+        CompositionTarget.Rendering += renderingHandler;
     }
 }
