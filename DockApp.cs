@@ -15016,7 +15016,8 @@ namespace MacStyleDock
 
 			}
 
-			if (Config != null && !string.IsNullOrEmpty (Config.FilePath) && Directory.Exists (Config.FilePath)) {
+			string targetPath = (Config != null && !string.IsNullOrEmpty (Config.FilePath)) ? System.Environment.ExpandEnvironmentVariables (Config.FilePath) : "";
+			if (!string.IsNullOrEmpty (targetPath) && Directory.Exists (targetPath)) {
 
 				if (Window.GetWindow (this) is DockWindow dockWindow4) {
 
@@ -15027,30 +15028,25 @@ namespace MacStyleDock
 						viewMode = "List";
 					}
 
-					System.Windows.Point point = dockWindow4.PhysicalToLogical (PointToScreen (new System.Windows.Point (0.0, 0.0)), this);
+					StackOverlayWindow stackOverlayWindow = new StackOverlayWindow (dockWindow4, targetPath, viewMode);
+					stackOverlayWindow.Width = 420;
+					stackOverlayWindow.Height = 480;
 
-					StackOverlayWindow stackOverlayWindow = new StackOverlayWindow (dockWindow4, Config.FilePath, viewMode);
+					System.Windows.Point point = PointToScreen (new System.Windows.Point (0.0, 0.0));
 
-					stackOverlayWindow.Left = point.X + (base.ActualWidth - stackOverlayWindow.Width) / 2.0;
+					stackOverlayWindow.Left = Math.Max(10.0, point.X + (base.ActualWidth - 420.0) / 2.0);
 
 					if (dockWindow4.settings.Position == "Bottom") {
 
-						stackOverlayWindow.Top = point.Y - stackOverlayWindow.Height - 8.0 + 20.0;
+						stackOverlayWindow.Top = Math.Max(10.0, point.Y - 480.0 - 12.0);
 
 					} else if (dockWindow4.settings.Position == "Top") {
 
-						stackOverlayWindow.Top = point.Y + base.ActualHeight + 8.0 - 20.0;
+						stackOverlayWindow.Top = point.Y + base.ActualHeight + 12.0;
 
 					}
 
 					double primaryScreenWidth = SystemParameters.PrimaryScreenWidth;
-
-					if (stackOverlayWindow.Left < 10.0) {
-
-						stackOverlayWindow.Left = 10.0;
-
-					}
-
 					if (stackOverlayWindow.Left + stackOverlayWindow.Width > primaryScreenWidth - 10.0) {
 
 						stackOverlayWindow.Left = primaryScreenWidth - stackOverlayWindow.Width - 10.0;
