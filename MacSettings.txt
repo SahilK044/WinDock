@@ -466,7 +466,6 @@
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
                                             <TextBlock Text="Enable Radial Stacks" Style="{StaticResource CardText}"/>
-                                            <CheckBox x:Name="RadialStacks" Template="{StaticResource MacToggle}"/>
                                         </Grid>
                                     </StackPanel>
                                 </Border>

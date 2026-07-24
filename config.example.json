@@ -19,7 +19,6 @@
   "EnableLiveWeather": true,
   "EnableMicroSounds": true,
   "EnablePoofAnimation": true,
-  "EnableRadialStacks": true,
   "EnableVoiceCommands": false,
   "GlassOpacity": 0.7,
   "Items": [
