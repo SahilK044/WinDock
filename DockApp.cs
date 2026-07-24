@@ -39161,25 +39161,18 @@ namespace MacStyleDock
 			System.Windows.Media.Brush subForeground = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 0, 0, 0));
 
 			Border glassContainer = new Border {
-				CornerRadius = new CornerRadius (20.0),
+				CornerRadius = new CornerRadius (22.0),
 				Background = glassBg,
 				BorderBrush = glassBorder,
 				BorderThickness = new Thickness (1.2),
 				Padding = new Thickness (16.0),
-				Margin = new Thickness (0.0)
+				Margin = new Thickness (0.0),
+				ClipToBounds = true
 			};
 
-			if (isLiquidGlass && (parent == null || parent.settings == null || !parent.settings.PerformanceMode)) {
-				glassContainer.Effect = new LiquidGlassEffect {
-					CornerRadius = 20.0,
-					RefractionStrength = 5.0,
-					TintOpacity = 0.06,
-					SpecularIntensity = 0.3,
-					DockSize = new System.Windows.Size (420.0, 480.0)
-				};
-			} else if (parent == null || parent.settings == null || !parent.settings.PerformanceMode) {
+			if (parent == null || parent.settings == null || !parent.settings.PerformanceMode) {
 				glassContainer.Effect = new DropShadowEffect {
-					BlurRadius = 24.0,
+					BlurRadius = 28.0,
 					ShadowDepth = 6.0,
 					Opacity = 0.35,
 					Color = Colors.Black
