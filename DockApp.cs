@@ -38980,13 +38980,23 @@ namespace MacStyleDock
 			return System.IO.Path.Combine (dir, "pinned_stacks.txt");
 		}
 
+		private static string NormalizePath (string path)
+		{
+			if (string.IsNullOrEmpty (path)) return "";
+			try {
+				return System.IO.Path.GetFullPath (path).TrimEnd ('\\', '/').ToLowerInvariant ();
+			} catch {
+				return path.TrimEnd ('\\', '/').ToLowerInvariant ();
+			}
+		}
+
 		public static List<string> GetPinnedItems (string folderPath)
 		{
 			List<string> list = new List<string> ();
 			try {
 				string file = GetConfigPath ();
 				if (!File.Exists (file)) return list;
-				string key = "[" + (folderPath ?? "").TrimEnd ('\\', '/').ToLowerInvariant () + "]";
+				string key = "[" + NormalizePath (folderPath) + "]";
 				bool reading = false;
 				foreach (string line in File.ReadAllLines (file)) {
 					string trimmed = line.Trim ();
@@ -39005,19 +39015,21 @@ namespace MacStyleDock
 		public static bool IsPinned (string folderPath, string itemPath)
 		{
 			if (string.IsNullOrEmpty (folderPath) || string.IsNullOrEmpty (itemPath)) return false;
+			string target = NormalizePath (itemPath);
 			List<string> pinned = GetPinnedItems (folderPath);
-			return pinned.Any (p => string.Equals (p, itemPath, StringComparison.OrdinalIgnoreCase));
+			return pinned.Any (p => NormalizePath (p) == target);
 		}
 
 		public static void PinItem (string folderPath, string itemPath)
 		{
 			try {
 				if (string.IsNullOrEmpty (folderPath) || string.IsNullOrEmpty (itemPath)) return;
-				string key = folderPath.TrimEnd ('\\', '/').ToLowerInvariant ();
+				string key = NormalizePath (folderPath);
+				string target = System.IO.Path.GetFullPath (itemPath);
 				Dictionary<string, List<string>> all = LoadAll ();
 				if (!all.ContainsKey (key)) all [key] = new List<string> ();
-				if (!all [key].Any (p => string.Equals (p, itemPath, StringComparison.OrdinalIgnoreCase))) {
-					all [key].Add (itemPath);
+				if (!all [key].Any (p => NormalizePath (p) == NormalizePath (target))) {
+					all [key].Add (target);
 					SaveAll (all);
 				}
 			} catch { }
@@ -39027,10 +39039,24 @@ namespace MacStyleDock
 		{
 			try {
 				if (string.IsNullOrEmpty (folderPath) || string.IsNullOrEmpty (itemPath)) return;
-				string key = folderPath.TrimEnd ('\\', '/').ToLowerInvariant ();
+				string key = NormalizePath (folderPath);
+				string target = NormalizePath (itemPath);
 				Dictionary<string, List<string>> all = LoadAll ();
 				if (all.ContainsKey (key)) {
-					all [key].RemoveAll (p => string.Equals (p, itemPath, StringComparison.OrdinalIgnoreCase));
+					all [key].RemoveAll (p => NormalizePath (p) == target);
+					SaveAll (all);
+				}
+			} catch { }
+		}
+
+		public static void ClearAllPinned (string folderPath)
+		{
+			try {
+				if (string.IsNullOrEmpty (folderPath)) return;
+				string key = NormalizePath (folderPath);
+				Dictionary<string, List<string>> all = LoadAll ();
+				if (all.ContainsKey (key)) {
+					all [key].Clear ();
 					SaveAll (all);
 				}
 			} catch { }
@@ -39069,6 +39095,202 @@ namespace MacStyleDock
 				}
 				File.WriteAllLines (GetConfigPath (), lines);
 			} catch { }
+		}
+	}
+
+	public class StackManagerWindow : Window
+	{
+		private string folderPath;
+		private StackOverlayWindow overlayWindow;
+		private StackPanel pinnedPanel;
+		private TextBlock cleanStatusText;
+
+		public StackManagerWindow (string path, StackOverlayWindow overlay)
+		{
+			folderPath = path;
+			overlayWindow = overlay;
+
+			base.Title = "Stack Cleaner & Manager - " + System.IO.Path.GetFileName (folderPath);
+			base.Width = 440.0;
+			base.Height = 420.0;
+			base.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+			base.ResizeMode = ResizeMode.NoResize;
+			base.Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (28, 28, 32));
+
+			Border rootBorder = new Border {
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (28, 28, 32)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 255, 255, 255)),
+				BorderThickness = new Thickness (1.0),
+				Padding = new Thickness (16.0)
+			};
+
+			DockPanel mainPanel = new DockPanel ();
+			rootBorder.Child = mainPanel;
+			base.Content = rootBorder;
+
+			TextBlock titleText = new TextBlock {
+				Text = "⚙️ Stack Manager & Cleaner",
+				Foreground = System.Windows.Media.Brushes.White,
+				FontSize = 15.0,
+				FontWeight = FontWeights.Bold,
+				Margin = new Thickness (0, 0, 0, 4)
+			};
+			TextBlock pathSubtext = new TextBlock {
+				Text = folderPath,
+				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 255, 255, 255)),
+				FontSize = 11.0,
+				TextTrimming = TextTrimming.CharacterEllipsis,
+				Margin = new Thickness (0, 0, 0, 12)
+			};
+			StackPanel headerSp = new StackPanel ();
+			headerSp.Children.Add (titleText);
+			headerSp.Children.Add (pathSubtext);
+			DockPanel.SetDock (headerSp, Dock.Top);
+			mainPanel.Children.Add (headerSp);
+
+			StackPanel modeSp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness (0, 0, 0, 12) };
+			modeSp.Children.Add (new TextBlock { Text = "Stack View: ", Foreground = System.Windows.Media.Brushes.White, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness (0, 0, 8, 0) });
+
+			System.Windows.Controls.Button fanBtn = new System.Windows.Controls.Button { Content = "Fan View", Margin = new Thickness (0, 0, 4, 0), Padding = new Thickness (8, 2, 8, 2) };
+			System.Windows.Controls.Button gridBtn = new System.Windows.Controls.Button { Content = "Grid View", Margin = new Thickness (0, 0, 4, 0), Padding = new Thickness (8, 2, 8, 2) };
+			System.Windows.Controls.Button listBtn = new System.Windows.Controls.Button { Content = "List View", Margin = new Thickness (0, 0, 4, 0), Padding = new Thickness (8, 2, 8, 2) };
+
+			fanBtn.Click += delegate { SetMode ("Fan"); };
+			gridBtn.Click += delegate { SetMode ("Grid"); };
+			listBtn.Click += delegate { SetMode ("List"); };
+
+			modeSp.Children.Add (fanBtn);
+			modeSp.Children.Add (gridBtn);
+			modeSp.Children.Add (listBtn);
+
+			DockPanel.SetDock (modeSp, Dock.Top);
+			mainPanel.Children.Add (modeSp);
+
+			System.Windows.Controls.TabControl tabs = new System.Windows.Controls.TabControl {
+				Background = System.Windows.Media.Brushes.Transparent,
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (40, 255, 255, 255))
+			};
+
+			TabItem pinnedTab = new TabItem { Header = "📌 Pinned Items" };
+			ScrollViewer svPinned = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness (0, 8, 0, 8) };
+			pinnedPanel = new StackPanel ();
+			svPinned.Content = pinnedPanel;
+
+			DockPanel pinnedDock = new DockPanel ();
+			System.Windows.Controls.Button clearAllBtn = new System.Windows.Controls.Button { Content = "Clear All Pinned Items", Padding = new Thickness (10, 4, 10, 4), Margin = new Thickness (0, 4, 0, 0) };
+			clearAllBtn.Click += delegate {
+				StackPinManager.ClearAllPinned (folderPath);
+				RefreshPinnedList ();
+				if (overlayWindow != null) overlayWindow.ReloadStack ();
+			};
+			DockPanel.SetDock (clearAllBtn, Dock.Bottom);
+			pinnedDock.Children.Add (clearAllBtn);
+			pinnedDock.Children.Add (svPinned);
+			pinnedTab.Content = pinnedDock;
+			tabs.Items.Add (pinnedTab);
+
+			TabItem cleanTab = new TabItem { Header = "🧹 Stack Cleaner" };
+			StackPanel cleanPanel = new StackPanel { Margin = new Thickness (8) };
+
+			cleanStatusText = new TextBlock {
+				Text = "Scan folder for temporary, log, download, or 0-byte junk files.",
+				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (200, 255, 255, 255)),
+				TextWrapping = TextWrapping.Wrap,
+				Margin = new Thickness (0, 0, 0, 12)
+			};
+			cleanPanel.Children.Add (cleanStatusText);
+
+			System.Windows.Controls.Button cleanBtn = new System.Windows.Controls.Button {
+				Content = "🧹 Scan & Clean Junk Files Now",
+				Height = 36.0,
+				FontWeight = FontWeights.Bold,
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (40, 120, 220)),
+				Foreground = System.Windows.Media.Brushes.White,
+				Margin = new Thickness (0, 8, 0, 0)
+			};
+			cleanBtn.Click += delegate {
+				PerformClean ();
+			};
+			cleanPanel.Children.Add (cleanBtn);
+
+			mainPanel.Children.Add (tabs);
+
+			RefreshPinnedList ();
+		}
+
+		private void SetMode (string mode)
+		{
+			try {
+				if (overlayWindow != null) {
+					overlayWindow.SetViewMode (mode);
+				}
+			} catch { }
+		}
+
+		private void RefreshPinnedList ()
+		{
+			try {
+				pinnedPanel.Children.Clear ();
+				List<string> items = StackPinManager.GetPinnedItems (folderPath);
+				if (items.Count == 0) {
+					pinnedPanel.Children.Add (new TextBlock {
+						Text = "No items pinned to this stack yet.",
+						Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (140, 255, 255, 255)),
+						Margin = new Thickness (8)
+					});
+					return;
+				}
+
+				foreach (string item in items) {
+					DockPanel row = new DockPanel { Margin = new Thickness (0, 2, 0, 2) };
+					System.Windows.Controls.Button unpinBtn = new System.Windows.Controls.Button { Content = "Unpin", Width = 60, Padding = new Thickness (4, 2, 4, 2) };
+					string targetPath = item;
+					unpinBtn.Click += delegate {
+						StackPinManager.UnpinItem (folderPath, targetPath);
+						RefreshPinnedList ();
+						if (overlayWindow != null) overlayWindow.ReloadStack ();
+					};
+					DockPanel.SetDock (unpinBtn, Dock.Right);
+					row.Children.Add (unpinBtn);
+
+					TextBlock itemLabel = new TextBlock {
+						Text = System.IO.Path.GetFileName (item),
+						Foreground = System.Windows.Media.Brushes.White,
+						VerticalAlignment = VerticalAlignment.Center,
+						TextTrimming = TextTrimming.CharacterEllipsis,
+						Margin = new Thickness (0, 0, 8, 0)
+					};
+					row.Children.Add (itemLabel);
+					pinnedPanel.Children.Add (row);
+				}
+			} catch { }
+		}
+
+		private void PerformClean ()
+		{
+			try {
+				if (string.IsNullOrEmpty (folderPath) || !Directory.Exists (folderPath)) return;
+				int deletedCount = 0;
+				long freedBytes = 0;
+
+				string[] files = Directory.GetFiles (folderPath);
+				foreach (string f in files) {
+					try {
+						FileInfo info = new FileInfo (f);
+						string ext = info.Extension.ToLowerInvariant ();
+						if (ext == ".tmp" || ext == ".log" || ext == ".crdownload" || ext == ".dmp" || info.Length == 0) {
+							freedBytes += info.Length;
+							File.Delete (f);
+							deletedCount++;
+						}
+					} catch { }
+				}
+
+				cleanStatusText.Text = string.Format ("✨ Cleaning complete! Removed {0} junk files ({1:N2} MB freed).", deletedCount, freedBytes / 1048576.0);
+				if (overlayWindow != null) overlayWindow.ReloadStack ();
+			} catch (Exception ex) {
+				cleanStatusText.Text = "Clean error: " + ex.Message;
+			}
 		}
 	}
 
@@ -39578,12 +39800,32 @@ namespace MacStyleDock
 			actionPills.Children.Add (openPill);
 
 			Border addPinPill = CreateAddPinPill ();
-			addPinPill.Margin = new Thickness (8, 0, 0, 0);
+			addPinPill.Margin = new Thickness (6, 0, 0, 0);
 			actionPills.Children.Add (addPinPill);
 
-			Canvas.SetLeft (actionPills, anchorX - 110.0);
+			Border manageCleanPill = CreateManageCleanPill ();
+			manageCleanPill.Margin = new Thickness (6, 0, 0, 0);
+			actionPills.Children.Add (manageCleanPill);
+
+			Canvas.SetLeft (actionPills, anchorX - 145.0);
 			Canvas.SetTop (actionPills, 12.0);
 			canvas.Children.Add (actionPills);
+		}
+
+		public void ReloadStack ()
+		{
+			try {
+				LoadDirectoryContents ();
+				RebuildStackUI (animateEntrance: false);
+			} catch { }
+		}
+
+		public void SetViewMode (string mode)
+		{
+			try {
+				viewMode = mode;
+				RebuildStackUI (animateEntrance: false);
+			} catch { }
 		}
 
 		private Border CreateAddPinPill ()
@@ -39612,16 +39854,63 @@ namespace MacStyleDock
 			});
 			pill.Child = sp;
 
+			string targetFolderPath = folderPath;
+			StackOverlayWindow selfWin = this;
+
 			pill.MouseLeftButtonDown += delegate {
 				try {
 					Microsoft.Win32.OpenFileDialog ofd = new Microsoft.Win32.OpenFileDialog ();
 					ofd.Title = "Select File or Application to Pin to Stack";
 					ofd.Filter = "All Files (*.*)|*.*|Applications (*.exe)|*.exe";
-					if (ofd.ShowDialog () == true && !string.IsNullOrEmpty (ofd.FileName)) {
-						StackPinManager.PinItem (folderPath, ofd.FileName);
-						LoadDirectoryContents ();
-						RebuildStackUI (animateEntrance: false);
+					if (Directory.Exists (targetFolderPath)) {
+						ofd.InitialDirectory = targetFolderPath;
 					}
+					selfWin.Topmost = false;
+					bool? res = ofd.ShowDialog ();
+					selfWin.Topmost = true;
+					if (res == true && !string.IsNullOrEmpty (ofd.FileName)) {
+						StackPinManager.PinItem (targetFolderPath, ofd.FileName);
+						ReloadStack ();
+					}
+				} catch { }
+			};
+			return pill;
+		}
+
+		private Border CreateManageCleanPill ()
+		{
+			Border pill = new Border {
+				Height = 28.0,
+				CornerRadius = new CornerRadius (14.0),
+				Background = isDark
+					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, 45, 45, 50))
+					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (200, 230, 230, 235)),
+				BorderBrush = GetCardBorder (),
+				BorderThickness = new Thickness (1.0),
+				Padding = new Thickness (10.0, 0, 10.0, 0),
+				Cursor = System.Windows.Input.Cursors.Hand,
+				ToolTip = "Manage Pinned Items & Clean Junk Files"
+			};
+
+			StackPanel sp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+			sp.Children.Add (new TextBlock {
+				Text = "⚙️ Clean",
+				Foreground = GetFg (),
+				FontSize = 11.0,
+				FontWeight = FontWeights.SemiBold,
+				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
+				VerticalAlignment = VerticalAlignment.Center
+			});
+			pill.Child = sp;
+
+			string targetFolderPath = folderPath;
+			StackOverlayWindow selfWin = this;
+
+			pill.MouseLeftButtonDown += delegate {
+				try {
+					StackManagerWindow mgr = new StackManagerWindow (targetFolderPath, selfWin);
+					mgr.Owner = selfWin;
+					mgr.ShowDialog ();
 				} catch { }
 			};
 			return pill;
