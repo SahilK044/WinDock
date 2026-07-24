@@ -12617,6 +12617,11 @@ namespace MacStyleDock
 
 		public TranslateTransform BounceTransform { get; private set; }
 
+		public SkewTransform TiltTransform { get; private set; } = new SkewTransform (0.0, 0.0);
+
+		private System.Windows.Point _lastMousePos;
+		private DateTime _lastMouseMoveTime = DateTime.Now;
+
 
 
 		public IntPtr TargetHwnd { get; set; }
@@ -12719,6 +12724,7 @@ namespace MacStyleDock
 			RotateTransform value = new RotateTransform (0.0);
 
 			transformGroup.Children.Add (value);
+			transformGroup.Children.Add (TiltTransform);
 
 			base.RenderTransform = transformGroup;
 
@@ -13062,6 +13068,20 @@ namespace MacStyleDock
 
 			base.Children.Add (IndicatorDot);
 
+			base.MouseMove += (s, e) => {
+				try {
+					System.Windows.Point curPos = e.GetPosition (this);
+					double dt = (DateTime.Now - _lastMouseMoveTime).TotalSeconds;
+					if (dt > 0.005) {
+						double vx = (curPos.X - _lastMousePos.X) / dt;
+						double targetTilt = Math.Min (14.0, Math.Max (-14.0, vx * 0.015));
+						TiltTransform.BeginAnimation (SkewTransform.AngleXProperty, new DoubleAnimation (targetTilt, TimeSpan.FromMilliseconds (60)));
+						_lastMousePos = curPos;
+						_lastMouseMoveTime = DateTime.Now;
+					}
+				} catch { }
+			};
+
 			base.MouseEnter += delegate {
 
 				SoundEffects.PlayHover ();
@@ -13119,6 +13139,10 @@ namespace MacStyleDock
 			};
 
 			base.MouseLeave += delegate {
+
+				try {
+					TiltTransform.BeginAnimation (SkewTransform.AngleXProperty, new DoubleAnimation (0.0, TimeSpan.FromMilliseconds (180)));
+				} catch { }
 
 				DockWindow mainWindow = System.Windows.Application.Current.MainWindow as DockWindow;
 
