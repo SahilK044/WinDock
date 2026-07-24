@@ -17,6 +17,10 @@ public static class FullscreenDetector
     [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+    private const uint GA_ROOTOWNER = 3;
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
     {
@@ -32,8 +36,12 @@ public static class FullscreenDetector
     {
         try
         {
-            IntPtr fgHwnd = GetForegroundWindow();
-            if (fgHwnd == IntPtr.Zero || fgHwnd == dockHwnd) return false;
+            IntPtr rawFg = GetForegroundWindow();
+            if (rawFg == IntPtr.Zero) return false;
+
+            IntPtr fgHwnd = GetAncestor(rawFg, GA_ROOTOWNER);
+            if (fgHwnd == IntPtr.Zero) fgHwnd = rawFg;
+            if (fgHwnd == dockHwnd) return false;
 
             // Exclude system desktop/shell windows
             StringBuilder sb = new StringBuilder(256);
@@ -66,11 +74,11 @@ public static class FullscreenDetector
             int screenWidth = fgScreen.Bounds.Width;
             int screenHeight = fgScreen.Bounds.Height;
 
-            // Match width & height within 2px tolerance
-            bool matchesWidth = Math.Abs(winWidth - screenWidth) <= 2;
-            bool matchesHeight = Math.Abs(winHeight - screenHeight) <= 2;
-            bool matchesLeft = Math.Abs(rect.Left - fgScreen.Bounds.Left) <= 2;
-            bool matchesTop = Math.Abs(rect.Top - fgScreen.Bounds.Top) <= 2;
+            // Match width & height within 3px tolerance
+            bool matchesWidth = Math.Abs(winWidth - screenWidth) <= 3;
+            bool matchesHeight = Math.Abs(winHeight - screenHeight) <= 3;
+            bool matchesLeft = Math.Abs(rect.Left - fgScreen.Bounds.Left) <= 3;
+            bool matchesTop = Math.Abs(rect.Top - fgScreen.Bounds.Top) <= 3;
 
             return matchesWidth && matchesHeight && matchesLeft && matchesTop;
         }
