@@ -2903,8 +2903,8 @@ namespace MacStyleDock
 				double left = 0;
 				double top = 0;
 
-				if (targetItem != null) {
-					System.Windows.Point point = PhysicalToLogical (targetItem.PointToScreen (new System.Windows.Point (0.0, 0.0)), targetItem);
+				if (targetItem != null && PresentationSource.FromVisual (targetItem) != null) {
+					System.Windows.Point point = GetLogicalScreenPoint (targetItem);
 					if (settings.Position == "Left") {
 						left = point.X + targetItem.ActualWidth + 8.0 - 10.0;
 						top = point.Y + (targetItem.ActualHeight - f1Overlay.Height) / 2.0;
@@ -3077,8 +3077,8 @@ namespace MacStyleDock
 			};
 
 			try {
-
-				System.Windows.Point point = PhysicalToLogical (targetItem.PointToScreen (new System.Windows.Point (0.0, 0.0)), targetItem);
+				if (targetItem == null || PresentationSource.FromVisual (targetItem) == null) return;
+				System.Windows.Point point = GetLogicalScreenPoint (targetItem);
 
 				if (settings.Position == "Left") {
 
@@ -3348,7 +3348,8 @@ namespace MacStyleDock
 
 			try {
 
-				System.Windows.Point point = PhysicalToLogical (targetItem.PointToScreen (new System.Windows.Point (0.0, 0.0)), targetItem);
+				if (targetItem == null || PresentationSource.FromVisual (targetItem) == null) return;
+				System.Windows.Point point = GetLogicalScreenPoint (targetItem);
 
 				if (settings.Position == "Left") {
 
@@ -3474,7 +3475,8 @@ namespace MacStyleDock
 
 			try {
 
-				System.Windows.Point point = PhysicalToLogical (targetItem.PointToScreen (new System.Windows.Point (0.0, 0.0)), targetItem);
+				if (targetItem == null || PresentationSource.FromVisual (targetItem) == null) return;
+				System.Windows.Point point = GetLogicalScreenPoint (targetItem);
 
 				System.Windows.Point point2 = new System.Windows.Point (point.X, point.Y);
 
@@ -3600,9 +3602,8 @@ namespace MacStyleDock
 
 			try {
 
-				mediaOverlay.SyncSizeAndVisibilityFromSettings ();
-
-				System.Windows.Point point = PhysicalToLogical (targetItem.PointToScreen (new System.Windows.Point (0.0, 0.0)), targetItem);
+				if (targetItem == null || PresentationSource.FromVisual (targetItem) == null) return;
+				System.Windows.Point point = GetLogicalScreenPoint (targetItem);
 
 				if (settings.Position == "Left") {
 
@@ -3728,7 +3729,8 @@ namespace MacStyleDock
 
 			try {
 
-				System.Windows.Point point = PhysicalToLogical (targetItem.PointToScreen (new System.Windows.Point (0.0, 0.0)), targetItem);
+				if (targetItem == null || PresentationSource.FromVisual (targetItem) == null) return;
+				System.Windows.Point point = GetLogicalScreenPoint (targetItem);
 
 				if (settings.Position == "Left") {
 
@@ -4350,6 +4352,18 @@ namespace MacStyleDock
 
 			return new System.Windows.Point (physicalPoint.X / num, physicalPoint.Y / num2);
 
+		}
+
+		public System.Windows.Point GetLogicalScreenPoint (FrameworkElement item)
+		{
+			if (item == null) return new System.Windows.Point (0.0, 0.0);
+			try {
+				if (PresentationSource.FromVisual (item) == null) return new System.Windows.Point (0.0, 0.0);
+				System.Windows.Point screenPoint = item.PointToScreen (new System.Windows.Point (0.0, 0.0));
+				return PhysicalToLogical (screenPoint, item);
+			} catch {
+				return new System.Windows.Point (0.0, 0.0);
+			}
 		}
 
 
@@ -11070,10 +11084,10 @@ namespace MacStyleDock
 					ShowInTaskbar = false,
 
 					ResizeMode = ResizeMode.NoResize
-
 				};
 
-				System.Windows.Point point = PhysicalToLogical (item.PointToScreen (new System.Windows.Point (0.0, 0.0)), item);
+				if (item == null || PresentationSource.FromVisual (item) == null) return;
+				System.Windows.Point point = GetLogicalScreenPoint (item);
 
 				exposeWin.Left = point.X + item.ActualWidth / 2.0 - 160.0;
 
