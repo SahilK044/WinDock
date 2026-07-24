@@ -3962,12 +3962,10 @@ namespace MacStyleDock
 				GenieEffect.Initialize (this, ResolveIconRect);
 				SetupFullscreenWatcher ();
 
-				if (settings.EnableDynamicIsland) {
-					try {
-						dynamicNotchOverlay = new DynamicNotchWindow (this);
-						dynamicNotchOverlay.Show ();
-					} catch { }
-				}
+				try {
+					dynamicNotchOverlay = new DynamicNotchWindow (this);
+					dynamicNotchOverlay.Show ();
+				} catch { }
 			};
 
 			base.Closed += delegate {
@@ -4836,11 +4834,16 @@ namespace MacStyleDock
 						}
 
 						if (!text.Contains ("EnableLaunchGlow")) {
-
 							settings.EnableLaunchGlow = true;
-
 							flag = true;
-
+						}
+						if (!text.Contains ("EnableDynamicIsland")) {
+							settings.EnableDynamicIsland = true;
+							flag = true;
+						}
+						if (!text.Contains ("EnableDownloadProgressRing")) {
+							settings.EnableDownloadProgressRing = true;
+							flag = true;
 						}
 
 						if (!text.Contains ("EnableClickSquish")) {
