@@ -51724,12 +51724,19 @@ namespace MacStyleDock
 		private StackPanel compactContent;
 		private StackPanel expandedContent;
 		private System.Windows.Controls.Image albumArtImage;
+		private TextBlock compactNetText;
 		private TextBlock trackTitleText;
 		private TextBlock artistText;
+		private TextBlock expandedNetText;
 		private DispatcherTimer spectrumTimer;
+		private DispatcherTimer netTimer;
 		private System.Windows.Shapes.Rectangle[] spectrumBars;
 		private bool isExpanded = false;
 		private Random rnd = new Random ();
+
+		private long lastBytesReceived = 0;
+		private long lastBytesSent = 0;
+		private DateTime lastNetCheck = DateTime.Now;
 
 		public DynamicNotchWindow (DockWindow parentDock)
 		{
@@ -51740,7 +51747,7 @@ namespace MacStyleDock
 			base.Topmost = true;
 			base.ShowInTaskbar = false;
 			base.Title = "DynamicNotch";
-			base.Width = 200.0;
+			base.Width = 240.0;
 			base.Height = 32.0;
 
 			double screenW = SystemParameters.PrimaryScreenWidth;
@@ -51749,8 +51756,8 @@ namespace MacStyleDock
 
 			mainBorder = new Border {
 				CornerRadius = new CornerRadius (16.0),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (230, 16, 16, 22)),
-				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (60, 255, 255, 255)),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 16, 16, 24)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (65, 255, 255, 255)),
 				BorderThickness = new Thickness (1.0),
 				Effect = new DropShadowEffect { BlurRadius = 16.0, ShadowDepth = 3.0, Opacity = 0.5, Color = Colors.Black },
 				Cursor = System.Windows.Input.Cursors.Hand
@@ -51759,24 +51766,26 @@ namespace MacStyleDock
 			notchGrid = new Grid ();
 			mainBorder.Child = notchGrid;
 
+			// Compact View
 			compactContent = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
 			
 			Border camLens = new Border {
-				Width = 10.0, Height = 10.0, CornerRadius = new CornerRadius (5.0),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (200, 30, 30, 42)),
+				Width = 8.0, Height = 8.0, CornerRadius = new CornerRadius (4.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 30, 30, 48)),
 				Margin = new Thickness (0, 0, 8, 0)
 			};
 			compactContent.Children.Add (camLens);
 
-			TextBlock compactTb = new TextBlock {
-				Text = "🎵 macOS Tahoe Notch",
+			compactNetText = new TextBlock {
+				Text = "↓ 0.0 B/s  ↑ 0.0 B/s",
 				Foreground = System.Windows.Media.Brushes.White,
 				FontSize = 11.0,
 				FontWeight = FontWeights.SemiBold,
+				FontFamily = new System.Windows.Media.FontFamily ("Consolas, Segoe UI"),
 				VerticalAlignment = VerticalAlignment.Center,
 				Margin = new Thickness (0, 0, 8, 0)
 			};
-			compactContent.Children.Add (compactTb);
+			compactContent.Children.Add (compactNetText);
 
 			StackPanel specPanel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 			spectrumBars = new System.Windows.Shapes.Rectangle [4];
@@ -51791,16 +51800,20 @@ namespace MacStyleDock
 			compactContent.Children.Add (specPanel);
 			notchGrid.Children.Add (compactContent);
 
-			expandedContent = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness (12, 8, 12, 8), Visibility = Visibility.Collapsed };
-			albumArtImage = new System.Windows.Controls.Image { Width = 40.0, Height = 40.0, Stretch = Stretch.UniformToFill };
-			Border artWrap = new Border { Width = 40.0, Height = 40.0, CornerRadius = new CornerRadius (8.0), ClipToBounds = true, Child = albumArtImage, Margin = new Thickness (0, 0, 12, 0) };
+			// Expanded View
+			expandedContent = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness (14, 8, 14, 8), Visibility = Visibility.Collapsed };
+			albumArtImage = new System.Windows.Controls.Image { Width = 44.0, Height = 44.0, Stretch = Stretch.UniformToFill };
+			Border artWrap = new Border { Width = 44.0, Height = 44.0, CornerRadius = new CornerRadius (8.0), ClipToBounds = true, Child = albumArtImage, Margin = new Thickness (0, 0, 12, 0) };
 			expandedContent.Children.Add (artWrap);
 
 			StackPanel textSp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-			trackTitleText = new TextBlock { Text = "macOS Tahoe Dynamic Island", Foreground = System.Windows.Media.Brushes.White, FontSize = 12.0, FontWeight = FontWeights.Bold };
-			artistText = new TextBlock { Text = "Click to expand / collapse", Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, 255, 255, 255)), FontSize = 10.0 };
+			trackTitleText = new TextBlock { Text = "macOS Dynamic Island (NSD)", Foreground = System.Windows.Media.Brushes.White, FontSize = 12.0, FontWeight = FontWeights.Bold };
+			artistText = new TextBlock { Text = "Real-Time Network Speed & Media", Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, 255, 255, 255)), FontSize = 10.0, Margin = new Thickness (0, 1, 0, 2) };
+			expandedNetText = new TextBlock { Text = "↓ 0.0 B/s   ↑ 0.0 B/s", Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (50, 215, 75)), FontSize = 11.0, FontWeight = FontWeights.SemiBold, FontFamily = new System.Windows.Media.FontFamily ("Consolas, Segoe UI") };
+			
 			textSp.Children.Add (trackTitleText);
 			textSp.Children.Add (artistText);
+			textSp.Children.Add (expandedNetText);
 			expandedContent.Children.Add (textSp);
 
 			notchGrid.Children.Add (expandedContent);
@@ -51818,13 +51831,55 @@ namespace MacStyleDock
 				}
 			};
 			spectrumTimer.Start ();
+
+			netTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds (1) };
+			netTimer.Tick += delegate { UpdateNetworkSpeed (); };
+			netTimer.Start ();
+		}
+
+		private void UpdateNetworkSpeed ()
+		{
+			try {
+				long currentReceived = 0;
+				long currentSent = 0;
+
+				foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces ()) {
+					if (ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && ni.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback) {
+						var stats = ni.GetIPStatistics ();
+						currentReceived += stats.BytesReceived;
+						currentSent += stats.BytesSent;
+					}
+				}
+
+				DateTime now = DateTime.Now;
+				double seconds = (now - lastNetCheck).TotalSeconds;
+				if (seconds > 0 && lastBytesReceived > 0) {
+					double downSpeed = (currentReceived - lastBytesReceived) / seconds;
+					double upSpeed = (currentSent - lastBytesSent) / seconds;
+
+					string speedStr = $"↓ {FormatSpeed (downSpeed)}  ↑ {FormatSpeed (upSpeed)}";
+					compactNetText.Text = speedStr;
+					expandedNetText.Text = $"↓ {FormatSpeed (downSpeed)}   ↑ {FormatSpeed (upSpeed)}";
+				}
+
+				lastBytesReceived = currentReceived;
+				lastBytesSent = currentSent;
+				lastNetCheck = now;
+			} catch { }
+		}
+
+		private string FormatSpeed (double bytesPerSec)
+		{
+			if (bytesPerSec < 1024) return $"{bytesPerSec:F0} B/s";
+			if (bytesPerSec < 1024 * 1024) return $"{(bytesPerSec / 1024.0):F1} KB/s";
+			return $"{(bytesPerSec / (1024.0 * 1024.0)):F1} MB/s";
 		}
 
 		public void ToggleExpand ()
 		{
 			isExpanded = !isExpanded;
-			double targetW = isExpanded ? 340.0 : 200.0;
-			double targetH = isExpanded ? 64.0 : 32.0;
+			double targetW = isExpanded ? 360.0 : 240.0;
+			double targetH = isExpanded ? 68.0 : 32.0;
 
 			DoubleAnimation animW = new DoubleAnimation (targetW, TimeSpan.FromMilliseconds (220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
 			DoubleAnimation animH = new DoubleAnimation (targetH, TimeSpan.FromMilliseconds (220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
