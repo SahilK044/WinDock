@@ -9355,7 +9355,7 @@ namespace MacStyleDock
 
 
 
-		private static void FetchTrackDetailsStatic (string artist, string track, out string artUrl, out int durationSeconds)
+		public static void FetchTrackDetailsStatic (string artist, string track, out string artUrl, out int durationSeconds)
 
 		{
 
@@ -51723,20 +51723,18 @@ namespace MacStyleDock
 		private Grid notchGrid;
 		private StackPanel compactContent;
 		private StackPanel expandedContent;
+		private System.Windows.Controls.Image compactArtImage;
 		private System.Windows.Controls.Image albumArtImage;
-		private TextBlock compactNetText;
+		private TextBlock compactTrackText;
 		private TextBlock trackTitleText;
 		private TextBlock artistText;
-		private TextBlock expandedNetText;
+		private DispatcherTimer mediaTimer;
 		private DispatcherTimer spectrumTimer;
-		private DispatcherTimer netTimer;
 		private System.Windows.Shapes.Rectangle[] spectrumBars;
 		private bool isExpanded = false;
+		private bool isPlayingMedia = false;
+		private string currentTrackKey = "";
 		private Random rnd = new Random ();
-
-		private long lastBytesReceived = 0;
-		private long lastBytesSent = 0;
-		private DateTime lastNetCheck = DateTime.Now;
 
 		public DynamicNotchWindow (DockWindow parentDock)
 		{
@@ -51747,19 +51745,20 @@ namespace MacStyleDock
 			base.Topmost = true;
 			base.ShowInTaskbar = false;
 			base.Title = "DynamicNotch";
-			base.Width = 240.0;
-			base.Height = 32.0;
+			base.Width = 220.0;
+			base.Height = 34.0;
+			base.Opacity = 0.0;
 
 			double screenW = SystemParameters.PrimaryScreenWidth;
 			base.Left = (screenW - base.Width) / 2.0;
 			base.Top = 4.0;
 
 			mainBorder = new Border {
-				CornerRadius = new CornerRadius (16.0),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 16, 16, 24)),
-				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (65, 255, 255, 255)),
+				CornerRadius = new CornerRadius (17.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 12, 12, 18)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (55, 255, 255, 255)),
 				BorderThickness = new Thickness (1.0),
-				Effect = new DropShadowEffect { BlurRadius = 16.0, ShadowDepth = 3.0, Opacity = 0.5, Color = Colors.Black },
+				Effect = new DropShadowEffect { BlurRadius = 18.0, ShadowDepth = 3.0, Opacity = 0.55, Color = Colors.Black },
 				Cursor = System.Windows.Input.Cursors.Hand
 			};
 
@@ -51769,30 +51768,31 @@ namespace MacStyleDock
 			// Compact View
 			compactContent = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
 			
-			Border camLens = new Border {
-				Width = 8.0, Height = 8.0, CornerRadius = new CornerRadius (4.0),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 30, 30, 48)),
-				Margin = new Thickness (0, 0, 8, 0)
+			compactArtImage = new System.Windows.Controls.Image { Width = 20.0, Height = 20.0, Stretch = Stretch.UniformToFill };
+			Border compactArtWrap = new Border {
+				Width = 20.0, Height = 20.0, CornerRadius = new CornerRadius (10.0), ClipToBounds = true,
+				Child = compactArtImage, Margin = new Thickness (0, 0, 8, 0)
 			};
-			compactContent.Children.Add (camLens);
+			compactContent.Children.Add (compactArtWrap);
 
-			compactNetText = new TextBlock {
-				Text = "↓ 0.0 B/s  ↑ 0.0 B/s",
+			compactTrackText = new TextBlock {
+				Text = "No Media Playing",
 				Foreground = System.Windows.Media.Brushes.White,
-				FontSize = 11.0,
+				FontSize = 11.5,
 				FontWeight = FontWeights.SemiBold,
-				FontFamily = new System.Windows.Media.FontFamily ("Consolas, Segoe UI"),
 				VerticalAlignment = VerticalAlignment.Center,
-				Margin = new Thickness (0, 0, 8, 0)
+				Margin = new Thickness (0, 0, 10, 0),
+				MaxWidth = 140.0,
+				TextTrimming = TextTrimming.CharacterEllipsis
 			};
-			compactContent.Children.Add (compactNetText);
+			compactContent.Children.Add (compactTrackText);
 
 			StackPanel specPanel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 			spectrumBars = new System.Windows.Shapes.Rectangle [4];
 			for (int b = 0; b < 4; b++) {
 				spectrumBars [b] = new System.Windows.Shapes.Rectangle {
 					Width = 2.5, Height = 10.0, Margin = new Thickness (1.0),
-					Fill = new SolidColorBrush (System.Windows.Media.Color.FromRgb (50, 215, 75)),
+					Fill = new SolidColorBrush (System.Windows.Media.Color.FromRgb (30, 215, 96)),
 					RadiusX = 1.0, RadiusY = 1.0
 				};
 				specPanel.Children.Add (spectrumBars [b]);
@@ -51801,19 +51801,17 @@ namespace MacStyleDock
 			notchGrid.Children.Add (compactContent);
 
 			// Expanded View
-			expandedContent = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness (14, 8, 14, 8), Visibility = Visibility.Collapsed };
-			albumArtImage = new System.Windows.Controls.Image { Width = 44.0, Height = 44.0, Stretch = Stretch.UniformToFill };
-			Border artWrap = new Border { Width = 44.0, Height = 44.0, CornerRadius = new CornerRadius (8.0), ClipToBounds = true, Child = albumArtImage, Margin = new Thickness (0, 0, 12, 0) };
+			expandedContent = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness (14, 10, 14, 10), Visibility = Visibility.Collapsed };
+			albumArtImage = new System.Windows.Controls.Image { Width = 48.0, Height = 48.0, Stretch = Stretch.UniformToFill };
+			Border artWrap = new Border { Width = 48.0, Height = 48.0, CornerRadius = new CornerRadius (10.0), ClipToBounds = true, Child = albumArtImage, Margin = new Thickness (0, 0, 14, 0) };
 			expandedContent.Children.Add (artWrap);
 
 			StackPanel textSp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-			trackTitleText = new TextBlock { Text = "macOS Dynamic Island (NSD)", Foreground = System.Windows.Media.Brushes.White, FontSize = 12.0, FontWeight = FontWeights.Bold };
-			artistText = new TextBlock { Text = "Real-Time Network Speed & Media", Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, 255, 255, 255)), FontSize = 10.0, Margin = new Thickness (0, 1, 0, 2) };
-			expandedNetText = new TextBlock { Text = "↓ 0.0 B/s   ↑ 0.0 B/s", Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (50, 215, 75)), FontSize = 11.0, FontWeight = FontWeights.SemiBold, FontFamily = new System.Windows.Media.FontFamily ("Consolas, Segoe UI") };
+			trackTitleText = new TextBlock { Text = "Track Title", Foreground = System.Windows.Media.Brushes.White, FontSize = 13.0, FontWeight = FontWeights.Bold, MaxWidth = 220.0, TextTrimming = TextTrimming.CharacterEllipsis };
+			artistText = new TextBlock { Text = "Artist Name", Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, 255, 255, 255)), FontSize = 11.0, Margin = new Thickness (0, 2, 0, 0), MaxWidth = 220.0, TextTrimming = TextTrimming.CharacterEllipsis };
 			
 			textSp.Children.Add (trackTitleText);
 			textSp.Children.Add (artistText);
-			textSp.Children.Add (expandedNetText);
 			expandedContent.Children.Add (textSp);
 
 			notchGrid.Children.Add (expandedContent);
@@ -51823,66 +51821,122 @@ namespace MacStyleDock
 				ToggleExpand ();
 			};
 
-			spectrumTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (100) };
+			spectrumTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (80) };
 			spectrumTimer.Tick += delegate {
-				for (int i = 0; i < spectrumBars.Length; i++) {
-					double h = 3.0 + rnd.NextDouble () * 10.0;
-					spectrumBars [i].Height = h;
+				if (isPlayingMedia) {
+					for (int i = 0; i < spectrumBars.Length; i++) {
+						double h = 4.0 + rnd.NextDouble () * 12.0;
+						spectrumBars [i].Height = h;
+					}
 				}
 			};
 			spectrumTimer.Start ();
 
-			netTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds (1) };
-			netTimer.Tick += delegate { UpdateNetworkSpeed (); };
-			netTimer.Start ();
+			mediaTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (250) };
+			mediaTimer.Tick += delegate { CheckMediaState (); };
+			mediaTimer.Start ();
 		}
 
-		private void UpdateNetworkSpeed ()
+		private void CheckMediaState ()
 		{
 			try {
-				long currentReceived = 0;
-				long currentSent = 0;
-
-				foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces ()) {
-					if (ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && ni.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback) {
-						var stats = ni.GetIPStatistics ();
-						currentReceived += stats.BytesReceived;
-						currentSent += stats.BytesSent;
+				IntPtr dockHwnd = (parent != null) ? new System.Windows.Interop.WindowInteropHelper (parent).Handle : IntPtr.Zero;
+				if (dockHwnd != IntPtr.Zero && FullscreenDetector.IsFullscreenOnDockMonitor (dockHwnd)) {
+					if (base.Visibility != Visibility.Collapsed) {
+						base.Visibility = Visibility.Collapsed;
 					}
+					return;
 				}
 
-				DateTime now = DateTime.Now;
-				double seconds = (now - lastNetCheck).TotalSeconds;
-				if (seconds > 0 && lastBytesReceived > 0) {
-					double downSpeed = (currentReceived - lastBytesReceived) / seconds;
-					double upSpeed = (currentSent - lastBytesSent) / seconds;
+				if (parent != null) {
+					parent.Dispatcher.Invoke (() => {
+						try {
+							string rawTitle = parent.bgSpotifyTrackKey;
+							bool isPlaying = parent.bgSpotifyIsPlaying;
 
-					string speedStr = $"↓ {FormatSpeed (downSpeed)}  ↑ {FormatSpeed (upSpeed)}";
-					compactNetText.Text = speedStr;
-					expandedNetText.Text = $"↓ {FormatSpeed (downSpeed)}   ↑ {FormatSpeed (upSpeed)}";
+							if (string.IsNullOrEmpty (rawTitle) || !isPlaying || rawTitle == "Spotify" || rawTitle == "Spotify Premium" || rawTitle == "Spotify Free") {
+								SetMediaState (false, "", "");
+								return;
+							}
+
+							int dashIdx = rawTitle.IndexOf (" - ");
+							string artist = "Spotify";
+							string track = rawTitle;
+							if (dashIdx != -1) {
+								artist = rawTitle.Substring (0, dashIdx).Trim ();
+								track = rawTitle.Substring (dashIdx + 3).Trim ();
+							}
+
+							SetMediaState (true, track, artist);
+						} catch { }
+					});
 				}
-
-				lastBytesReceived = currentReceived;
-				lastBytesSent = currentSent;
-				lastNetCheck = now;
 			} catch { }
 		}
 
-		private string FormatSpeed (double bytesPerSec)
+		public void SetMediaState (bool playing, string track, string artist)
 		{
-			if (bytesPerSec < 1024) return $"{bytesPerSec:F0} B/s";
-			if (bytesPerSec < 1024 * 1024) return $"{(bytesPerSec / 1024.0):F1} KB/s";
-			return $"{(bytesPerSec / (1024.0 * 1024.0)):F1} MB/s";
+			try {
+				isPlayingMedia = playing;
+
+				if (!playing) {
+					if (base.Opacity > 0.0) {
+						DoubleAnimation animFade = new DoubleAnimation (0.0, TimeSpan.FromMilliseconds (300)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+						animFade.Completed += (s, e) => {
+							if (!isPlayingMedia) base.Visibility = Visibility.Collapsed;
+						};
+						base.BeginAnimation (Window.OpacityProperty, animFade);
+					}
+					return;
+				}
+
+				if (base.Visibility != Visibility.Visible) {
+					base.Visibility = Visibility.Visible;
+				}
+
+				if (base.Opacity < 1.0) {
+					DoubleAnimation animFadeIn = new DoubleAnimation (1.0, TimeSpan.FromMilliseconds (300)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+					base.BeginAnimation (Window.OpacityProperty, animFadeIn);
+				}
+
+				string newKey = $"{track} - {artist}";
+				if (newKey != currentTrackKey) {
+					currentTrackKey = newKey;
+					compactTrackText.Text = string.IsNullOrEmpty (artist) ? track : $"{track} • {artist}";
+					trackTitleText.Text = track;
+					artistText.Text = artist;
+
+					ThreadPool.QueueUserWorkItem (delegate {
+						try {
+							DockWindow.FetchTrackDetailsStatic (artist, track, out string artUrl, out var _);
+							if (!string.IsNullOrEmpty (artUrl)) {
+								base.Dispatcher.BeginInvoke ((Action)delegate {
+									try {
+										BitmapImage bmp = new BitmapImage ();
+										bmp.BeginInit ();
+										bmp.UriSource = new Uri (artUrl);
+										bmp.CacheOption = BitmapCacheOption.OnLoad;
+										bmp.EndInit ();
+										compactArtImage.Source = bmp;
+										albumArtImage.Source = bmp;
+									} catch { }
+								});
+							}
+						} catch { }
+					});
+				}
+			} catch { }
 		}
 
 		public void ToggleExpand ()
 		{
 			isExpanded = !isExpanded;
-			double targetW = isExpanded ? 360.0 : 240.0;
-			double targetH = isExpanded ? 68.0 : 32.0;
+			double targetW = isExpanded ? 340.0 : 220.0;
+			double targetH = isExpanded ? 72.0 : 34.0;
+			double targetCorner = targetH / 2.0;
 
-			DoubleAnimation animW = new DoubleAnimation (targetW, TimeSpan.FromMilliseconds (220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
-			DoubleAnimation animH = new DoubleAnimation (targetH, TimeSpan.FromMilliseconds (220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+			DoubleAnimation animW = new DoubleAnimation (targetW, TimeSpan.FromMilliseconds (250)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+			DoubleAnimation animH = new DoubleAnimation (targetH, TimeSpan.FromMilliseconds (250)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
 
 			animW.Completed += delegate {
 				if (isExpanded) {
@@ -51901,16 +51955,8 @@ namespace MacStyleDock
 
 			base.BeginAnimation (Window.WidthProperty, animW);
 			base.BeginAnimation (Window.HeightProperty, animH);
+			mainBorder.CornerRadius = new CornerRadius (targetCorner);
 			base.Left = (SystemParameters.PrimaryScreenWidth - targetW) / 2.0;
-		}
-
-		public void UpdateMediaInfo (string title, string artist, ImageSource art = null)
-		{
-			try {
-				trackTitleText.Text = title;
-				artistText.Text = artist;
-				if (art != null) albumArtImage.Source = art;
-			} catch { }
 		}
 	}
 }
