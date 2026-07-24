@@ -39107,23 +39107,77 @@ namespace MacStyleDock
 			mainGrid.Children.Clear ();
 
 			bool isDark = (parent == null || parent.settings == null || parent.settings.Theme.ToLower () != "light");
+			bool isLiquidGlass = (parent != null && parent.settings != null && parent.settings.EnableLiquidGlass);
+
+			System.Windows.Media.Brush glassBg;
+			System.Windows.Media.Brush glassBorder;
+
+			if (isLiquidGlass) {
+				if (isDark) {
+					LinearGradientBrush darkGlass = new LinearGradientBrush {
+						StartPoint = new System.Windows.Point (0.0, 0.0),
+						EndPoint = new System.Windows.Point (0.0, 1.0)
+					};
+					darkGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (210, 32, 32, 36), 0.0));
+					darkGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (185, 20, 20, 24), 0.5));
+					darkGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (200, 28, 28, 32), 1.0));
+					glassBg = darkGlass;
+
+					LinearGradientBrush darkBorder = new LinearGradientBrush {
+						StartPoint = new System.Windows.Point (0.0, 0.0),
+						EndPoint = new System.Windows.Point (0.0, 1.0)
+					};
+					darkBorder.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (160, 255, 255, 255), 0.0));
+					darkBorder.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (60, 255, 255, 255), 1.0));
+					glassBorder = darkBorder;
+				} else {
+					LinearGradientBrush lightGlass = new LinearGradientBrush {
+						StartPoint = new System.Windows.Point (0.0, 0.0),
+						EndPoint = new System.Windows.Point (0.0, 1.0)
+					};
+					lightGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (220, 255, 255, 255), 0.0));
+					lightGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (190, 240, 243, 248), 0.5));
+					lightGlass.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (210, 255, 255, 255), 1.0));
+					glassBg = lightGlass;
+
+					LinearGradientBrush lightBorder = new LinearGradientBrush {
+						StartPoint = new System.Windows.Point (0.0, 0.0),
+						EndPoint = new System.Windows.Point (0.0, 1.0)
+					};
+					lightBorder.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (220, 255, 255, 255), 0.0));
+					lightBorder.GradientStops.Add (new GradientStop (System.Windows.Media.Color.FromArgb (80, 0, 0, 0), 1.0));
+					glassBorder = lightBorder;
+				}
+			} else {
+				glassBg = isDark 
+					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 24, 24, 26))
+					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 248, 248, 250));
+				glassBorder = isDark
+					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (70, 255, 255, 255))
+					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (50, 0, 0, 0));
+			}
+
 			System.Windows.Media.Brush foreground = isDark ? System.Windows.Media.Brushes.White : System.Windows.Media.Brushes.Black;
 			System.Windows.Media.Brush subForeground = isDark ? new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 255, 255, 255)) : new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 0, 0, 0));
 
 			Border glassContainer = new Border {
 				CornerRadius = new CornerRadius (20.0),
-				Background = isDark 
-					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 24, 24, 26))
-					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 248, 248, 250)),
-				BorderBrush = isDark
-					? new SolidColorBrush (System.Windows.Media.Color.FromArgb (70, 255, 255, 255))
-					: new SolidColorBrush (System.Windows.Media.Color.FromArgb (50, 0, 0, 0)),
+				Background = glassBg,
+				BorderBrush = glassBorder,
 				BorderThickness = new Thickness (1.2),
 				Padding = new Thickness (16.0),
 				Margin = new Thickness (0.0)
 			};
 
-			if (parent == null || parent.settings == null || !parent.settings.PerformanceMode) {
+			if (isLiquidGlass && (parent == null || parent.settings == null || !parent.settings.PerformanceMode)) {
+				glassContainer.Effect = new LiquidGlassEffect {
+					CornerRadius = 20.0,
+					RefractionStrength = 5.0,
+					TintOpacity = 0.06,
+					SpecularIntensity = 0.3,
+					DockSize = new System.Windows.Size (420.0, 480.0)
+				};
+			} else if (parent == null || parent.settings == null || !parent.settings.PerformanceMode) {
 				glassContainer.Effect = new DropShadowEffect {
 					BlurRadius = 24.0,
 					ShadowDepth = 6.0,
