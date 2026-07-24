@@ -39357,6 +39357,8 @@ namespace MacStyleDock
 			} catch {}
 		}
 
+		public bool SuppressDeactivate = false;
+
 		public StackOverlayWindow (DockWindow parent, string folderPath, string viewMode)
 		{
 			this.parent = parent;
@@ -39371,6 +39373,7 @@ namespace MacStyleDock
 			base.Height = 480.0;
 
 			base.Deactivated += delegate {
+				if (SuppressDeactivate) return;
 				try { CloseAnimated (); } catch { Close (); }
 			};
 
@@ -39859,6 +39862,7 @@ namespace MacStyleDock
 
 			pill.MouseLeftButtonDown += delegate {
 				try {
+					selfWin.SuppressDeactivate = true;
 					Microsoft.Win32.OpenFileDialog ofd = new Microsoft.Win32.OpenFileDialog ();
 					ofd.Title = "Select File or Application to Pin to Stack";
 					ofd.Filter = "All Files (*.*)|*.*|Applications (*.exe)|*.exe";
@@ -39872,7 +39876,10 @@ namespace MacStyleDock
 						StackPinManager.PinItem (targetFolderPath, ofd.FileName);
 						ReloadStack ();
 					}
-				} catch { }
+				} catch {
+				} finally {
+					selfWin.SuppressDeactivate = false;
+				}
 			};
 			return pill;
 		}
@@ -39908,10 +39915,13 @@ namespace MacStyleDock
 
 			pill.MouseLeftButtonDown += delegate {
 				try {
+					selfWin.SuppressDeactivate = true;
 					StackManagerWindow mgr = new StackManagerWindow (targetFolderPath, selfWin);
-					mgr.Owner = selfWin;
 					mgr.ShowDialog ();
-				} catch { }
+				} catch {
+				} finally {
+					selfWin.SuppressDeactivate = false;
+				}
 			};
 			return pill;
 		}
