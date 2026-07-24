@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 public static class GenieEffect
 {
@@ -108,6 +109,7 @@ public static class GenieEffect
     private static Window _mainDockWindow;
     private static Window _overlayWindow;
     private static readonly HashSet<IntPtr> _animatingHwnds = new HashSet<IntPtr>();
+    private static readonly HashSet<IntPtr> _ignoreMinimizes = new HashSet<IntPtr>();
     private static bool _isEnabled = true;
 
     public static bool IsEnabled
@@ -121,7 +123,6 @@ public static class GenieEffect
         _mainDockWindow = animHostWindow;
         _iconRectResolver = iconRectResolver;
 
-        // Suppress Windows native minimize animation so it doesn't collide with Genie
         SuppressNativeAnimation(true);
 
         _winEventDelegate = new WinEventDelegate(WinEventCallback);
@@ -231,6 +232,16 @@ public static class GenieEffect
     {
         if (!_isEnabled || hwnd == IntPtr.Zero || _mainDockWindow == null) return;
 
+        lock (_ignoreMinimizes)
+        {
+            if (_ignoreMinimizes.Contains(hwnd)) return;
+        }
+
+        lock (_animatingHwnds)
+        {
+            if (_animatingHwnds.Contains(hwnd)) return;
+        }
+
         if (eventType == EVENT_SYSTEM_MINIMIZESTART)
         {
             _mainDockWindow.Dispatcher.BeginInvoke((Action)(() =>
@@ -258,15 +269,28 @@ public static class GenieEffect
             _animatingHwnds.Add(targetHwnd);
         }
 
+        lock (_ignoreMinimizes)
+        {
+            _ignoreMinimizes.Add(targetHwnd);
+        }
+
         void Finish()
         {
-            lock (_animatingHwnds) { _animatingHwnds.Remove(targetHwnd); }
-            onCompleted?.Invoke();
+            ShowWindow(targetHwnd, 6); // SW_MINIMIZE
+
+            DispatcherTimer delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+            delayTimer.Tick += (s, e) =>
+            {
+                delayTimer.Stop();
+                lock (_animatingHwnds) { _animatingHwnds.Remove(targetHwnd); }
+                lock (_ignoreMinimizes) { _ignoreMinimizes.Remove(targetHwnd); }
+                onCompleted?.Invoke();
+            };
+            delayTimer.Start();
         }
 
         if (!GetRealWindowRect(targetHwnd, out RECT winRect))
         {
-            ShowWindow(targetHwnd, 6); // SW_MINIMIZE
             Finish();
             return;
         }
@@ -304,7 +328,6 @@ public static class GenieEffect
                 double elapsedMs = (DateTime.Now - startTime).TotalMilliseconds;
                 double t = Math.Min(1.0, elapsedMs / durationMs);
 
-                // Ultra-smooth VSYNC synced Genie suction curve
                 double easeY = t * t * t;
                 double easeX = t * t;
 
@@ -321,7 +344,6 @@ public static class GenieEffect
                 {
                     CompositionTarget.Rendering -= renderingHandler;
                     DwmUnregisterThumbnail(hThumbnail);
-                    ShowWindow(targetHwnd, 6); // SW_MINIMIZE
                     overlay.Hide();
                     Finish();
                 }
@@ -331,7 +353,6 @@ public static class GenieEffect
         }
         else
         {
-            ShowWindow(targetHwnd, 6); // SW_MINIMIZE
             Finish();
         }
     }
@@ -358,16 +379,29 @@ public static class GenieEffect
             _animatingHwnds.Add(targetHwnd);
         }
 
+        lock (_ignoreMinimizes)
+        {
+            _ignoreMinimizes.Add(targetHwnd);
+        }
+
         void Finish()
         {
-            lock (_animatingHwnds) { _animatingHwnds.Remove(targetHwnd); }
-            onCompleted?.Invoke();
+            ShowWindow(targetHwnd, 9); // SW_RESTORE
+            SetForegroundWindow(targetHwnd);
+
+            DispatcherTimer delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+            delayTimer.Tick += (s, e) =>
+            {
+                delayTimer.Stop();
+                lock (_animatingHwnds) { _animatingHwnds.Remove(targetHwnd); }
+                lock (_ignoreMinimizes) { _ignoreMinimizes.Remove(targetHwnd); }
+                onCompleted?.Invoke();
+            };
+            delayTimer.Start();
         }
 
         if (!GetRealWindowRect(targetHwnd, out RECT finalWinRect))
         {
-            ShowWindow(targetHwnd, 9); // SW_RESTORE
-            SetForegroundWindow(targetHwnd);
             Finish();
             return;
         }
@@ -402,7 +436,6 @@ public static class GenieEffect
                 double elapsedMs = (DateTime.Now - startTime).TotalMilliseconds;
                 double t = Math.Min(1.0, elapsedMs / durationMs);
 
-                // Inverse cubic ease out for restore expansion
                 double ease = 1.0 - Math.Pow(1.0 - t, 3);
 
                 int curLeft = (int)(startIconRect.Left + (finalWinRect.Left - startIconRect.Left) * ease);
@@ -418,8 +451,6 @@ public static class GenieEffect
                 {
                     CompositionTarget.Rendering -= renderingHandler;
                     DwmUnregisterThumbnail(hThumbnail);
-                    ShowWindow(targetHwnd, 9); // SW_RESTORE
-                    SetForegroundWindow(targetHwnd);
                     overlay.Hide();
                     Finish();
                 }
@@ -429,8 +460,6 @@ public static class GenieEffect
         }
         else
         {
-            ShowWindow(targetHwnd, 9); // SW_RESTORE
-            SetForegroundWindow(targetHwnd);
             Finish();
         }
     }
