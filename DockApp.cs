@@ -51734,6 +51734,7 @@ namespace MacStyleDock
 	{
 		private DockWindow parent;
 		private Border mainBorder;
+		private Border innerGlowBorder;
 		private Grid notchGrid;
 		private StackPanel compactContent;
 		private Grid expandedContent;
@@ -51746,14 +51747,17 @@ namespace MacStyleDock
 		private System.Windows.Controls.Button playPauseBtn;
 		private DispatcherTimer mediaTimer;
 		private System.Windows.Shapes.Rectangle[] spectrumBars;
-		private double[] currentBarHeights = new double[5] { 2.5, 2.5, 2.5, 2.5, 2.5 };
-		private double[] bandSensitivities = new double[5] { 1.1, 1.4, 1.0, 1.3, 0.9 };
+		private double[] currentBarHeights;
+		private double[] barVelocities;
+		private double[] barPhaseOffsets;
 		private bool isExpanded = false;
 		private bool isPlayingMedia = false;
 		private string currentTrackKey = "";
-		private ScaleTransform borderScale = new ScaleTransform (1.0, 1.0);
-		private double waveAnimTime = 0.0;
-		private DateTime lastSpectrumTime = DateTime.Now;
+		private ScaleTransform borderScale;
+		private double animPhase = 0.0;
+		private DateTime lastFrameTime = DateTime.Now;
+		private double smoothedPeak = 0.0;
+		private double peakVelocity = 0.0;
 
 		public DynamicNotchWindow (DockWindow parentDock)
 		{
@@ -51764,123 +51768,157 @@ namespace MacStyleDock
 			base.Topmost = true;
 			base.ShowInTaskbar = false;
 			base.Title = "DynamicNotch";
-
-			base.Width = 440.0;
-			base.Height = 130.0;
+			base.Width = 460.0;
+			base.Height = 140.0;
 			base.Opacity = 0.0;
 
 			double screenW = SystemParameters.PrimaryScreenWidth;
 			base.Left = (screenW - base.Width) / 2.0;
-			base.Top = 2.0;
+			base.Top = 0.0;
 
+			// Initialize bar state arrays
+			int barCount = 5;
+			currentBarHeights = new double[barCount];
+			barVelocities = new double[barCount];
+			barPhaseOffsets = new double[barCount];
+			Random rng = new Random ();
+			for (int i = 0; i < barCount; i++) {
+				currentBarHeights[i] = 3.0;
+				barVelocities[i] = 0.0;
+				barPhaseOffsets[i] = rng.NextDouble () * Math.PI * 2.0;
+			}
+
+			// Outer container: centered, with room for shadow to breathe
+			Grid rootGrid = new Grid ();
+
+			// Main pill border — multi-layer glass
 			mainBorder = new Border {
 				Width = 240.0,
-				Height = 36.0,
-				CornerRadius = new CornerRadius (18.0),
+				Height = 38.0,
+				CornerRadius = new CornerRadius (19.0),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 				VerticalAlignment = VerticalAlignment.Top,
-				Margin = new Thickness (0, 8, 0, 0),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (238, 14, 15, 20)),
-				BorderBrush = new LinearGradientBrush (
-					System.Windows.Media.Color.FromArgb (55, 255, 255, 255),
-					System.Windows.Media.Color.FromArgb (12, 255, 255, 255),
-					new System.Windows.Point (0, 0),
-					new System.Windows.Point (0, 1)
+				Margin = new Thickness (0, 10, 0, 0),
+				Background = new LinearGradientBrush (
+					System.Windows.Media.Color.FromArgb (245, 18, 18, 24),
+					System.Windows.Media.Color.FromArgb (250, 8, 8, 14),
+					new System.Windows.Point (0.5, 0),
+					new System.Windows.Point (0.5, 1)
 				),
-				BorderThickness = new Thickness (1.0),
+				BorderBrush = new LinearGradientBrush (
+					System.Windows.Media.Color.FromArgb (70, 255, 255, 255),
+					System.Windows.Media.Color.FromArgb (18, 255, 255, 255),
+					new System.Windows.Point (0.5, 0),
+					new System.Windows.Point (0.5, 1)
+				),
+				BorderThickness = new Thickness (0.8),
 				Effect = new DropShadowEffect {
-					BlurRadius = 22.0,
-					ShadowDepth = 4.0,
-					Opacity = 0.52,
-					Color = Colors.Black
+					BlurRadius = 28.0,
+					ShadowDepth = 6.0,
+					Opacity = 0.6,
+					Color = Colors.Black,
+					Direction = 270
 				},
-				Cursor = System.Windows.Input.Cursors.Hand
+				Cursor = System.Windows.Input.Cursors.Hand,
+				ClipToBounds = false
 			};
 
 			borderScale = new ScaleTransform (1.0, 1.0);
 			mainBorder.RenderTransform = borderScale;
 			mainBorder.RenderTransformOrigin = new System.Windows.Point (0.5, 0.5);
 
+			// Hover micro-interaction
 			mainBorder.MouseEnter += (s, e) => {
-				DoubleAnimation scaleAnim = new DoubleAnimation (1.025, TimeSpan.FromMilliseconds (180)) {
-					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+				DoubleAnimation sa = new DoubleAnimation (1.03, TimeSpan.FromMilliseconds (200)) {
+					EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
 				};
-				borderScale.BeginAnimation (ScaleTransform.ScaleXProperty, scaleAnim);
-				borderScale.BeginAnimation (ScaleTransform.ScaleYProperty, scaleAnim);
+				borderScale.BeginAnimation (ScaleTransform.ScaleXProperty, sa);
+				borderScale.BeginAnimation (ScaleTransform.ScaleYProperty, sa);
 			};
 			mainBorder.MouseLeave += (s, e) => {
-				DoubleAnimation scaleAnim = new DoubleAnimation (1.0, TimeSpan.FromMilliseconds (180)) {
-					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+				DoubleAnimation sa = new DoubleAnimation (1.0, TimeSpan.FromMilliseconds (250)) {
+					EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
 				};
-				borderScale.BeginAnimation (ScaleTransform.ScaleXProperty, scaleAnim);
-				borderScale.BeginAnimation (ScaleTransform.ScaleYProperty, scaleAnim);
+				borderScale.BeginAnimation (ScaleTransform.ScaleXProperty, sa);
+				borderScale.BeginAnimation (ScaleTransform.ScaleYProperty, sa);
 			};
 
-			notchGrid = new Grid ();
-			mainBorder.Child = notchGrid;
+			// Inner glow highlight layer (subtle top reflection like real glass)
+			Grid pillContent = new Grid ();
+			innerGlowBorder = new Border {
+				CornerRadius = new CornerRadius (18.0),
+				Background = new LinearGradientBrush (
+					System.Windows.Media.Color.FromArgb (20, 255, 255, 255),
+					System.Windows.Media.Color.FromArgb (0, 255, 255, 255),
+					new System.Windows.Point (0.5, 0),
+					new System.Windows.Point (0.5, 0.4)
+				),
+				IsHitTestVisible = false
+			};
+			pillContent.Children.Add (innerGlowBorder);
 
-			// Compact View
+			notchGrid = new Grid ();
+			pillContent.Children.Add (notchGrid);
+			mainBorder.Child = pillContent;
+
+			// ===== COMPACT VIEW =====
 			compactContent = new StackPanel {
 				Orientation = System.Windows.Controls.Orientation.Horizontal,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-				VerticalAlignment = VerticalAlignment.Center,
-				Opacity = 1.0
+				VerticalAlignment = VerticalAlignment.Center
 			};
-			
+
+			// Album art thumbnail
 			compactArtImage = new System.Windows.Controls.Image {
-				Width = 22.0,
-				Height = 22.0,
+				Width = 24.0, Height = 24.0,
 				Stretch = Stretch.UniformToFill
 			};
 			RenderOptions.SetBitmapScalingMode (compactArtImage, BitmapScalingMode.HighQuality);
 
 			Border compactArtWrap = new Border {
-				Width = 22.0,
-				Height = 22.0,
-				CornerRadius = new CornerRadius (11.0),
+				Width = 24.0, Height = 24.0,
+				CornerRadius = new CornerRadius (6.0),
 				ClipToBounds = true,
-				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
-				BorderThickness = new Thickness (0.8),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (40, 255, 255, 255)),
 				Child = compactArtImage,
-				Margin = new Thickness (0, 0, 8, 0)
+				Margin = new Thickness (0, 0, 10, 0)
 			};
 			compactContent.Children.Add (compactArtWrap);
 
+			// Track text
 			compactTrackText = new TextBlock {
-				Text = "No Media Playing",
-				Foreground = System.Windows.Media.Brushes.White,
-				FontSize = 11.5,
+				Text = "",
+				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (240, 255, 255, 255)),
+				FontSize = 12.0,
 				FontWeight = FontWeights.SemiBold,
-				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
+				FontFamily = new System.Windows.Media.FontFamily ("Segoe UI, sans-serif"),
 				VerticalAlignment = VerticalAlignment.Center,
-				Margin = new Thickness (0, 0, 10, 0),
-				MaxWidth = 150.0,
+				Margin = new Thickness (0, 0, 12, 0),
+				MaxWidth = 155.0,
 				TextTrimming = TextTrimming.CharacterEllipsis
 			};
 			compactContent.Children.Add (compactTrackText);
 
+			// ===== EQ SPECTRUM BARS =====
 			StackPanel specPanel = new StackPanel {
 				Orientation = System.Windows.Controls.Orientation.Horizontal,
-				VerticalAlignment = VerticalAlignment.Center,
-				Margin = new Thickness (0, 0, 2, 0)
+				VerticalAlignment = VerticalAlignment.Center
 			};
 
-			LinearGradientBrush eqBrush = new LinearGradientBrush (
-				System.Windows.Media.Color.FromRgb (30, 215, 96),
-				System.Windows.Media.Color.FromRgb (0, 230, 118),
-				new System.Windows.Point (0, 1),
-				new System.Windows.Point (0, 0)
-			);
-
-			spectrumBars = new System.Windows.Shapes.Rectangle[5];
-			for (int b = 0; b < 5; b++) {
+			spectrumBars = new System.Windows.Shapes.Rectangle[barCount];
+			for (int b = 0; b < barCount; b++) {
 				spectrumBars[b] = new System.Windows.Shapes.Rectangle {
-					Width = 2.8,
-					Height = 2.5,
-					Margin = new Thickness (0.9, 0, 0.9, 0),
-					Fill = eqBrush,
-					RadiusX = 1.4,
-					RadiusY = 1.4,
+					Width = 3.0,
+					Height = 3.0,
+					Margin = new Thickness (1.2, 0, 1.2, 0),
+					Fill = new LinearGradientBrush (
+						System.Windows.Media.Color.FromRgb (30, 215, 96),
+						System.Windows.Media.Color.FromRgb (80, 255, 140),
+						new System.Windows.Point (0, 1),
+						new System.Windows.Point (0, 0)
+					),
+					RadiusX = 1.5,
+					RadiusY = 1.5,
 					VerticalAlignment = VerticalAlignment.Center
 				};
 				specPanel.Children.Add (spectrumBars[b]);
@@ -51888,56 +51926,54 @@ namespace MacStyleDock
 			compactContent.Children.Add (specPanel);
 			notchGrid.Children.Add (compactContent);
 
-			// Expanded View
+			// ===== EXPANDED VIEW =====
 			expandedContent = new Grid {
-				Margin = new Thickness (12, 10, 12, 10),
+				Margin = new Thickness (14, 0, 14, 0),
 				Visibility = Visibility.Collapsed,
-				Opacity = 0.0
+				Opacity = 0.0,
+				VerticalAlignment = VerticalAlignment.Center
 			};
 			expandedContent.ColumnDefinitions.Add (new ColumnDefinition { Width = GridLength.Auto });
 			expandedContent.ColumnDefinitions.Add (new ColumnDefinition { Width = new GridLength (1.0, GridUnitType.Star) });
 			expandedContent.ColumnDefinitions.Add (new ColumnDefinition { Width = GridLength.Auto });
 
 			albumArtImage = new System.Windows.Controls.Image {
-				Width = 52.0,
-				Height = 52.0,
+				Width = 50.0, Height = 50.0,
 				Stretch = Stretch.UniformToFill
 			};
 			RenderOptions.SetBitmapScalingMode (albumArtImage, BitmapScalingMode.HighQuality);
 
 			Border artWrap = new Border {
-				Width = 52.0,
-				Height = 52.0,
-				CornerRadius = new CornerRadius (12.0),
+				Width = 50.0, Height = 50.0,
+				CornerRadius = new CornerRadius (10.0),
 				ClipToBounds = true,
-				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (45, 255, 255, 255)),
-				BorderThickness = new Thickness (1.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 255, 255, 255)),
 				Child = albumArtImage,
-				Margin = new Thickness (0, 0, 12, 0)
+				Margin = new Thickness (0, 0, 14, 0)
 			};
 			Grid.SetColumn (artWrap, 0);
 			expandedContent.Children.Add (artWrap);
 
 			StackPanel textSp = new StackPanel {
 				VerticalAlignment = VerticalAlignment.Center,
-				Margin = new Thickness (0, 0, 10, 0)
+				Margin = new Thickness (0, 0, 8, 0)
 			};
 			trackTitleText = new TextBlock {
-				Text = "Track Title",
+				Text = "",
 				Foreground = System.Windows.Media.Brushes.White,
-				FontSize = 13.0,
-				FontWeight = FontWeights.Bold,
-				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
-				MaxWidth = 180.0,
+				FontSize = 13.5,
+				FontWeight = FontWeights.SemiBold,
+				FontFamily = new System.Windows.Media.FontFamily ("Segoe UI, sans-serif"),
+				MaxWidth = 170.0,
 				TextTrimming = TextTrimming.CharacterEllipsis
 			};
 			artistText = new TextBlock {
-				Text = "Artist Name",
-				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, 255, 255, 255)),
+				Text = "",
+				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 255, 255, 255)),
 				FontSize = 11.0,
-				FontFamily = new System.Windows.Media.FontFamily ("SF Pro Display, Segoe UI, sans-serif"),
-				Margin = new Thickness (0, 2, 0, 0),
-				MaxWidth = 180.0,
+				FontFamily = new System.Windows.Media.FontFamily ("Segoe UI, sans-serif"),
+				Margin = new Thickness (0, 3, 0, 0),
+				MaxWidth = 170.0,
 				TextTrimming = TextTrimming.CharacterEllipsis
 			};
 			textSp.Children.Add (trackTitleText);
@@ -51945,56 +51981,35 @@ namespace MacStyleDock
 			Grid.SetColumn (textSp, 1);
 			expandedContent.Children.Add (textSp);
 
+			// Playback controls
 			StackPanel ctrlSp = new StackPanel {
 				Orientation = System.Windows.Controls.Orientation.Horizontal,
 				VerticalAlignment = VerticalAlignment.Center
 			};
 
-			System.Windows.Controls.Button prevBtn = new System.Windows.Controls.Button {
-				Content = "\uE892",
-				FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
-				FontSize = 12.0,
-				Foreground = System.Windows.Media.Brushes.White,
-				Background = System.Windows.Media.Brushes.Transparent,
-				BorderThickness = new Thickness (0),
-				Width = 28.0,
-				Height = 28.0,
-				Cursor = System.Windows.Input.Cursors.Hand
-			};
+			System.Windows.Controls.Button prevBtn = MakeCtrlButton ("\uE892", 11.0);
 			prevBtn.Click += (s, e) => { SendMediaCommand (12); };
 
 			playPauseIconText = new TextBlock {
 				Text = "\uE769",
 				FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
-				FontSize = 13.0,
-				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (14, 15, 20)),
+				FontSize = 14.0,
+				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (12, 12, 16)),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 				VerticalAlignment = VerticalAlignment.Center
 			};
-
 			playPauseBtn = new System.Windows.Controls.Button {
 				Content = playPauseIconText,
-				Width = 32.0,
-				Height = 32.0,
+				Width = 34.0, Height = 34.0,
 				Background = System.Windows.Media.Brushes.White,
 				BorderThickness = new Thickness (0),
 				Cursor = System.Windows.Input.Cursors.Hand,
-				Margin = new Thickness (4, 0, 4, 0)
+				Margin = new Thickness (6, 0, 6, 0)
 			};
-			playPauseBtn.Template = GetRoundButtonTemplate ();
+			playPauseBtn.Template = GetRoundButtonTemplate (17.0);
 			playPauseBtn.Click += (s, e) => { SendMediaCommand (14); };
 
-			System.Windows.Controls.Button nextBtn = new System.Windows.Controls.Button {
-				Content = "\uE893",
-				FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
-				FontSize = 12.0,
-				Foreground = System.Windows.Media.Brushes.White,
-				Background = System.Windows.Media.Brushes.Transparent,
-				BorderThickness = new Thickness (0),
-				Width = 28.0,
-				Height = 28.0,
-				Cursor = System.Windows.Input.Cursors.Hand
-			};
+			System.Windows.Controls.Button nextBtn = MakeCtrlButton ("\uE893", 11.0);
 			nextBtn.Click += (s, e) => { SendMediaCommand (11); };
 
 			ctrlSp.Children.Add (prevBtn);
@@ -52003,26 +52018,42 @@ namespace MacStyleDock
 
 			Grid.SetColumn (ctrlSp, 2);
 			expandedContent.Children.Add (ctrlSp);
-
 			notchGrid.Children.Add (expandedContent);
-			base.Content = mainBorder;
 
-			mainBorder.MouseLeftButtonDown += delegate {
-				ToggleExpand ();
-			};
+			rootGrid.Children.Add (mainBorder);
+			base.Content = rootGrid;
 
-			CompositionTarget.Rendering += RenderSpectrumFrame;
+			mainBorder.MouseLeftButtonDown += delegate { ToggleExpand (); };
 
-			mediaTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (250) };
+			// High-FPS frame loop for silky smooth EQ
+			CompositionTarget.Rendering += OnRenderFrame;
+
+			mediaTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (200) };
 			mediaTimer.Tick += delegate { CheckMediaState (); };
 			mediaTimer.Start ();
 		}
 
-		private ControlTemplate GetRoundButtonTemplate ()
+		private System.Windows.Controls.Button MakeCtrlButton (string icon, double fontSize)
+		{
+			System.Windows.Controls.Button btn = new System.Windows.Controls.Button {
+				Content = icon,
+				FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
+				FontSize = fontSize,
+				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (200, 255, 255, 255)),
+				Background = System.Windows.Media.Brushes.Transparent,
+				BorderThickness = new Thickness (0),
+				Width = 30.0, Height = 30.0,
+				Cursor = System.Windows.Input.Cursors.Hand
+			};
+			btn.Template = GetRoundButtonTemplate (15.0);
+			return btn;
+		}
+
+		private ControlTemplate GetRoundButtonTemplate (double radius)
 		{
 			ControlTemplate ct = new ControlTemplate (typeof (System.Windows.Controls.Button));
 			FrameworkElementFactory border = new FrameworkElementFactory (typeof (Border));
-			border.SetValue (Border.CornerRadiusProperty, new CornerRadius (16.0));
+			border.SetValue (Border.CornerRadiusProperty, new CornerRadius (radius));
 			border.SetValue (Border.BackgroundProperty, new TemplateBindingExtension (System.Windows.Controls.Button.BackgroundProperty));
 			FrameworkElementFactory cp = new FrameworkElementFactory (typeof (ContentPresenter));
 			cp.SetValue (ContentPresenter.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Center);
@@ -52046,31 +52077,64 @@ namespace MacStyleDock
 			} catch { }
 		}
 
-		private void RenderSpectrumFrame (object sender, EventArgs e)
+		// ===== CORE RENDER LOOP — spring-damper physics EQ =====
+		private void OnRenderFrame (object sender, EventArgs e)
 		{
 			if (base.Visibility != Visibility.Visible || spectrumBars == null) return;
 
 			DateTime now = DateTime.Now;
-			double dt = (now - lastSpectrumTime).TotalSeconds;
-			if (dt > 0.1) dt = 0.1;
-			lastSpectrumTime = now;
+			double dt = (now - lastFrameTime).TotalSeconds;
+			if (dt <= 0.0 || dt > 0.1) dt = 0.016;
+			lastFrameTime = now;
 
+			// Smooth the raw audio peak with spring-damper physics
 			float rawPeak = DockWindow.SharedAudioPeak;
-			waveAnimTime += dt * 7.5;
+			if (!isPlayingMedia) rawPeak = 0.0f;
+
+			double targetPeak = Math.Min (1.0, rawPeak * 2.0);
+			// Spring: fast attack, slow release
+			double springK = (targetPeak > smoothedPeak) ? 80.0 : 15.0;
+			double damping = (targetPeak > smoothedPeak) ? 12.0 : 6.0;
+			double force = springK * (targetPeak - smoothedPeak) - damping * peakVelocity;
+			peakVelocity += force * dt;
+			smoothedPeak += peakVelocity * dt;
+			if (smoothedPeak < 0.0) { smoothedPeak = 0.0; peakVelocity = 0.0; }
+			if (smoothedPeak > 1.0) { smoothedPeak = 1.0; peakVelocity = 0.0; }
+
+			animPhase += dt;
+
+			// Per-bar animation
+			double[] freqMult = { 1.2, 0.85, 1.4, 0.7, 1.1 };
+			double[] speedMult = { 3.2, 4.8, 2.7, 5.5, 3.9 };
 
 			for (int i = 0; i < spectrumBars.Length; i++) {
-				double targetH = 2.5;
-				if (isPlayingMedia && rawPeak > 0.005f) {
-					double wave = Math.Sin (waveAnimTime * (1.0 + i * 0.3) + i * 1.3);
-					double energy = Math.Min (1.0, rawPeak * 2.4);
-					targetH = Math.Max (3.0, Math.Min (15.0, 3.0 + energy * bandSensitivities[i] * 12.0 * (0.65 + 0.35 * wave)));
+				double targetH;
+
+				if (isPlayingMedia && smoothedPeak > 0.02) {
+					// Active audio — bars respond to peak with organic wave offsets
+					double wave = Math.Sin (animPhase * speedMult[i] + barPhaseOffsets[i]);
+					double barEnergy = smoothedPeak * freqMult[i];
+					targetH = 3.5 + barEnergy * 13.0 * (0.55 + 0.45 * wave);
+					targetH = Math.Max (3.5, Math.Min (16.0, targetH));
 				} else if (isPlayingMedia) {
-					double wave = Math.Sin (waveAnimTime * 2.0 + i * 0.9);
-					targetH = 3.0 + 3.0 * (0.5 + 0.5 * wave);
+					// Playing but silent/quiet — gentle breathing idle animation
+					double breath = Math.Sin (animPhase * 1.8 + barPhaseOffsets[i]);
+					targetH = 4.0 + 3.5 * (0.5 + 0.5 * breath);
+				} else {
+					// Not playing — tiny resting dots
+					targetH = 3.0;
 				}
 
-				double lerpRate = (targetH > currentBarHeights[i]) ? 24.0 : 12.0;
-				currentBarHeights[i] += (targetH - currentBarHeights[i]) * Math.Min (1.0, dt * lerpRate);
+				// Spring-damper per bar for ultra-smooth motion
+				double barSpringK = (targetH > currentBarHeights[i]) ? 60.0 : 20.0;
+				double barDamp = (targetH > currentBarHeights[i]) ? 10.0 : 7.0;
+				double barForce = barSpringK * (targetH - currentBarHeights[i]) - barDamp * barVelocities[i];
+				barVelocities[i] += barForce * dt;
+				currentBarHeights[i] += barVelocities[i] * dt;
+
+				if (currentBarHeights[i] < 2.5) { currentBarHeights[i] = 2.5; barVelocities[i] = 0; }
+				if (currentBarHeights[i] > 17.0) { currentBarHeights[i] = 17.0; barVelocities[i] = 0; }
+
 				spectrumBars[i].Height = currentBarHeights[i];
 			}
 		}
@@ -52119,13 +52183,13 @@ namespace MacStyleDock
 
 				if (!playing) {
 					if (base.Opacity > 0.0) {
-						DoubleAnimation animFade = new DoubleAnimation (0.0, TimeSpan.FromMilliseconds (250)) {
-							EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+						DoubleAnimation fade = new DoubleAnimation (0.0, TimeSpan.FromMilliseconds (350)) {
+							EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
 						};
-						animFade.Completed += (s, e) => {
+						fade.Completed += (s, e) => {
 							if (!isPlayingMedia) base.Visibility = Visibility.Collapsed;
 						};
-						base.BeginAnimation (Window.OpacityProperty, animFade);
+						base.BeginAnimation (Window.OpacityProperty, fade);
 					}
 					return;
 				}
@@ -52133,18 +52197,17 @@ namespace MacStyleDock
 				if (base.Visibility != Visibility.Visible) {
 					base.Visibility = Visibility.Visible;
 				}
-
 				if (base.Opacity < 1.0) {
-					DoubleAnimation animFadeIn = new DoubleAnimation (1.0, TimeSpan.FromMilliseconds (250)) {
-						EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+					DoubleAnimation fadeIn = new DoubleAnimation (1.0, TimeSpan.FromMilliseconds (350)) {
+						EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
 					};
-					base.BeginAnimation (Window.OpacityProperty, animFadeIn);
+					base.BeginAnimation (Window.OpacityProperty, fadeIn);
 				}
 
 				string newKey = $"{track} - {artist}";
 				if (newKey != currentTrackKey) {
 					currentTrackKey = newKey;
-					compactTrackText.Text = string.IsNullOrEmpty (artist) ? track : $"{track} • {artist}";
+					compactTrackText.Text = string.IsNullOrEmpty (artist) || artist == "Spotify" ? track : $"{track}  •  {artist}";
 					trackTitleText.Text = track;
 					artistText.Text = artist;
 
@@ -52174,40 +52237,43 @@ namespace MacStyleDock
 		{
 			isExpanded = !isExpanded;
 			double targetW = isExpanded ? 370.0 : 240.0;
-			double targetH = isExpanded ? 76.0 : 36.0;
-			double targetCorner = targetH / 2.0;
+			double targetH = isExpanded ? 78.0 : 38.0;
+			double targetCorner = isExpanded ? 22.0 : 19.0;
+			TimeSpan dur = TimeSpan.FromMilliseconds (320);
+			IEasingFunction ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
-			DoubleAnimation animW = new DoubleAnimation (targetW, TimeSpan.FromMilliseconds (280)) {
-				EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-			};
-			DoubleAnimation animH = new DoubleAnimation (targetH, TimeSpan.FromMilliseconds (280)) {
-				EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-			};
+			DoubleAnimation animW = new DoubleAnimation (targetW, dur) { EasingFunction = ease };
+			DoubleAnimation animH = new DoubleAnimation (targetH, dur) { EasingFunction = ease };
 
 			if (isExpanded) {
-				compactContent.Visibility = Visibility.Collapsed;
-				expandedContent.Visibility = Visibility.Visible;
-
-				DoubleAnimation fadeExp = new DoubleAnimation (1.0, TimeSpan.FromMilliseconds (200)) {
-					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+				// Immediately start the size animation, cross-fade content
+				DoubleAnimation fadeOutCompact = new DoubleAnimation (0.0, TimeSpan.FromMilliseconds (100));
+				fadeOutCompact.Completed += (s, e) => {
+					compactContent.Visibility = Visibility.Collapsed;
+					expandedContent.Visibility = Visibility.Visible;
+					DoubleAnimation fadeInExpanded = new DoubleAnimation (1.0, TimeSpan.FromMilliseconds (200)) {
+						EasingFunction = ease
+					};
+					expandedContent.BeginAnimation (UIElement.OpacityProperty, fadeInExpanded);
 				};
-				expandedContent.BeginAnimation (Grid.OpacityProperty, fadeExp);
+				compactContent.BeginAnimation (UIElement.OpacityProperty, fadeOutCompact);
 			} else {
-				compactContent.Visibility = Visibility.Visible;
-				compactContent.Opacity = 1.0;
-
-				DoubleAnimation fadeExp = new DoubleAnimation (0.0, TimeSpan.FromMilliseconds (150)) {
-					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+				DoubleAnimation fadeOutExpanded = new DoubleAnimation (0.0, TimeSpan.FromMilliseconds (100));
+				fadeOutExpanded.Completed += (s, e) => {
+					expandedContent.Visibility = Visibility.Collapsed;
+					compactContent.Visibility = Visibility.Visible;
+					DoubleAnimation fadeInCompact = new DoubleAnimation (1.0, TimeSpan.FromMilliseconds (200)) {
+						EasingFunction = ease
+					};
+					compactContent.BeginAnimation (UIElement.OpacityProperty, fadeInCompact);
 				};
-				fadeExp.Completed += (s, e) => {
-					if (!isExpanded) expandedContent.Visibility = Visibility.Collapsed;
-				};
-				expandedContent.BeginAnimation (Grid.OpacityProperty, fadeExp);
+				expandedContent.BeginAnimation (UIElement.OpacityProperty, fadeOutExpanded);
 			}
 
 			mainBorder.BeginAnimation (FrameworkElement.WidthProperty, animW);
 			mainBorder.BeginAnimation (FrameworkElement.HeightProperty, animH);
 			mainBorder.CornerRadius = new CornerRadius (targetCorner);
+			innerGlowBorder.CornerRadius = new CornerRadius (targetCorner - 1);
 		}
 	}
 }
