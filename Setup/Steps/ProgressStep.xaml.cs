@@ -103,6 +103,14 @@ namespace WinDockSetup.Steps
             {
                 Directory.CreateDirectory(installPath);
             }
+            else
+            {
+                // Clean out any legacy MacDock files from earlier builds
+                foreach (string legacyFile in Directory.GetFiles(installPath, "MacDock*"))
+                {
+                    try { File.Delete(legacyFile); } catch { }
+                }
+            }
             await Task.Delay(400);
 
             // Step 2: Extracting application files
