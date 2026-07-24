@@ -15714,13 +15714,31 @@ namespace MacStyleDock
 
 
 
+		public static ImageSource GetFolderShellIcon (string path)
+		{
+			try {
+				SHFILEINFO psfi = default (SHFILEINFO);
+				uint flags = 0x000000100 | 0x000000000; // SHGFI_ICON | SHGFI_LARGEICON
+				if (SHGetFileInfo (path, 0, ref psfi, (uint)Marshal.SizeOf (psfi), flags) != IntPtr.Zero && psfi.hIcon != IntPtr.Zero) {
+					try {
+						BitmapSource bs = Imaging.CreateBitmapSourceFromHIcon (psfi.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions ());
+						bs.Freeze ();
+						return bs;
+					} finally {
+						DestroyIcon (psfi.hIcon);
+					}
+				}
+			} catch { }
+			return null;
+		}
+
 		public static ImageSource GetHighQualityIcon (string path, int size)
 
 		{
 
 			try {
 
-				if (File.Exists (path) || (!string.IsNullOrEmpty (path) && path.StartsWith ("shell:", StringComparison.OrdinalIgnoreCase))) {
+				if (File.Exists (path) || Directory.Exists (path) || (!string.IsNullOrEmpty (path) && path.StartsWith ("shell:", StringComparison.OrdinalIgnoreCase))) {
 
 					IntPtr[] array = new IntPtr[1];
 
@@ -39226,6 +39244,8 @@ namespace MacStyleDock
 			card = null;
 			_entranceTarget = null;
 
+			MeasureWindowSize ();
+
 			try {
 				if (string.Equals (viewMode, "Grid", StringComparison.OrdinalIgnoreCase)) {
 					BuildGridStack ();
@@ -39247,7 +39267,6 @@ namespace MacStyleDock
 				} catch { }
 			}
 
-			MeasureWindowSize ();
 			PositionAtAnchor ();
 			if (animateEntrance) {
 				PlayEntrance (animateEntrance: true);
@@ -39271,9 +39290,9 @@ namespace MacStyleDock
 				base.Height = Math.Max (180.0, 52.0 + maxShow * 42.0);
 			} else {
 				// Fan view: sized to fit vertical pill fan items cleanly
-				int maxShow = Math.Min (items.Count, 12);
+				int maxShow = Math.Min (items.Count, 10);
 				base.Width = 320.0;
-				base.Height = Math.Max (140.0, 80.0 + maxShow * 46.0);
+				base.Height = Math.Max (180.0, 110.0 + maxShow * 50.0);
 			}
 
 			base.Width = Math.Min (base.Width, screenW - 24.0);
@@ -39348,26 +39367,12 @@ namespace MacStyleDock
 			} catch { }
 		}
 
-		private static ImageSource _defaultFolderIcon = null;
-		private static ImageSource _defaultFileIcon = null;
-
 		private ImageSource GetFallbackIcon (string path)
 		{
 			try {
 				if (Directory.Exists (path)) {
-					if (_defaultFolderIcon == null) {
-						string windir = System.Environment.GetFolderPath (System.Environment.SpecialFolder.Windows);
-						string shell32 = System.IO.Path.Combine (windir, "System32", "shell32.dll");
-						_defaultFolderIcon = IconExtractor.GetHighQualityIcon (shell32, 48);
-					}
-					if (_defaultFolderIcon != null) return _defaultFolderIcon;
-				} else {
-					if (_defaultFileIcon == null) {
-						string windir = System.Environment.GetFolderPath (System.Environment.SpecialFolder.Windows);
-						string imageres = System.IO.Path.Combine (windir, "System32", "imageres.dll");
-						_defaultFileIcon = IconExtractor.GetHighQualityIcon (imageres, 48);
-					}
-					if (_defaultFileIcon != null) return _defaultFileIcon;
+					ImageSource folderIcon = IconExtractor.GetFolderShellIcon (path);
+					if (folderIcon != null) return folderIcon;
 				}
 			} catch { }
 			return null;
@@ -39379,8 +39384,9 @@ namespace MacStyleDock
 			System.Windows.Controls.Image closureImg = target;
 
 			try {
-				ImageSource syncIcon = IconExtractor.GetHighQualityIcon (closurePath, 48)
-					?? IconExtractor.GetJumboIcon (closurePath);
+				ImageSource syncIcon = Directory.Exists (closurePath)
+					? IconExtractor.GetFolderShellIcon (closurePath)
+					: (IconExtractor.GetHighQualityIcon (closurePath, 48) ?? IconExtractor.GetJumboIcon (closurePath));
 				if (syncIcon != null) {
 					closureImg.Source = syncIcon;
 					return;
@@ -39389,7 +39395,11 @@ namespace MacStyleDock
 
 			ThreadPool.QueueUserWorkItem (delegate {
 				ImageSource icon = null;
-				try { icon = IconExtractor.GetHighQualityIcon (closurePath, 48) ?? IconExtractor.GetJumboIcon (closurePath) ?? IconExtractor.GetShellItemIcon (closurePath); } catch { }
+				try {
+					icon = Directory.Exists (closurePath)
+						? IconExtractor.GetFolderShellIcon (closurePath)
+						: (IconExtractor.GetHighQualityIcon (closurePath, 48) ?? IconExtractor.GetJumboIcon (closurePath) ?? IconExtractor.GetShellItemIcon (closurePath));
+				} catch { }
 				if (icon == null) icon = GetFallbackIcon (closurePath);
 				if (icon != null) {
 					try {
@@ -39406,11 +39416,11 @@ namespace MacStyleDock
 			mainGrid.Children.Add (canvas);
 			_entranceTarget = canvas;
 
-			int maxShow = Math.Min (items.Count, 12);
+			int maxShow = Math.Min (items.Count, 10);
 			if (maxShow == 0) return;
 
 			double anchorX = base.Width / 2.0;
-			double startY = base.Height - 48.0;
+			double startY = base.Height - 60.0;
 
 			for (int i = 0; i < maxShow; i++) {
 				string path = items [i];
@@ -39543,7 +39553,7 @@ namespace MacStyleDock
 					try { CloseAnimated (); } catch { Close (); }
 				};
 
-				double yOffset = startY - i * 46.0;
+				double yOffset = startY - i * 50.0;
 				double xOffset = anchorX - 130.0 + Math.Sin (i * 0.4) * 12.0;
 
 				Canvas.SetLeft (tile, xOffset);
@@ -39572,7 +39582,7 @@ namespace MacStyleDock
 			actionPills.Children.Add (addPinPill);
 
 			Canvas.SetLeft (actionPills, anchorX - 110.0);
-			Canvas.SetTop (actionPills, startY - maxShow * 46.0 - 10.0);
+			Canvas.SetTop (actionPills, 12.0);
 			canvas.Children.Add (actionPills);
 		}
 
