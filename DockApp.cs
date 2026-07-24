@@ -4092,13 +4092,17 @@ namespace MacStyleDock
 			};
 
 			dockBorder.MouseMove += (s, e) => {
-				if (dockBorder.Effect is LiquidGlassEffect glassEffect) {
-					System.Windows.Point pos = e.GetPosition (dockBorder);
-					System.Windows.Point center = new System.Windows.Point (dockBorder.ActualWidth / 2.0, dockBorder.ActualHeight / 2.0);
-					glassEffect.LightAngle = Math.Atan2 (pos.Y - center.Y, pos.X - center.X);
-					glassEffect.RefractionStrength = 9.0;
-					glassEffect.SpecularIntensity = 0.70;
-				}
+				try {
+					if (dockBorder != null && dockBorder.Effect is LiquidGlassEffect glassEffect) {
+						System.Windows.Point pos = e.GetPosition (dockBorder);
+						if (dockBorder.ActualWidth > 0.0 && dockBorder.ActualHeight > 0.0) {
+							System.Windows.Point center = new System.Windows.Point (dockBorder.ActualWidth / 2.0, dockBorder.ActualHeight / 2.0);
+							glassEffect.LightAngle = Math.Atan2 (pos.Y - center.Y, pos.X - center.X);
+							glassEffect.RefractionStrength = 9.0;
+							glassEffect.SpecularIntensity = 0.70;
+						}
+					}
+				} catch { }
 			};
 
 			dockSlideTransform = new TranslateTransform ();
@@ -7839,10 +7843,12 @@ namespace MacStyleDock
 		public void Update3DShelf ()
 		{
 			if (dockBorder == null) return;
-			if (dockBorder.Effect is LiquidGlassEffect glassEffect) {
-				glassEffect.RefractionStrength += (6.0 - glassEffect.RefractionStrength) * 0.12;
-				glassEffect.SpecularIntensity += (0.35 - glassEffect.SpecularIntensity) * 0.12;
-			}
+			try {
+				if (dockBorder.Effect is LiquidGlassEffect glassEffect) {
+					glassEffect.RefractionStrength += (6.0 - glassEffect.RefractionStrength) * 0.12;
+					glassEffect.SpecularIntensity += (0.35 - glassEffect.SpecularIntensity) * 0.12;
+				}
+			} catch { }
 			Grid grid2 = dockBorder.Child as Grid;
 			if (grid2 == null) return;
 
@@ -13076,7 +13082,7 @@ namespace MacStyleDock
 
 					}
 
-					if (dockWindow3.settings.EnableHoverBorderTint) {
+					if (dockWindow3.settings.EnableHoverBorderTint && !dockWindow3.settings.EnableLiquidGlass) {
 
 						LinearGradientBrush linearGradientBrush = dockWindow3.dockBorder.BorderBrush as LinearGradientBrush;
 
@@ -13132,7 +13138,7 @@ namespace MacStyleDock
 
 					}
 
-					if (mainWindow.settings.EnableHoverBorderTint && mainWindow.dockBorder.BorderBrush is SolidColorBrush solidColorBrush) {
+					if (mainWindow.settings.EnableHoverBorderTint && !mainWindow.settings.EnableLiquidGlass && mainWindow.dockBorder.BorderBrush is SolidColorBrush solidColorBrush) {
 
 						ColorAnimation colorAnimation = new ColorAnimation (System.Windows.Media.Color.FromArgb (30, byte.MaxValue, byte.MaxValue, byte.MaxValue), TimeSpan.FromMilliseconds (200.0));
 
