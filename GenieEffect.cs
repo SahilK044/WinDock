@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
-using System.Windows.Threading;
+using System.Windows.Media;
 
 public static class GenieEffect
 {
@@ -35,6 +35,9 @@ public static class GenieEffect
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, ref ANIMATIONINFO pvParam, uint fWinIni);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmRegisterThumbnail(IntPtr hwndDestination, IntPtr hwndSource, out IntPtr phThumbnailId);
@@ -83,6 +86,16 @@ public static class GenieEffect
         public int Y;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ANIMATIONINFO
+    {
+        public uint cbSize;
+        public int iMinAnimate;
+    }
+
+    private const uint SPI_GETANIMATION = 0x0048;
+    private const uint SPI_SETANIMATION = 0x0049;
+
     private const uint DWM_TNS_RECTDESTINATION = 0x00000001;
     private const uint DWM_TNS_OPACITY = 0x00000004;
     private const uint DWM_TNS_VISIBLE = 0x00000008;
@@ -95,11 +108,21 @@ public static class GenieEffect
     private static Window _mainDockWindow;
     private static Window _overlayWindow;
     private static readonly HashSet<IntPtr> _animatingHwnds = new HashSet<IntPtr>();
+    private static bool _isEnabled = true;
+
+    public static bool IsEnabled
+    {
+        get => _isEnabled;
+        set => _isEnabled = value;
+    }
 
     public static void Initialize(Window animHostWindow, Func<IntPtr, Rect?> iconRectResolver)
     {
         _mainDockWindow = animHostWindow;
         _iconRectResolver = iconRectResolver;
+
+        // Suppress Windows native minimize animation so it doesn't collide with Genie
+        SuppressNativeAnimation(true);
 
         _winEventDelegate = new WinEventDelegate(WinEventCallback);
         _hook = SetWinEventHook(
@@ -115,6 +138,8 @@ public static class GenieEffect
 
     public static void Shutdown()
     {
+        SuppressNativeAnimation(false);
+
         if (_hook != IntPtr.Zero)
         {
             UnhookWinEvent(_hook);
@@ -125,6 +150,20 @@ public static class GenieEffect
             try { _overlayWindow.Close(); } catch { }
             _overlayWindow = null;
         }
+    }
+
+    private static void SuppressNativeAnimation(bool suppress)
+    {
+        try
+        {
+            ANIMATIONINFO ai = new ANIMATIONINFO
+            {
+                cbSize = (uint)Marshal.SizeOf(typeof(ANIMATIONINFO)),
+                iMinAnimate = suppress ? 0 : 1
+            };
+            SystemParametersInfo(SPI_SETANIMATION, 0, ref ai, 0);
+        }
+        catch { }
     }
 
     private static bool GetRealWindowRect(IntPtr hWnd, out RECT rect)
@@ -171,7 +210,7 @@ public static class GenieEffect
             {
                 WindowStyle = WindowStyle.None,
                 AllowsTransparency = true,
-                Background = System.Windows.Media.Brushes.Transparent,
+                Background = Brushes.Transparent,
                 ShowInTaskbar = false,
                 Topmost = true,
                 Left = SystemParameters.VirtualScreenLeft,
@@ -190,7 +229,7 @@ public static class GenieEffect
 
     private static void WinEventCallback(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
     {
-        if (hwnd == IntPtr.Zero || _mainDockWindow == null) return;
+        if (!_isEnabled || hwnd == IntPtr.Zero || _mainDockWindow == null) return;
 
         if (eventType == EVENT_SYSTEM_MINIMIZESTART)
         {
@@ -203,8 +242,9 @@ public static class GenieEffect
 
     public static void PlayMinimizeAnimation(IntPtr targetHwnd, Action onCompleted = null)
     {
-        if (targetHwnd == IntPtr.Zero || _mainDockWindow == null)
+        if (!_isEnabled || targetHwnd == IntPtr.Zero || _mainDockWindow == null)
         {
+            if (targetHwnd != IntPtr.Zero) ShowWindow(targetHwnd, 6);
             onCompleted?.Invoke();
             return;
         }
@@ -231,7 +271,6 @@ public static class GenieEffect
             return;
         }
 
-        // Temporarily ensure window composition surface is active for DWM
         if (IsIconic(targetHwnd))
         {
             ShowWindow(targetHwnd, 4); // SW_SHOWNOACTIVATE
@@ -256,16 +295,16 @@ public static class GenieEffect
             };
             DwmUpdateThumbnailProperties(hThumbnail, ref props);
 
-            int elapsedMs = 0;
-            int durationMs = 260;
-            DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+            DateTime startTime = DateTime.Now;
+            const double durationMs = 220.0;
 
-            timer.Tick += (s, e) =>
+            EventHandler renderingHandler = null;
+            renderingHandler = (s, e) =>
             {
-                elapsedMs += 16;
-                double t = Math.Min(1.0, (double)elapsedMs / durationMs);
+                double elapsedMs = (DateTime.Now - startTime).TotalMilliseconds;
+                double t = Math.Min(1.0, elapsedMs / durationMs);
 
-                // Authentic macOS Genie curve (suction curve: quadratic X, cubic Y)
+                // Ultra-smooth VSYNC synced Genie suction curve
                 double easeY = t * t * t;
                 double easeX = t * t;
 
@@ -275,19 +314,20 @@ public static class GenieEffect
                 int curBottom = (int)(winRect.Bottom + (destIconRect.Bottom - winRect.Bottom) * easeY);
 
                 props.rcDestination = new RECT { Left = curLeft, Top = curTop, Right = curRight, Bottom = curBottom };
-                props.opacity = (byte)(255 * (1.0 - t * 0.25));
+                props.opacity = (byte)(255 * (1.0 - t * 0.3));
                 DwmUpdateThumbnailProperties(hThumbnail, ref props);
 
                 if (t >= 1.0)
                 {
-                    timer.Stop();
+                    CompositionTarget.Rendering -= renderingHandler;
                     DwmUnregisterThumbnail(hThumbnail);
                     ShowWindow(targetHwnd, 6); // SW_MINIMIZE
                     overlay.Hide();
                     Finish();
                 }
             };
-            timer.Start();
+
+            CompositionTarget.Rendering += renderingHandler;
         }
         else
         {
@@ -298,8 +338,13 @@ public static class GenieEffect
 
     public static void PlayRestoreAnimation(IntPtr targetHwnd, Action onCompleted = null)
     {
-        if (targetHwnd == IntPtr.Zero || _mainDockWindow == null)
+        if (!_isEnabled || targetHwnd == IntPtr.Zero || _mainDockWindow == null)
         {
+            if (targetHwnd != IntPtr.Zero)
+            {
+                ShowWindow(targetHwnd, 9);
+                SetForegroundWindow(targetHwnd);
+            }
             onCompleted?.Invoke();
             return;
         }
@@ -348,14 +393,14 @@ public static class GenieEffect
             };
             DwmUpdateThumbnailProperties(hThumbnail, ref props);
 
-            int elapsedMs = 0;
-            int durationMs = 240;
-            DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+            DateTime startTime = DateTime.Now;
+            const double durationMs = 200.0;
 
-            timer.Tick += (s, e) =>
+            EventHandler renderingHandler = null;
+            renderingHandler = (s, e) =>
             {
-                elapsedMs += 16;
-                double t = Math.Min(1.0, (double)elapsedMs / durationMs);
+                double elapsedMs = (DateTime.Now - startTime).TotalMilliseconds;
+                double t = Math.Min(1.0, elapsedMs / durationMs);
 
                 // Inverse cubic ease out for restore expansion
                 double ease = 1.0 - Math.Pow(1.0 - t, 3);
@@ -371,7 +416,7 @@ public static class GenieEffect
 
                 if (t >= 1.0)
                 {
-                    timer.Stop();
+                    CompositionTarget.Rendering -= renderingHandler;
                     DwmUnregisterThumbnail(hThumbnail);
                     ShowWindow(targetHwnd, 9); // SW_RESTORE
                     SetForegroundWindow(targetHwnd);
@@ -379,7 +424,8 @@ public static class GenieEffect
                     Finish();
                 }
             };
-            timer.Start();
+
+            CompositionTarget.Rendering += renderingHandler;
         }
         else
         {
