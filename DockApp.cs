@@ -15055,33 +15055,14 @@ namespace MacStyleDock
 						viewMode = "List";
 					}
 
-					StackOverlayWindow stackOverlayWindow = new StackOverlayWindow (dockWindow4, targetPath, viewMode);
-					stackOverlayWindow.Width = 420;
-					stackOverlayWindow.Height = 480;
-
-					System.Windows.Point point = PointToScreen (new System.Windows.Point (0.0, 0.0));
-
-					double screenW = SystemParameters.PrimaryScreenWidth;
-					double screenH = SystemParameters.PrimaryScreenHeight;
-					string pos = (dockWindow4.settings != null && dockWindow4.settings.Position != null) ? dockWindow4.settings.Position : "Bottom";
-
-					if (pos == "Left") {
-						stackOverlayWindow.Left = point.X + base.ActualWidth + 12.0;
-						stackOverlayWindow.Top = Math.Max (10.0, Math.Min (screenH - 480.0 - 10.0, point.Y + (base.ActualHeight - 480.0) / 2.0));
-					} else if (pos == "Right") {
-						stackOverlayWindow.Left = point.X - 420.0 - 12.0;
-						stackOverlayWindow.Top = Math.Max (10.0, Math.Min (screenH - 480.0 - 10.0, point.Y + (base.ActualHeight - 480.0) / 2.0));
-					} else if (pos == "Top") {
-						stackOverlayWindow.Left = Math.Max (10.0, Math.Min (screenW - 420.0 - 10.0, point.X + (base.ActualWidth - 420.0) / 2.0));
-						stackOverlayWindow.Top = point.Y + base.ActualHeight + 12.0;
-					} else {
-						stackOverlayWindow.Left = Math.Max (10.0, Math.Min (screenW - 420.0 - 10.0, point.X + (base.ActualWidth - 420.0) / 2.0));
-						stackOverlayWindow.Top = Math.Max (10.0, point.Y - 480.0 - 12.0);
-					}
-
-					stackOverlayWindow.Show ();
-
-					stackOverlayWindow.Activate ();
+					try {
+						StackOverlayWindow stackOverlayWindow = new StackOverlayWindow (dockWindow4, targetPath, viewMode);
+						System.Windows.Point point = new System.Windows.Point (0.0, 0.0);
+						try { point = PointToScreen (new System.Windows.Point (0.0, 0.0)); } catch { }
+						stackOverlayWindow.SetDockAnchor (point.X, point.Y, base.ActualWidth > 0 ? base.ActualWidth : 48.0, base.ActualHeight > 0 ? base.ActualHeight : 48.0);
+						stackOverlayWindow.Show ();
+						try { stackOverlayWindow.Activate (); } catch { }
+					} catch { }
 
 				}
 
@@ -39700,8 +39681,14 @@ namespace MacStyleDock
 			if (closing) return;
 			closing = true;
 			try {
-				if (parent != null && parent.settings != null && parent.settings.PerformanceMode) { Close (); return; }
-				if (_entranceTarget == null) { Close (); return; }
+				if (parent != null && parent.settings != null && parent.settings.PerformanceMode) {
+					try { Close (); } catch { }
+					return;
+				}
+				if (_entranceTarget == null) {
+					try { Close (); } catch { }
+					return;
+				}
 
 				ScaleTransform targetScale = _entranceTarget.RenderTransform as ScaleTransform;
 				if (targetScale == null) {
@@ -39716,11 +39703,15 @@ namespace MacStyleDock
 				DoubleAnimation fade = new DoubleAnimation (_entranceTarget.Opacity, 0.0, TimeSpan.FromMilliseconds (140)) {
 					EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
 				};
-				fade.Completed += delegate { try { Close (); } catch { } };
+				fade.Completed += delegate {
+					try { Close (); } catch { }
+				};
 				targetScale.BeginAnimation (ScaleTransform.ScaleXProperty, shrink);
 				targetScale.BeginAnimation (ScaleTransform.ScaleYProperty, shrink);
 				_entranceTarget.BeginAnimation (UIElement.OpacityProperty, fade);
-			} catch { try { Close (); } catch { } }
+			} catch {
+				try { Close (); } catch { }
+			}
 		}
 	}
 
