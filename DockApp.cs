@@ -15054,14 +15054,18 @@ namespace MacStyleDock
 			}
 
 			string targetPath = (Config != null && !string.IsNullOrEmpty (Config.FilePath)) ? System.Environment.ExpandEnvironmentVariables (Config.FilePath) : "";
+			if (string.IsNullOrEmpty (targetPath) && Config != null && Config.Name != null && (Config.Name.Contains ("Download") || Config.Name.Contains ("Folder") || Config.Name.Contains ("Document"))) {
+				targetPath = System.Environment.GetFolderPath (System.Environment.SpecialFolder.UserProfile) + "\\Downloads";
+			}
+
 			if (!string.IsNullOrEmpty (targetPath) && Directory.Exists (targetPath)) {
 
 				if (Window.GetWindow (this) is DockWindow dockWindow4) {
 
 					string viewMode = "Fan";
-					if (Config.Arguments == "Grid") {
+					if (Config != null && Config.Arguments == "Grid") {
 						viewMode = "Grid";
-					} else if (Config.Arguments == "List") {
+					} else if (Config != null && Config.Arguments == "List") {
 						viewMode = "List";
 					}
 
@@ -15071,23 +15075,22 @@ namespace MacStyleDock
 
 					System.Windows.Point point = PointToScreen (new System.Windows.Point (0.0, 0.0));
 
-					stackOverlayWindow.Left = Math.Max(10.0, point.X + (base.ActualWidth - 420.0) / 2.0);
+					double screenW = SystemParameters.PrimaryScreenWidth;
+					double screenH = SystemParameters.PrimaryScreenHeight;
+					string pos = (dockWindow4.settings != null && dockWindow4.settings.Position != null) ? dockWindow4.settings.Position : "Bottom";
 
-					if (dockWindow4.settings.Position == "Bottom") {
-
-						stackOverlayWindow.Top = Math.Max(10.0, point.Y - 480.0 - 12.0);
-
-					} else if (dockWindow4.settings.Position == "Top") {
-
+					if (pos == "Left") {
+						stackOverlayWindow.Left = point.X + base.ActualWidth + 12.0;
+						stackOverlayWindow.Top = Math.Max (10.0, Math.Min (screenH - 480.0 - 10.0, point.Y + (base.ActualHeight - 480.0) / 2.0));
+					} else if (pos == "Right") {
+						stackOverlayWindow.Left = point.X - 420.0 - 12.0;
+						stackOverlayWindow.Top = Math.Max (10.0, Math.Min (screenH - 480.0 - 10.0, point.Y + (base.ActualHeight - 480.0) / 2.0));
+					} else if (pos == "Top") {
+						stackOverlayWindow.Left = Math.Max (10.0, Math.Min (screenW - 420.0 - 10.0, point.X + (base.ActualWidth - 420.0) / 2.0));
 						stackOverlayWindow.Top = point.Y + base.ActualHeight + 12.0;
-
-					}
-
-					double primaryScreenWidth = SystemParameters.PrimaryScreenWidth;
-					if (stackOverlayWindow.Left + stackOverlayWindow.Width > primaryScreenWidth - 10.0) {
-
-						stackOverlayWindow.Left = primaryScreenWidth - stackOverlayWindow.Width - 10.0;
-
+					} else {
+						stackOverlayWindow.Left = Math.Max (10.0, Math.Min (screenW - 420.0 - 10.0, point.X + (base.ActualWidth - 420.0) / 2.0));
+						stackOverlayWindow.Top = Math.Max (10.0, point.Y - 480.0 - 12.0);
 					}
 
 					stackOverlayWindow.Show ();
