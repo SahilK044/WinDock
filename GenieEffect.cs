@@ -40,6 +40,10 @@ public static class GenieEffect
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, ref ANIMATIONINFO pvParam, uint fWinIni);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+    private const uint GA_ROOTOWNER = 3;
+
     [DllImport("dwmapi.dll")]
     private static extern int DwmRegisterThumbnail(IntPtr hwndDestination, IntPtr hwndSource, out IntPtr phThumbnailId);
 
@@ -96,6 +100,8 @@ public static class GenieEffect
 
     private const uint SPI_GETANIMATION = 0x0048;
     private const uint SPI_SETANIMATION = 0x0049;
+    private const uint SPIF_UPDATEINIFILE = 0x01;
+    private const uint SPIF_SENDCHANGE = 0x02;
 
     private const uint DWM_TNS_RECTDESTINATION = 0x00000001;
     private const uint DWM_TNS_RECTSOURCE = 0x00000002;
@@ -104,7 +110,6 @@ public static class GenieEffect
 
     #endregion
 
-    // 8 optimized slices provide buttery-smooth 60/120 FPS performance with zero IPC latency
     private const int SLICE_COUNT = 8;
 
     private static IntPtr _hook;
@@ -120,6 +125,13 @@ public static class GenieEffect
     {
         get => _isEnabled;
         set => _isEnabled = value;
+    }
+
+    public static IntPtr GetRootHwnd(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return IntPtr.Zero;
+        IntPtr root = GetAncestor(hwnd, GA_ROOTOWNER);
+        return root != IntPtr.Zero ? root : hwnd;
     }
 
     public static void Initialize(Window animHostWindow, Func<IntPtr, Rect?> iconRectResolver)
@@ -166,7 +178,7 @@ public static class GenieEffect
                 cbSize = (uint)Marshal.SizeOf(typeof(ANIMATIONINFO)),
                 iMinAnimate = suppress ? 0 : 1
             };
-            SystemParametersInfo(SPI_SETANIMATION, 0, ref ai, 0);
+            SystemParametersInfo(SPI_SETANIMATION, 0, ref ai, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
         }
         catch { }
     }
@@ -176,18 +188,20 @@ public static class GenieEffect
         rect = default;
         if (hWnd == IntPtr.Zero) return false;
 
-        if (IsIconic(hWnd))
+        IntPtr realHwnd = GetRootHwnd(hWnd);
+
+        if (IsIconic(realHwnd))
         {
             WINDOWPLACEMENT wp = default;
             wp.length = Marshal.SizeOf(typeof(WINDOWPLACEMENT));
-            if (GetWindowPlacement(hWnd, ref wp))
+            if (GetWindowPlacement(realHwnd, ref wp))
             {
                 rect = wp.rcNormalPosition;
                 return (rect.Right - rect.Left > 20 && rect.Bottom - rect.Top > 20);
             }
         }
 
-        if (GetWindowRect(hWnd, out RECT r))
+        if (GetWindowRect(realHwnd, out RECT r))
         {
             if (r.Left > -10000 && r.Right - r.Left > 20)
             {
@@ -198,7 +212,7 @@ public static class GenieEffect
 
         WINDOWPLACEMENT wpFallback = default;
         wpFallback.length = Marshal.SizeOf(typeof(WINDOWPLACEMENT));
-        if (GetWindowPlacement(hWnd, ref wpFallback))
+        if (GetWindowPlacement(realHwnd, ref wpFallback))
         {
             rect = wpFallback.rcNormalPosition;
             return (rect.Right - rect.Left > 20 && rect.Bottom - rect.Top > 20);
@@ -236,21 +250,23 @@ public static class GenieEffect
     {
         if (!_isEnabled || hwnd == IntPtr.Zero || _mainDockWindow == null) return;
 
+        IntPtr rootHwnd = GetRootHwnd(hwnd);
+
         lock (_ignoreMinimizes)
         {
-            if (_ignoreMinimizes.Contains(hwnd)) return;
+            if (_ignoreMinimizes.Contains(rootHwnd)) return;
         }
 
         lock (_animatingHwnds)
         {
-            if (_animatingHwnds.Contains(hwnd)) return;
+            if (_animatingHwnds.Contains(rootHwnd)) return;
         }
 
         if (eventType == EVENT_SYSTEM_MINIMIZESTART)
         {
             _mainDockWindow.Dispatcher.BeginInvoke((Action)(() =>
             {
-                PlayMinimizeAnimation(hwnd);
+                PlayMinimizeAnimation(rootHwnd);
             }));
         }
     }
@@ -264,47 +280,48 @@ public static class GenieEffect
             return;
         }
 
+        IntPtr rootHwnd = GetRootHwnd(targetHwnd);
         IntPtr dockHwnd = new WindowInteropHelper(_mainDockWindow).Handle;
-        if (targetHwnd == dockHwnd) return;
+        if (rootHwnd == dockHwnd) return;
 
         lock (_animatingHwnds)
         {
-            if (_animatingHwnds.Contains(targetHwnd)) return;
-            _animatingHwnds.Add(targetHwnd);
+            if (_animatingHwnds.Contains(rootHwnd)) return;
+            _animatingHwnds.Add(rootHwnd);
         }
 
         lock (_ignoreMinimizes)
         {
-            _ignoreMinimizes.Add(targetHwnd);
+            _ignoreMinimizes.Add(rootHwnd);
         }
 
         void Finish()
         {
-            ShowWindow(targetHwnd, 6); // SW_MINIMIZE
+            ShowWindow(rootHwnd, 6); // SW_MINIMIZE
 
             DispatcherTimer delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
             delayTimer.Tick += (s, e) =>
             {
                 delayTimer.Stop();
-                lock (_animatingHwnds) { _animatingHwnds.Remove(targetHwnd); }
-                lock (_ignoreMinimizes) { _ignoreMinimizes.Remove(targetHwnd); }
+                lock (_animatingHwnds) { _animatingHwnds.Remove(rootHwnd); }
+                lock (_ignoreMinimizes) { _ignoreMinimizes.Remove(rootHwnd); }
                 onCompleted?.Invoke();
             };
             delayTimer.Start();
         }
 
-        if (!GetRealWindowRect(targetHwnd, out RECT winRect))
+        if (!GetRealWindowRect(rootHwnd, out RECT winRect))
         {
             Finish();
             return;
         }
 
-        if (IsIconic(targetHwnd))
+        if (IsIconic(rootHwnd))
         {
-            ShowWindow(targetHwnd, 4); // SW_SHOWNOACTIVATE
+            ShowWindow(rootHwnd, 4); // SW_SHOWNOACTIVATE
         }
 
-        Rect? targetIconRect = _iconRectResolver?.Invoke(targetHwnd);
+        Rect? targetIconRect = _iconRectResolver?.Invoke(rootHwnd);
         Rect destIconRect = targetIconRect.HasValue
             ? targetIconRect.Value
             : new Rect(SystemParameters.PrimaryScreenWidth / 2.0 - 24, SystemParameters.PrimaryScreenHeight - 60, 48, 48);
@@ -330,7 +347,7 @@ public static class GenieEffect
 
         for (int i = 0; i < SLICE_COUNT; i++)
         {
-            if (DwmRegisterThumbnail(overlayHwnd, targetHwnd, out thumbnails[i]) == 0)
+            if (DwmRegisterThumbnail(overlayHwnd, rootHwnd, out thumbnails[i]) == 0)
             {
                 int srcY1 = (int)(i * winHeight / SLICE_COUNT);
                 int srcY2 = (int)((i + 1) * winHeight / SLICE_COUNT);
@@ -373,12 +390,10 @@ public static class GenieEffect
 
             for (int i = 0; i < SLICE_COUNT; i++)
             {
-                // Bottom slices lead the suction curve; top slices follow with smooth lag
                 double sliceNormalized = (double)i / (SLICE_COUNT - 1.0);
                 double lagDelay = (1.0 - sliceNormalized) * 0.24;
                 double sliceT = Math.Min(1.0, Math.Max(0.0, (globalT - lagDelay) / (1.0 - lagDelay)));
 
-                // Authentic macOS Tahoe Smoothstep Bezier Curve (smooth Y suction & quadratic X funnel contraction)
                 double easeY = sliceT * sliceT * (3.0 - 2.0 * sliceT);
                 double easeX = sliceT * sliceT;
 
@@ -428,48 +443,49 @@ public static class GenieEffect
             return;
         }
 
+        IntPtr rootHwnd = GetRootHwnd(targetHwnd);
         IntPtr dockHwnd = new WindowInteropHelper(_mainDockWindow).Handle;
-        if (targetHwnd == dockHwnd) return;
+        if (rootHwnd == dockHwnd) return;
 
         lock (_animatingHwnds)
         {
-            if (_animatingHwnds.Contains(targetHwnd)) return;
-            _animatingHwnds.Add(targetHwnd);
+            if (_animatingHwnds.Contains(rootHwnd)) return;
+            _animatingHwnds.Add(rootHwnd);
         }
 
         lock (_ignoreMinimizes)
         {
-            _ignoreMinimizes.Add(targetHwnd);
+            _ignoreMinimizes.Add(rootHwnd);
         }
 
         void Finish()
         {
-            ShowWindow(targetHwnd, 9); // SW_RESTORE
-            SetForegroundWindow(targetHwnd);
+            ShowWindow(rootHwnd, 9); // SW_RESTORE
+            SetForegroundWindow(rootHwnd);
 
             DispatcherTimer delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
             delayTimer.Tick += (s, e) =>
             {
                 delayTimer.Stop();
-                lock (_animatingHwnds) { _animatingHwnds.Remove(targetHwnd); }
-                lock (_ignoreMinimizes) { _ignoreMinimizes.Remove(targetHwnd); }
+                lock (_animatingHwnds) { _animatingHwnds.Remove(rootHwnd); }
+                lock (_ignoreMinimizes) { _ignoreMinimizes.Remove(rootHwnd); }
                 onCompleted?.Invoke();
             };
             delayTimer.Start();
         }
 
-        if (!GetRealWindowRect(targetHwnd, out RECT finalWinRect))
+        if (!GetRealWindowRect(rootHwnd, out RECT finalWinRect))
         {
             Finish();
             return;
         }
 
-        Rect? targetIconRect = _iconRectResolver?.Invoke(targetHwnd);
+        Rect? targetIconRect = _iconRectResolver?.Invoke(rootHwnd);
         Rect startIconRect = targetIconRect.HasValue
             ? targetIconRect.Value
             : new Rect(SystemParameters.PrimaryScreenWidth / 2.0 - 24, SystemParameters.PrimaryScreenHeight - 60, 48, 48);
 
-        ShowWindow(targetHwnd, 4); // SW_SHOWNOACTIVATE to render surface for DWM capture
+        ShowWindow(rootHwnd, 4); // SW_SHOWNOACTIVATE to render surface for DWM capture
 
         Window overlay = EnsureOverlayWindow();
         IntPtr overlayHwnd = new WindowInteropHelper(overlay).Handle;
@@ -492,7 +508,7 @@ public static class GenieEffect
 
         for (int i = 0; i < SLICE_COUNT; i++)
         {
-            if (DwmRegisterThumbnail(overlayHwnd, targetHwnd, out thumbnails[i]) == 0)
+            if (DwmRegisterThumbnail(overlayHwnd, rootHwnd, out thumbnails[i]) == 0)
             {
                 int srcY1 = (int)(i * winHeight / SLICE_COUNT);
                 int srcY2 = (int)((i + 1) * winHeight / SLICE_COUNT);
@@ -539,7 +555,6 @@ public static class GenieEffect
                 double lagDelay = sliceNormalized * 0.22;
                 double sliceT = Math.Min(1.0, Math.Max(0.0, (globalT - lagDelay) / (1.0 - lagDelay)));
 
-                // Smoothstep inverse cubic expansion for restore
                 double ease = sliceT * sliceT * (3.0 - 2.0 * sliceT);
 
                 double curWidth = startIconRect.Width + (winWidth - startIconRect.Width) * ease;

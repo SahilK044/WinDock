@@ -15041,21 +15041,43 @@ namespace MacStyleDock
 
 				try {
 
-					if (DockWindow.GetForegroundWindow () == TargetHwnd) {
-						GenieEffect.PlayMinimizeAnimation (TargetHwnd);
+					IntPtr rootTarget = GenieEffect.GetRootHwnd (TargetHwnd);
+
+					IntPtr rootFg = GenieEffect.GetRootHwnd (DockWindow.GetForegroundWindow ());
+
+
+
+					if (rootFg == rootTarget || DockWindow.GetForegroundWindow () == TargetHwnd) {
+
+						GenieEffect.PlayMinimizeAnimation (rootTarget);
+
 						return;
+
 					}
 
-					if (DockWindow.IsIconic (TargetHwnd)) {
-						GenieEffect.PlayRestoreAnimation (TargetHwnd);
+
+
+					if (DockWindow.IsIconic (rootTarget)) {
+
+						GenieEffect.PlayRestoreAnimation (rootTarget);
+
 					} else {
-						DockWindow.SetForegroundWindow (TargetHwnd);
+
+						DockWindow.SetForegroundWindow (rootTarget);
+
 					}
+
 					return;
+
+
 
 				} catch {
 
+
+
 				}
+
+
 
 			}
 
