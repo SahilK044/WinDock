@@ -13,7 +13,8 @@
     <Compile Include="..\NativeBlur.cs" Link="NativeBlur.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="..\app_payload.zip" Link="app_payload.zip" />
+    <EmbeddedResource Include="..\app_payload_part1.dat" Link="app_payload_part1.dat" />
+    <EmbeddedResource Include="..\app_payload_part2.dat" Link="app_payload_part2.dat" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />

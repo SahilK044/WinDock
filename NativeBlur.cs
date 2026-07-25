@@ -12,8 +12,10 @@ namespace WinDock.Shared
         public struct DWM_BLURBEHIND
         {
             public uint dwFlags;
+            [MarshalAs(UnmanagedType.Bool)]
             public bool fEnable;
             public IntPtr hRgnBlur;
+            [MarshalAs(UnmanagedType.Bool)]
             public bool fTransitionOnMaximized;
         }
 
@@ -31,20 +33,26 @@ namespace WinDock.Shared
             try
             {
                 IntPtr hRgn = IntPtr.Zero;
-                if (right > left && bottom > top && cornerWidth > 0 && cornerHeight > 0)
+                try
                 {
-                    hRgn = CreateRoundRectRgn(left, top, right, bottom, cornerWidth, cornerHeight);
+                    if (right > left && bottom > top && cornerWidth > 0 && cornerHeight > 0)
+                    {
+                        hRgn = CreateRoundRectRgn(left, top, right, bottom, cornerWidth, cornerHeight);
+                    }
+                    DWM_BLURBEHIND bb = new DWM_BLURBEHIND
+                    {
+                        dwFlags = DWM_BB_ENABLE | (hRgn != IntPtr.Zero ? DWM_BB_BLURREGION : 0),
+                        fEnable = true,
+                        hRgnBlur = hRgn
+                    };
+                    DwmEnableBlurBehindWindow(hwnd, ref bb);
                 }
-                DWM_BLURBEHIND bb = new DWM_BLURBEHIND
+                finally
                 {
-                    dwFlags = DWM_BB_ENABLE | (hRgn != IntPtr.Zero ? DWM_BB_BLURREGION : 0),
-                    fEnable = true,
-                    hRgnBlur = hRgn
-                };
-                DwmEnableBlurBehindWindow(hwnd, ref bb);
-                if (hRgn != IntPtr.Zero)
-                {
-                    DeleteObject(hRgn);
+                    if (hRgn != IntPtr.Zero)
+                    {
+                        DeleteObject(hRgn);
+                    }
                 }
             }
             catch { }

@@ -211,6 +211,10 @@ namespace MacStyleDock
 
 			try {
 
+				_hoverPlayer?.Dispose ();
+				_poofPlayer?.Dispose ();
+				_swooshPlayer?.Dispose ();
+
 				_hoverPlayer = new SoundPlayer (new MemoryStream (ScaleVolume (GenerateClickWav (), _volume)));
 
 				_hoverPlayer.Load ();
@@ -597,11 +601,6 @@ namespace MacStyleDock
 
 		public bool EnableLiquidGlass { get; set; } = true;
 
-		[DataMember]
-
-		public bool EnableGenieEffect { get; set; } = true;
-
-
 
 		[DataMember]
 
@@ -646,8 +645,10 @@ namespace MacStyleDock
 
 
 		[DataMember]
-
 		public bool ShowSpotifyAlbumArt { get; set; }
+
+		[DataMember]
+		public bool EnableF1Widget { get; set; } = true;
 
 
 
@@ -962,35 +963,20 @@ namespace MacStyleDock
 		[STAThread]
 
 		public static void Main ()
-
 		{
-
-			try {
-
-				Timeline.DesiredFrameRateProperty.OverrideMetadata (typeof(Timeline), new FrameworkPropertyMetadata (240));
-
-			} catch {
-
-			}
+			AppDomain.CurrentDomain.UnhandledException += (s, e) => {
+				try { File.WriteAllText (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "startup_error.log"), e.ExceptionObject.ToString ()); } catch { }
+			};
 
 			try {
 				System.Windows.Application app = new System.Windows.Application ();
 				app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 				app.Run (new DockWindow ());
 			} catch (Exception ex) {
-
 				try {
-
-					File.WriteAllText (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "crash.txt"), ex.ToString ());
-
-				} catch {
-
-				}
-
-				throw;
-
+					File.WriteAllText (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "startup_error.log"), ex.ToString ());
+				} catch { }
 			}
-
 		}
 
 	}
@@ -1520,6 +1506,7 @@ namespace MacStyleDock
 		private bool? _lastAppliedEnableLiveWeather;
 
 		private bool? _lastAppliedEnableControlCenter;
+		private bool? _lastAppliedEnableF1Widget;
 
 		private bool? _lastAppliedShowLaunchpad;
 
@@ -1838,6 +1825,20 @@ namespace MacStyleDock
 		[DllImport ("user32.dll")]
 
 		public static extern IntPtr GetWindow (IntPtr hWnd, uint uCmd);
+
+
+
+		[DllImport ("user32.dll")]
+		private static extern IntPtr GetAncestor (IntPtr hwnd, uint flags);
+		private const uint GA_ROOTOWNER = 3u;
+
+		// Root window handle helper for window minimize/restore animations.
+		public static IntPtr GetRootHwnd (IntPtr hwnd)
+		{
+			if (hwnd == IntPtr.Zero) return IntPtr.Zero;
+			IntPtr root = GetAncestor (hwnd, GA_ROOTOWNER);
+			return root != IntPtr.Zero ? root : hwnd;
+		}
 
 
 
@@ -3898,12 +3899,16 @@ namespace MacStyleDock
 				if (settings == null || !settings.HideOnFullscreen) return;
 				IntPtr dockHwnd = new WindowInteropHelper (this).Handle;
 				bool isFS = FullscreenDetector.IsFullscreenOnDockMonitor (dockHwnd);
-				if (isFS && !isDockHidden) {
+				if (isFS && !_wasFullscreenHidden) {
 					_wasFullscreenHidden = true;
 					HideDock ();
-				} else if (!isFS && _wasFullscreenHidden && !settings.AutoHide) {
+					SetRippleVisibility (false);
+				} else if (!isFS && _wasFullscreenHidden) {
 					_wasFullscreenHidden = false;
-					ShowDock ();
+					if (!settings.AutoHide) {
+						ShowDock ();
+					}
+					SetRippleVisibility (true);
 				}
 			};
 			_fullscreenTimer.Start ();
@@ -3949,6 +3954,10 @@ namespace MacStyleDock
 
 		public DockWindow ()
 		{
+			System.Windows.Media.Effects.PixelShader.InvalidPixelShaderEncountered += (sender, args) => {
+				// Silently handle invalid pixel shaders to prevent crashes on incompatible hardware
+			};
+
 			Instance = this;
 
 			base.SourceInitialized += delegate {
@@ -3961,18 +3970,29 @@ namespace MacStyleDock
 				RegisterHotKey (handle2, 9012, 16384u, 115u);
 
 				_isPresentationSourceValid = true;
-				GenieEffect.Initialize (this, ResolveIconRect);
 				SetupFullscreenWatcher ();
 
-				try {
-					dynamicNotchOverlay = new DynamicNotchWindow (this);
-					dynamicNotchOverlay.Show ();
-				} catch { }
+				// Perf fix: ManageRippleState() runs a WMI process query and (on first run)
+				// launches the ~200MB Chromium-based Ripple helper process. Doing that
+				// synchronously here blocked the UI thread right as the window was created,
+				// which is what caused the brutal multi-second system-wide stutter on launch.
+				// Now it runs entirely on a background thread pool thread instead.
+				ThreadPool.QueueUserWorkItem (delegate {
+					try {
+						ManageRippleState ();
+					} catch { }
+				});
 			};
 
 			base.Closed += delegate {
 				_isPresentationSourceValid = false;
-				GenieEffect.Shutdown ();
+				try {
+					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("ripple")) {
+						using (proc) {
+							try { KillProcessAndChildren (proc.Id); } catch { }
+						}
+					}
+				} catch { }
 			};
 
 			base.AllowsTransparency = true;
@@ -4098,8 +4118,12 @@ namespace MacStyleDock
 				}
 			};
 
+			DateTime _lastGlassMove = DateTime.MinValue;
 			dockBorder.MouseMove += (s, e) => {
 				try {
+					DateTime now = DateTime.Now;
+					if ((now - _lastGlassMove).TotalMilliseconds < 40.0) return;
+					_lastGlassMove = now;
 					if (dockBorder != null && dockBorder.Effect is LiquidGlassEffect glassEffect) {
 						System.Windows.Point pos = e.GetPosition (dockBorder);
 						if (dockBorder.ActualWidth > 0.0 && dockBorder.ActualHeight > 0.0) {
@@ -5043,15 +5067,13 @@ namespace MacStyleDock
 
 						}
 
-						if (!text.Contains ("EnableGenieEffect")) {
+						if (!text.Contains ("EnableF1Widget")) {
 
-							settings.EnableGenieEffect = true;
+							settings.EnableF1Widget = true;
 
 							flag = true;
 
 						}
-
-						GenieEffect.IsEnabled = settings.EnableGenieEffect;
 
 						if (!settings.Items.Any ((DockItemConfig i) => i.FilePath == "action:search")) {
 
@@ -5495,6 +5517,7 @@ namespace MacStyleDock
 			                    (!_lastAppliedEnableLiveWeather.HasValue || _lastAppliedEnableLiveWeather.Value != newSettings.EnableLiveWeather) ||
 
 			                    (!_lastAppliedEnableControlCenter.HasValue || _lastAppliedEnableControlCenter.Value != newSettings.EnableControlCenter) ||
+			                    (!_lastAppliedEnableF1Widget.HasValue || _lastAppliedEnableF1Widget.Value != newSettings.EnableF1Widget) ||
 
 			                    (!_lastAppliedShowLaunchpad.HasValue || _lastAppliedShowLaunchpad.Value != newSettings.ShowLaunchpad) ||
 
@@ -5518,6 +5541,8 @@ namespace MacStyleDock
 
 			_lastAppliedEnableControlCenter = newSettings.EnableControlCenter;
 
+			_lastAppliedEnableF1Widget = newSettings.EnableF1Widget;
+
 			_lastAppliedShowLaunchpad = newSettings.ShowLaunchpad;
 
 			_lastAppliedShowCalendarWidget = newSettings.ShowCalendarWidget;
@@ -5537,8 +5562,6 @@ namespace MacStyleDock
 			SoundEffects.Volume = ((newSettings.SoundVolume > 0.0) ? newSettings.SoundVolume : 1.0);
 
 			SaveSettings ();
-
-			GenieEffect.IsEnabled = newSettings.EnableGenieEffect;
 
 			SetAutoStart (newSettings.AutoStart);
 
@@ -5645,6 +5668,8 @@ namespace MacStyleDock
 			ApplyAutoHideState ();
 
 			UpdateSpotifyDockIcon (null);
+
+			ManageRippleState ();
 
 		}
 
@@ -5858,7 +5883,7 @@ namespace MacStyleDock
 
 				foreach (DockItemControl item in (from item in dockItems.Concat (runningItems)
 
-					where item.Config.ProcessName.ToLower () == "spotify" || item.Config.Name.ToLower ().Contains ("spotify")
+					where item.Config != null && (string.Equals (item.Config.ProcessName, "spotify", StringComparison.OrdinalIgnoreCase) || (item.Config.Name != null && item.Config.Name.IndexOf ("spotify", StringComparison.OrdinalIgnoreCase) >= 0))
 
 					select item).ToList ()) {
 
@@ -6722,21 +6747,7 @@ namespace MacStyleDock
 				CreateItemContextMenu (itemControl);
 
 				if (config.FilePath == "action:weather") {
-
-					DockItemControl closureItem = itemControl;
-
-					itemControl.MouseEnter += delegate {
-
-						ShowWeatherOverlay (closureItem);
-
-					};
-
-					itemControl.MouseLeave += delegate {
-
-						StartHideWeatherOverlay ();
-
-					};
-
+					// Standalone WeatherOS app handles weather interaction
 				} else if (config.FilePath == "action:f1") {
 
 					DockItemControl closureItem2 = itemControl;
@@ -6753,7 +6764,7 @@ namespace MacStyleDock
 
 					};
 
-				} else if (config.FilePath == "action:calendar" || config.Name.ToLower () == "calendar") {
+				} else if (config.FilePath == "action:calendar" || (config.Name != null && string.Equals (config.Name, "calendar", StringComparison.OrdinalIgnoreCase))) {
 
 					DockItemControl closureItem3 = itemControl;
 
@@ -6769,7 +6780,7 @@ namespace MacStyleDock
 
 					};
 
-				} else if (config.ProcessName.ToLower () == "spotify" || config.Name.ToLower ().Contains ("spotify")) {
+				} else if ((config.ProcessName != null && string.Equals (config.ProcessName, "spotify", StringComparison.OrdinalIgnoreCase)) || (config.Name != null && config.Name.IndexOf ("spotify", StringComparison.OrdinalIgnoreCase) >= 0)) {
 
 					DockItemControl closureItem4 = itemControl;
 
@@ -6813,6 +6824,7 @@ namespace MacStyleDock
 
 				exposeItem.PreviewMouseLeftButtonDown += delegate {
 
+					if (holdTimer != null) { holdTimer.Stop (); holdTimer = null; }
 					holdTimer = new DispatcherTimer {
 
 						Interval = TimeSpan.FromMilliseconds (600.0)
@@ -7241,8 +7253,16 @@ namespace MacStyleDock
 			dockBorder.Child = grid2;
 			List<DockItemConfig> list = new List<DockItemConfig> ();
 
+			if (settings.EnableF1Widget && !settings.Items.Any ((DockItemConfig i) => i.FilePath == "action:f1")) {
+				settings.Items.Add (new DockItemConfig {
+					Name = "F1 Widget",
+					FilePath = "action:f1",
+					ProcessName = "F1Widget"
+				});
+			}
+
 			foreach (DockItemConfig item in settings.Items) {
-				if ((!(item.FilePath == "action:weather") || settings.EnableLiveWeather) && (!(item.FilePath == "action:controlcenter") || settings.EnableControlCenter) && (!(item.FilePath == "action:launchpad") || settings.ShowLaunchpad) && !Directory.Exists (item.FilePath) && item.FilePath != "action:search" && item.FilePath != "action:trash") {
+				if ((!(item.FilePath == "action:weather") || settings.EnableLiveWeather) && (!(item.FilePath == "action:controlcenter") || settings.EnableControlCenter) && (!(item.FilePath == "action:launchpad") || settings.ShowLaunchpad) && (!(item.FilePath == "action:f1") || settings.EnableF1Widget) && !Directory.Exists (item.FilePath) && item.FilePath != "action:search" && item.FilePath != "action:trash") {
 					list.Add (item);
 				}
 			}
@@ -7265,8 +7285,11 @@ namespace MacStyleDock
 
 			int num = 0;
 			foreach (DockItemControl itemControl in runningItems) {
+				if (itemControl.Config != null && itemControl.Config.ProcessName != null && itemControl.Config.ProcessName.Equals ("ripple", StringComparison.OrdinalIgnoreCase)) {
+					continue;
+				}
 				itemControl.UpdateBaseSize (baseSize);
-				if (!settings.Items.Any ((DockItemConfig p) => p.ProcessName.ToLower () == itemControl.Config.ProcessName.ToLower ())) {
+				if (itemControl.Config != null && itemControl.Config.ProcessName != null && !settings.Items.Any ((DockItemConfig p) => p.ProcessName != null && string.Equals (p.ProcessName, itemControl.Config.ProcessName, StringComparison.OrdinalIgnoreCase))) {
 					SafeAdd (dockPanel, itemControl, "dockPanel.Add(runningItem)");
 					num++;
 				}
@@ -7275,7 +7298,7 @@ namespace MacStyleDock
 			int num2 = 0;
 			if (settings.ShowRecentApps) {
 				foreach (DockItemConfig config in recentApps) {
-					if (!runningItems.Any ((DockItemControl r) => r.Config.ProcessName.ToLower () == config.ProcessName.ToLower ())) {
+					if (config.ProcessName != null && !runningItems.Any ((DockItemControl r) => r.Config != null && r.Config.ProcessName != null && string.Equals (r.Config.ProcessName, config.ProcessName, StringComparison.OrdinalIgnoreCase))) {
 						DockItemControl dockItemControl3 = CreateDockItemControlHelper (config, canDrag: false);
 						dockItemControl3.IndicatorDot.Opacity = 0.0;
 						SafeAdd (dockPanel, dockItemControl3, "dockPanel.Add(recentItem)");
@@ -9069,7 +9092,7 @@ namespace MacStyleDock
 
 				if (flag && !isDockHidden && IsAnimationEnabled && dist < range) {
 					double num8 = Math.Sin ((1.0 - dist / range) * Math.PI / 2.0);
-					targetScales[i] = 1.0 + (maxSize / baseSize - 1.0) * num8;
+					targetScales[i] = 1.0 + ((baseSize > 0.0 ? maxSize / baseSize : 1.0) - 1.0) * num8;
 				} else {
 					targetScales[i] = 1.0;
 				}
@@ -9294,21 +9317,24 @@ namespace MacStyleDock
 			try {
 
 				Process[] processesByName = Process.GetProcessesByName (processName);
+				try {
+					foreach (Process process in processesByName) {
 
-				foreach (Process process in processesByName) {
+						try {
 
-					try {
+							if (process.MainWindowHandle != IntPtr.Zero && IsTaskbarWindow (process.MainWindowHandle)) {
 
-						if (process.MainWindowHandle != IntPtr.Zero && IsTaskbarWindow (process.MainWindowHandle)) {
+								return true;
 
-							return true;
+							}
+
+						} catch {
 
 						}
 
-					} catch {
-
 					}
-
+				} finally {
+					foreach (var p in processesByName) p?.Dispose ();
 				}
 
 			} catch {
@@ -9463,7 +9489,7 @@ namespace MacStyleDock
 
 			processCheckTimer = new DispatcherTimer ();
 
-			processCheckTimer.Interval = TimeSpan.FromSeconds (1.2);
+			processCheckTimer.Interval = TimeSpan.FromSeconds (3.0);
 
 			processCheckTimer.Tick += delegate {
 
@@ -9475,7 +9501,7 @@ namespace MacStyleDock
 
 			spotifySyncTimer = new DispatcherTimer ();
 
-			spotifySyncTimer.Interval = TimeSpan.FromMilliseconds (250.0);
+			spotifySyncTimer.Interval = TimeSpan.FromSeconds (1.0);
 
 			spotifySyncTimer.Tick += delegate {
 
@@ -9485,13 +9511,15 @@ namespace MacStyleDock
 
 			spotifySyncTimer.Start ();
 
-			SyncSpotifyStateFast ();
-
-			CheckRunningProcesses ();
+			ThreadPool.QueueUserWorkItem (delegate {
+				Thread.Sleep (400);
+				SyncSpotifyStateFast ();
+				CheckRunningProcesses ();
+			});
 
 			bgSampleTimer = new DispatcherTimer ();
 
-			bgSampleTimer.Interval = TimeSpan.FromSeconds (2.0);
+			bgSampleTimer.Interval = TimeSpan.FromSeconds (5.0);
 
 			bgSampleTimer.Tick += delegate {
 
@@ -9503,7 +9531,7 @@ namespace MacStyleDock
 
 			badgeUpdateTimer = new DispatcherTimer ();
 
-			badgeUpdateTimer.Interval = TimeSpan.FromSeconds (3.0);
+			badgeUpdateTimer.Interval = TimeSpan.FromSeconds (5.0);
 
 			badgeUpdateTimer.Tick += delegate {
 
@@ -9514,15 +9542,10 @@ namespace MacStyleDock
 			badgeUpdateTimer.Start ();
 
 			downloadPollTimer = new DispatcherTimer ();
-
-			downloadPollTimer.Interval = TimeSpan.FromSeconds (2.0);
-
+			downloadPollTimer.Interval = TimeSpan.FromMilliseconds (3000.0);
 			downloadPollTimer.Tick += delegate {
-
 				UpdateDownloadProgress ();
-
 			};
-
 			downloadPollTimer.Start ();
 
 		}
@@ -10363,30 +10386,62 @@ namespace MacStyleDock
 
 		}
 
+		private static bool IsBrowserRunning ()
+		{
+			try {
+				string[] browsers = new string[] { "chrome", "msedge", "firefox", "brave", "opera", "vivaldi" };
+				foreach (string b in browsers) {
+					Process[] procs = Process.GetProcessesByName (b);
+					bool running = procs.Length > 0;
+					foreach (var p in procs) p.Dispose ();
+					if (running) return true;
+				}
+			} catch { }
+			return false;
+		}
 
+		private static bool IsDownloadFileActive (string filePath)
+		{
+			try {
+				if (!File.Exists (filePath)) return false;
+				if (!IsBrowserRunning ()) return false;
+
+				FileInfo fi = new FileInfo (filePath);
+				return fi.Length > 0;
+			} catch {
+				return false;
+			}
+		}
+
+		private static Tuple<long, long> ReadCrdownloadFooter (string filePath)
+		{
+			try {
+				using (FileStream fs = new FileStream (filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) {
+					long length = fs.Length;
+					if (length >= 26) {
+						fs.Seek (length - 26, SeekOrigin.Begin);
+						using (BinaryReader reader = new BinaryReader (fs)) {
+							long totalBytes = reader.ReadInt64 ();
+							long receivedBytes = reader.ReadInt64 ();
+							if (totalBytes > 0 && totalBytes >= receivedBytes && receivedBytes >= 0 && totalBytes < 1000000000000L) {
+								return Tuple.Create (length, totalBytes);
+							}
+						}
+					}
+				}
+			} catch { }
+			return null;
+		}
 
 		private static bool IsFileLocked (string filePath)
-
 		{
-
 			try {
-
 				using (new FileStream (filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) {
-
 					return false;
-
 				}
-
-			} catch (IOException) {
-
-				return true;
-
 			} catch {
-
 				return true;
-
 			}
-
 		}
 
 
@@ -10444,600 +10499,325 @@ namespace MacStyleDock
 
 
 		private Dictionary<string, Tuple<long, long>> GetActiveChromiumDownloads ()
-
 		{
-
 			Dictionary<string, Tuple<long, long>> dictionary = new Dictionary<string, Tuple<long, long>> (StringComparer.OrdinalIgnoreCase);
+			if (!IsBrowserRunning ()) return dictionary;
 
 			List<string> chromiumHistoryPaths = GetChromiumHistoryPaths ();
-
 			string tempPath = System.IO.Path.GetTempPath ();
 
 			foreach (string item3 in chromiumHistoryPaths) {
-
 				string text = System.IO.Path.Combine (tempPath, "dock_hist_" + Guid.NewGuid ().ToString ("N") + ".db");
-
 				string text2 = text + "-wal";
-
 				string text3 = text + "-journal";
 
 				try {
-
 					SafeCopyFile (item3, text);
-
 					string text4 = item3 + "-wal";
-
 					if (File.Exists (text4)) {
-
-						try {
-
-							SafeCopyFile (text4, text2);
-
-						} catch {
-
-						}
-
+						try { SafeCopyFile (text4, text2); } catch { }
 					}
 
 					string text5 = item3 + "-journal";
-
 					if (File.Exists (text5)) {
-
-						try {
-
-							SafeCopyFile (text5, text3);
-
-						} catch {
-
-						}
-
+						try { SafeCopyFile (text5, text3); } catch { }
 					}
 
 					IntPtr db = IntPtr.Zero;
-
 					if (SQLiteNative.sqlite3_open (text, out db) != 0) {
-
 						continue;
-
 					}
 
-					string zSql = "SELECT current_path, target_path, received_bytes, total_bytes FROM downloads WHERE state = 0;";
-
+					string zSql = "SELECT current_path, target_path, received_bytes, total_bytes FROM downloads WHERE total_bytes > 0 ORDER BY start_time DESC LIMIT 50;";
 					IntPtr ppStmt = IntPtr.Zero;
 
 					if (SQLiteNative.sqlite3_prepare_v2 (db, zSql, -1, out ppStmt, IntPtr.Zero) == 0) {
-
 						while (SQLiteNative.sqlite3_step (ppStmt) == 100) {
-
 							IntPtr intPtr = SQLiteNative.sqlite3_column_text (ppStmt, 0);
-
 							string text6 = ((intPtr != IntPtr.Zero) ? PtrToStringUtf8 (intPtr) : "");
-
 							IntPtr intPtr2 = SQLiteNative.sqlite3_column_text (ppStmt, 1);
-
 							string text7 = ((intPtr2 != IntPtr.Zero) ? PtrToStringUtf8 (intPtr2) : "");
-
 							long item = SQLiteNative.sqlite3_column_int64 (ppStmt, 2);
-
 							long item2 = SQLiteNative.sqlite3_column_int64 (ppStmt, 3);
 
+							if (item2 <= 0) continue;
+
 							if (!string.IsNullOrEmpty (text6)) {
-
 								string key = NormalizePath (text6);
-
 								dictionary [key] = Tuple.Create (item, item2);
-
+								dictionary [key + ".crdownload"] = Tuple.Create (item, item2);
 							}
 
 							if (!string.IsNullOrEmpty (text7)) {
-
 								string key2 = NormalizePath (text7);
-
 								dictionary [key2] = Tuple.Create (item, item2);
+								dictionary [key2 + ".crdownload"] = Tuple.Create (item, item2);
 
+								string fname = System.IO.Path.GetFileName (key2).ToLowerInvariant ();
+								if (!string.IsNullOrEmpty (fname)) {
+									dictionary [fname] = Tuple.Create (item, item2);
+									dictionary [fname + ".crdownload"] = Tuple.Create (item, item2);
+								}
+								string fnameNoExt = System.IO.Path.GetFileNameWithoutExtension (key2).ToLowerInvariant ();
+								if (!string.IsNullOrEmpty (fnameNoExt)) {
+									dictionary [fnameNoExt] = Tuple.Create (item, item2);
+									dictionary [fnameNoExt + ".crdownload"] = Tuple.Create (item, item2);
+								}
 							}
-
 						}
-
 						SQLiteNative.sqlite3_finalize (ppStmt);
-
 					}
-
 					SQLiteNative.sqlite3_close (db);
-
-				} catch {
-
-				} finally {
-
-					try {
-
-						if (File.Exists (text)) {
-
-							File.Delete (text);
-
-						}
-
-					} catch {
-
-					}
-
-					try {
-
-						if (File.Exists (text2)) {
-
-							File.Delete (text2);
-
-						}
-
-					} catch {
-
-					}
-
-					try {
-
-						if (File.Exists (text3)) {
-
-							File.Delete (text3);
-
-						}
-
-					} catch {
-
-					}
-
+				} catch { } finally {
+					try { if (File.Exists (text)) File.Delete (text); } catch { }
+					try { if (File.Exists (text2)) File.Delete (text2); } catch { }
+					try { if (File.Exists (text3)) File.Delete (text3); } catch { }
 				}
-
 			}
-
 			return dictionary;
-
 		}
 
+		private DateTime _lastSqliteCheck = DateTime.MinValue;
+		private Dictionary<string, Tuple<long, long>> _cachedChromiumDownloads = new Dictionary<string, Tuple<long, long>> (StringComparer.OrdinalIgnoreCase);
 
+		private void OnRenderVsync (object sender, EventArgs e)
+		{
+			try {
+				foreach (DockItemControl item in dockItems) {
+					if (item != null && item.DownloadArc != null && item.DownloadArc.Visibility == Visibility.Visible) {
+						UpdateDownloadArc (item);
+					}
+				}
+				foreach (DockItemControl item in runningItems) {
+					if (item != null && item.DownloadArc != null && item.DownloadArc.Visibility == Visibility.Visible) {
+						UpdateDownloadArc (item);
+					}
+				}
+			} catch { }
+		}
+
+		private bool _isUpdatingDownloadProgress = false;
 
 		private void UpdateDownloadProgress ()
-
 		{
+			if (_isUpdatingDownloadProgress) return;
+			_isUpdatingDownloadProgress = true;
 
-			try {
-
-				string path = System.IO.Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.UserProfile), "Downloads");
-
-				if (!Directory.Exists (path)) {
-
-					return;
-
-				}
-
-				string[] obj = new string[4] { "*.crdownload", "*.part", "*.download", "*.!ut" };
-
-				List<string> list = new List<string> ();
-
-				string[] array = obj;
-
-				foreach (string searchPattern in array) {
-
-					try {
-
-						list.AddRange (Directory.GetFiles (path, searchPattern));
-
-					} catch {
-
+			ThreadPool.QueueUserWorkItem (delegate {
+				try {
+					string path = System.IO.Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.UserProfile), "Downloads");
+					if (!Directory.Exists (path)) {
+						_isUpdatingDownloadProgress = false;
+						return;
 					}
 
-				}
-
-				List<string> list2 = new List<string> ();
-
-				foreach (string item2 in list) {
-
-					if (IsFileLocked (item2)) {
-
-						list2.Add (item2);
-
-					}
-
-				}
-
-				Dictionary<string, Tuple<long, long>> activeChromiumDownloads = GetActiveChromiumDownloads ();
-
-				Dictionary<string, double> dictionary = new Dictionary<string, double> (StringComparer.OrdinalIgnoreCase);
-
-				foreach (string item3 in list2) {
-
-					try {
-
-						double num = -1.0;
-
-						bool flag = false;
-
-						Tuple<long, long> value = null;
-
-						string key = NormalizePath (item3);
-
-						if (activeChromiumDownloads.TryGetValue (key, out value)) {
-
-							flag = true;
-
-						} else {
-
-							string path2 = item3;
-
-							if (item3.EndsWith (".crdownload", StringComparison.OrdinalIgnoreCase)) {
-
-								path2 = item3.Substring (0, item3.Length - 11);
-
-							}
-
-							string key2 = NormalizePath (path2);
-
-							if (activeChromiumDownloads.TryGetValue (key2, out value)) {
-
-								flag = true;
-
-							}
-
-						}
-
-						if (flag && value != null && value.Item2 > 0) {
-
-							long num2 = 0L;
-
-							try {
-
-								num2 = new FileInfo (item3).Length;
-
-							} catch {
-
-							}
-
-							if (num2 <= 0) {
-
-								num2 = value.Item1;
-
-							}
-
-							num = (double)num2 / (double)value.Item2;
-
-							num = Math.Max (0.01, Math.Min (0.99, num));
-
-						} else {
-
-							num = -2.0;
-
-						}
-
-						dictionary [item3] = num;
-
-					} catch {
-
-					}
-
-				}
-
-				foreach (string item4 in new List<string> (_simulatedProgressCache.Keys)) {
-
-					bool flag2 = false;
-
-					foreach (string item5 in list2) {
-
-						if (string.Equals (item5, item4, StringComparison.OrdinalIgnoreCase)) {
-
-							flag2 = true;
-
-							break;
-
-						}
-
-					}
-
-					if (!flag2) {
-
-						_simulatedProgressCache.Remove (item4);
-
-						_lastSizeCache.Remove (item4);
-
-					}
-
-				}
-
-				double num3 = ((list2.Count > 0) ? 0.0 : (-1.0));
-
-				if (list2.Count > 0) {
-
-					double num4 = 0.0;
-
-					int num5 = 0;
-
-					bool flag3 = false;
-
-					foreach (double value2 in dictionary.Values) {
-
-						if (value2 == -2.0) {
-
-							flag3 = true;
-
-							continue;
-
-						}
-
-						num4 += value2;
-
-						num5++;
-
-					}
-
-					num3 = ((flag3 && num5 == 0) ? (-2.0) : ((num5 <= 0) ? (-2.0) : (num4 / (double)num5)));
-
-				}
-
-				int num6 = 0;
-
-				if (num3 >= 0.0) {
-
-					num6 = (int)Math.Round (num3 * 100.0);
-
-				}
-
-				List<DockItemControl> list3 = new List<DockItemControl> (dockItems);
-
-				list3.AddRange (runningItems);
-
-				bool pulseUp;
-
-				foreach (DockItemControl item in list3) {
-
-					if (item == null || item.DownloadArc == null) {
-
-						continue;
-
-					}
-
-					try {
-
-						string text = ((item.Config != null && item.Config.ProcessName != null) ? item.Config.ProcessName : "").ToLower ();
-
-						bool flag4 = text.Contains ("chrome") || text.Contains ("msedge") || text.Contains ("edge") || text.Contains ("firefox") || text.Contains ("brave") || text.Contains ("opera") || text.Contains ("vivaldi");
-
-						bool flag5 = false;
-
+					string[] patterns = new string[4] { "*.crdownload", "*.part", "*.download", "*.!ut" };
+					List<string> rawFiles = new List<string> ();
+					foreach (string p in patterns) {
 						try {
+							rawFiles.AddRange (Directory.GetFiles (path, p));
+						} catch { }
+					}
 
-							if (item.Config != null && !string.IsNullOrEmpty (item.Config.FilePath) && Directory.Exists (item.Config.FilePath)) {
+					List<string> activeFiles = new List<string> ();
+					foreach (string f in rawFiles) {
+						if (IsDownloadFileActive (f)) {
+							activeFiles.Add (f);
+						}
+					}
 
-								flag5 = string.Equals (System.IO.Path.GetFullPath (item.Config.FilePath).TrimEnd ('\\', '/'), System.IO.Path.GetFullPath (path).TrimEnd ('\\', '/'), StringComparison.OrdinalIgnoreCase);
+					double sqliteCheckInterval = (activeFiles.Count > 0) ? 0.5 : 3.0;
+					if ((DateTime.Now - _lastSqliteCheck).TotalSeconds > sqliteCheckInterval) {
+						_lastSqliteCheck = DateTime.Now;
+						try {
+							_cachedChromiumDownloads = GetActiveChromiumDownloads ();
+						} catch { }
+					}
 
+					Dictionary<string, double> progressMap = new Dictionary<string, double> (StringComparer.OrdinalIgnoreCase);
+					foreach (string file in activeFiles) {
+						try {
+							double prog = -1.0;
+							Tuple<long, long> sizeInfo = ReadCrdownloadFooter (file);
+							if (sizeInfo == null) {
+								string key = NormalizePath (file);
+								_cachedChromiumDownloads.TryGetValue (key, out sizeInfo);
 							}
-
-						} catch {
-
-						}
-
-						if (!flag4 && !flag5) {
-
-							continue;
-
-						}
-
-						if (num3 >= 0.0 || num3 == -2.0) {
-
-							item.DownloadProgress = num3;
-
-							UpdateDownloadArc (item);
-
-							if (item.DownloadArc.Visibility != 0) {
-
-								item.DownloadArc.Visibility = Visibility.Visible;
-
-								DoubleAnimation animation = new DoubleAnimation (0.0, 0.9, TimeSpan.FromMilliseconds (350.0)) {
-
-									EasingFunction = new CubicEase {
-
-										EasingMode = EasingMode.EaseOut
-
+							if (sizeInfo == null && file.EndsWith (".crdownload", StringComparison.OrdinalIgnoreCase)) {
+								string orig = file.Substring (0, file.Length - 11);
+								_cachedChromiumDownloads.TryGetValue (NormalizePath (orig), out sizeInfo);
+							}
+							if (sizeInfo == null) {
+								string fname = System.IO.Path.GetFileName (file).ToLowerInvariant ();
+								_cachedChromiumDownloads.TryGetValue (fname, out sizeInfo);
+							}
+							if (sizeInfo == null) {
+								string fnameNoExt = System.IO.Path.GetFileNameWithoutExtension (file).ToLowerInvariant ();
+								_cachedChromiumDownloads.TryGetValue (fnameNoExt, out sizeInfo);
+							}
+							if (sizeInfo == null) {
+								string fn = System.IO.Path.GetFileNameWithoutExtension (file).Replace ("Unconfirmed ", "").Replace (".crdownload", "").Trim ().ToLowerInvariant ();
+								if (!string.IsNullOrEmpty (fn)) {
+									foreach (var kvp in _cachedChromiumDownloads) {
+										if (kvp.Value != null && kvp.Value.Item2 > 0 && (kvp.Key.Contains (fn) || fn.Contains (kvp.Key))) {
+											sizeInfo = kvp.Value;
+											break;
+										}
 									}
-
-								};
-
-								item.DownloadArc.BeginAnimation (UIElement.OpacityProperty, animation);
-
-							}
-
-							if (item._downloadLabel != null) {
-
-								if (num3 == -2.0) {
-
-									item._downloadLabel.Text = "â†“";
-
-								} else {
-
-									item._downloadLabel.Text = num6 + "%";
-
 								}
-
-								if (item._downloadLabel.Visibility != 0) {
-
-									item._downloadLabel.Visibility = Visibility.Visible;
-
+							}
+							if (sizeInfo == null && _cachedChromiumDownloads.Count > 0) {
+								foreach (var kvp in _cachedChromiumDownloads) {
+									if (kvp.Value != null && kvp.Value.Item2 > 0) {
+										sizeInfo = kvp.Value;
+										break;
+									}
 								}
-
 							}
 
-							if (item._downloadPulseActive) {
+							long curLen = 0L;
+							try { curLen = new FileInfo (file).Length; } catch { }
 
-								continue;
-
+							if (sizeInfo != null && sizeInfo.Item2 > 0) {
+								prog = (double)curLen / (double)sizeInfo.Item2;
+								prog = Math.Max (0.005, Math.Min (0.999, prog));
+							} else if (curLen > 0) {
+								prog = -2.0;
+							} else {
+								prog = -2.0;
 							}
+							progressMap[file] = prog;
+						} catch { }
+					}
 
-							item._downloadPulseActive = true;
+					double overallProg = (activeFiles.Count > 0) ? -2.0 : -1.0;
+					if (activeFiles.Count > 0) {
+						double sum = 0.0;
+						int count = 0;
+						bool hasIndeterminate = false;
+						foreach (double val in progressMap.Values) {
+							if (val == -2.0) {
+								hasIndeterminate = true;
+							} else if (val >= 0.0) {
+								sum += val;
+								count++;
+							}
+						}
+						if (count > 0) {
+							overallProg = sum / (double)count;
+						} else if (hasIndeterminate) {
+							overallProg = -2.0;
+						}
+					}
 
-							item._downloadPulseTimer = new DispatcherTimer {
+					base.Dispatcher.BeginInvoke ((Action)delegate {
+						try {
+							List<DockItemControl> allItems = new List<DockItemControl> (dockItems);
+							allItems.AddRange (runningItems);
 
-								Interval = TimeSpan.FromMilliseconds (700.0)
-
-							};
-
-							pulseUp = true;
-
-							item._downloadPulseTimer.Tick += delegate {
+							foreach (DockItemControl item in allItems) {
+								if (item == null || item.DownloadArc == null) {
+									continue;
+								}
 
 								try {
+									string targetStr = (((item.Config != null && item.Config.ProcessName != null) ? item.Config.ProcessName : "") + " " + ((item.Config != null && item.Config.FilePath != null) ? item.Config.FilePath : "") + " " + ((item.Config != null && item.Config.Name != null) ? item.Config.Name : "")).ToLower ();
+									bool isBrowser = targetStr.Contains ("chrome") || targetStr.Contains ("msedge") || targetStr.Contains ("edge") || targetStr.Contains ("firefox") || targetStr.Contains ("brave") || targetStr.Contains ("opera") || targetStr.Contains ("vivaldi");
+									bool isDownloadsFolder = false;
 
-									if (item.DownloadArc.Visibility != 0) {
+									try {
+										if (item.Config != null && !string.IsNullOrEmpty (item.Config.FilePath) && Directory.Exists (item.Config.FilePath)) {
+											isDownloadsFolder = string.Equals (System.IO.Path.GetFullPath (item.Config.FilePath).TrimEnd ('\\', '/'), System.IO.Path.GetFullPath (path).TrimEnd ('\\', '/'), StringComparison.OrdinalIgnoreCase);
+										}
+									} catch { }
 
-										item._downloadPulseTimer.Stop ();
-
-										item._downloadPulseActive = false;
-
-									} else {
-
-										DoubleAnimation animation2 = new DoubleAnimation (pulseUp ? 1.0 : 0.55, TimeSpan.FromMilliseconds (650.0)) {
-
-											EasingFunction = new SineEase {
-
-												EasingMode = EasingMode.EaseInOut
-
-											}
-
-										};
-
-										item.DownloadArc.BeginAnimation (UIElement.OpacityProperty, animation2);
-
-										pulseUp = !pulseUp;
-
+									if (!isBrowser && !isDownloadsFolder) {
+										continue;
 									}
 
-								} catch {
-
-								}
-
-							};
-
-							item._downloadPulseTimer.Start ();
-
-							continue;
-
+									if (overallProg >= 0.0 || overallProg == -2.0) {
+										item.DownloadProgress = overallProg;
+										if (item.DownloadArc.Visibility != Visibility.Visible) {
+											item.DownloadArc.Visibility = Visibility.Visible;
+											if (item.DownloadTrack != null) item.DownloadTrack.Visibility = Visibility.Visible;
+										}
+										UpdateDownloadArc (item);
+										if (item._downloadLabel != null) {
+											item._downloadLabel.Visibility = Visibility.Collapsed;
+										}
+									} else {
+										item.DownloadProgress = -1.0;
+										item.CurrentVisualProgress = 0.0;
+										if (item.DownloadArc.Visibility == Visibility.Visible) {
+											item.DownloadArc.Visibility = Visibility.Collapsed;
+											if (item.DownloadTrack != null) item.DownloadTrack.Visibility = Visibility.Collapsed;
+											if (item._downloadLabel != null) {
+												item._downloadLabel.Visibility = Visibility.Collapsed;
+											}
+										}
+									}
+								} catch { }
+							}
+						} catch { } finally {
+							_isUpdatingDownloadProgress = false;
 						}
-
-						if (item.DownloadArc.Visibility != 0) {
-
-							continue;
-
-						}
-
-						DoubleAnimation doubleAnimation = new DoubleAnimation (0.0, TimeSpan.FromMilliseconds (500.0)) {
-
-							EasingFunction = new CubicEase {
-
-								EasingMode = EasingMode.EaseIn
-
-							}
-
-						};
-
-						doubleAnimation.Completed += delegate {
-
-							item.DownloadArc.Visibility = Visibility.Collapsed;
-
-							if (item._downloadLabel != null) {
-
-								item._downloadLabel.Visibility = Visibility.Collapsed;
-
-							}
-
-							if (item._downloadPulseTimer != null) {
-
-								item._downloadPulseTimer.Stop ();
-
-								item._downloadPulseActive = false;
-
-							}
-
-						};
-
-						item.DownloadArc.BeginAnimation (UIElement.OpacityProperty, doubleAnimation);
-
-					} catch {
-
-					}
-
+					});
+				} catch {
+					_isUpdatingDownloadProgress = false;
 				}
-
-			} catch {
-
-			}
-
+			});
 		}
-
-
 
 		private void UpdateDownloadArc (DockItemControl item)
-
 		{
-
 			try {
-
-				double num = item.IconImage.Width;
-
-				if (num <= 4.0) {
-
+				double num = (item.IconImage != null && !double.IsNaN (item.IconImage.ActualWidth) && item.IconImage.ActualWidth > 4.0) ? item.IconImage.ActualWidth : ((item.IconImage != null && !double.IsNaN (item.IconImage.Width) && item.IconImage.Width > 4.0) ? item.IconImage.Width : 48.0);
+				if (double.IsNaN (num) || num <= 4.0) {
 					num = 48.0;
-
 				}
 
-				double num2 = num / 2.0 - 4.0;
+				double radius = num / 2.0 - 2.0;
+				double cx = num / 2.0;
+				double cy = num / 2.0;
 
-				double num3 = num / 2.0;
+				if (item.DownloadTrack != null) {
+					item.DownloadTrack.Width = radius * 2.0;
+					item.DownloadTrack.Height = radius * 2.0;
+					item.DownloadTrack.Visibility = item.DownloadArc.Visibility;
+				}
 
-				double num4 = num / 2.0;
-
-				int num5 = 0;
-
-				double num7;
-
-				double num8;
+				int isLargeArc = 0;
+				double startAngle;
+				double endAngle;
 
 				if (item.DownloadProgress == -2.0) {
-
-					double num6 = DateTime.Now.TimeOfDay.TotalMilliseconds * 0.003 % (Math.PI * 2.0);
-
-					num7 = -Math.PI / 2.0 + num6;
-
-					num8 = num7 + Math.PI / 2.0;
-
-					num5 = 0;
-
+					item.IndeterminateAngle = (item.IndeterminateAngle + 0.08) % (Math.PI * 2.0);
+					startAngle = -Math.PI / 2.0 + item.IndeterminateAngle;
+					endAngle = startAngle + Math.PI / 1.8;
+					isLargeArc = 0;
 				} else {
+					double target = Math.Max (0.01, Math.Min (0.999, item.DownloadProgress));
+					if (item.CurrentVisualProgress <= 0.0) {
+						item.CurrentVisualProgress = target;
+					} else {
+						item.CurrentVisualProgress += (target - item.CurrentVisualProgress) * 0.12;
+					}
 
-					double num9 = Math.Max (0.01, Math.Min (0.99, item.DownloadProgress));
-
-					num7 = -Math.PI / 2.0;
-
-					num8 = num7 + Math.PI * 2.0 * num9;
-
-					num5 = ((num9 > 0.5) ? 1 : 0);
-
+					double pct = item.CurrentVisualProgress;
+					startAngle = -Math.PI / 2.0;
+					endAngle = startAngle + Math.PI * 2.0 * pct;
+					isLargeArc = ((pct > 0.5) ? 1 : 0);
 				}
 
-				double num10 = num3 + num2 * Math.Cos (num7);
+				double x1 = cx + radius * Math.Cos (startAngle);
+				double y1 = cy + radius * Math.Sin (startAngle);
+				double x2 = cx + radius * Math.Cos (endAngle);
+				double y2 = cy + radius * Math.Sin (endAngle);
 
-				double num11 = num4 + num2 * Math.Sin (num7);
-
-				double num12 = num3 + num2 * Math.Cos (num8);
-
-				double num13 = num4 + num2 * Math.Sin (num8);
-
-				string source = string.Format (CultureInfo.InvariantCulture, "M {0:F2},{1:F2} A {2:F2},{2:F2} 0 {3} 1 {4:F2},{5:F2}", num10, num11, num2, num5, num12, num13);
-
+				string source = string.Format (CultureInfo.InvariantCulture, "M {0:F2},{1:F2} A {2:F2},{2:F2} 0 {3} 1 {4:F2},{5:F2}", x1, y1, radius, isLargeArc, x2, y2);
 				item.DownloadArc.Data = Geometry.Parse (source);
-
-			} catch {
-
-			}
-
+			} catch { }
 		}
-
-
 
 		public void ShowAppExpose (DockItemControl item)
 
@@ -11794,29 +11574,32 @@ namespace MacStyleDock
 					try {
 
 						Process[] processesByName = Process.GetProcessesByName ("spotify");
+						try {
+							foreach (Process process in processesByName) {
 
-						foreach (Process process in processesByName) {
+								if (process != null && !string.IsNullOrEmpty (process.MainWindowTitle)) {
 
-							if (process != null && !string.IsNullOrEmpty (process.MainWindowTitle)) {
+									IntPtr mainWindowHandle = process.MainWindowHandle;
 
-								IntPtr mainWindowHandle = process.MainWindowHandle;
+									if (mainWindowHandle != IntPtr.Zero) {
 
-								if (mainWindowHandle != IntPtr.Zero) {
+										_cachedSpotifyHwnd = mainWindowHandle;
 
-									_cachedSpotifyHwnd = mainWindowHandle;
+										base.Dispatcher.BeginInvoke ((Action)delegate {
 
-									base.Dispatcher.BeginInvoke ((Action)delegate {
+											SyncSpotifyStateFast ();
 
-										SyncSpotifyStateFast ();
+										});
 
-									});
+									}
+
+									break;
 
 								}
 
-								break;
-
 							}
-
+						} finally {
+							foreach (var p in processesByName) p?.Dispose ();
 						}
 
 					} catch {
@@ -12007,49 +11790,30 @@ namespace MacStyleDock
 
 				}
 
-				HashSet<string> pinnedPaths = new HashSet<string> ();
-
-				HashSet<string> pinnedProcNames = new HashSet<string> ();
-
-				foreach (DockItemConfig item3 in settings.Items) {
-
-					if (!string.IsNullOrEmpty (item3.FilePath)) {
-
-						pinnedPaths.Add (item3.FilePath.ToLower ());
-
-						if (item3.FilePath.EndsWith (".lnk", StringComparison.OrdinalIgnoreCase)) {
-
-							try {
-
-								string text2 = IconExtractor.ResolveShortcut (item3.FilePath);
-
-								if (!string.IsNullOrEmpty (text2)) {
-
-									pinnedPaths.Add (text2.ToLower ());
-
-								}
-
-							} catch {
-
-							}
-
-						}
-
-					}
-
-					if (!string.IsNullOrEmpty (item3.ProcessName)) {
-
-						pinnedProcNames.Add (item3.ProcessName.ToLower ());
-
-					}
-
-				}
-
 				int currentPid = Process.GetCurrentProcess ().Id;
+				List<DockItemConfig> configItemsSnapshot = new List<DockItemConfig> (settings.Items);
 
 				ThreadPool.QueueUserWorkItem (delegate {
-
 					try {
+						HashSet<string> pinnedPaths = new HashSet<string> ();
+						HashSet<string> pinnedProcNames = new HashSet<string> ();
+
+						foreach (DockItemConfig item3 in configItemsSnapshot) {
+							if (!string.IsNullOrEmpty (item3.FilePath)) {
+								pinnedPaths.Add (item3.FilePath.ToLower ());
+								if (item3.FilePath.EndsWith (".lnk", StringComparison.OrdinalIgnoreCase)) {
+									try {
+										string text2 = IconExtractor.ResolveShortcut (item3.FilePath);
+										if (!string.IsNullOrEmpty (text2)) {
+											pinnedPaths.Add (text2.ToLower ());
+										}
+									} catch { }
+								}
+							}
+							if (!string.IsNullOrEmpty (item3.ProcessName)) {
+								pinnedProcNames.Add (item3.ProcessName.ToLower ());
+							}
+						}
 
 						List<PinnedProcessResult> pinnedResults = new List<PinnedProcessResult> ();
 
@@ -12246,11 +12010,14 @@ namespace MacStyleDock
 								}
 
 								foreach (ProcessWindowInfo appInfo in minimizedApps) {
+									if (appInfo.ProcessName != null && appInfo.ProcessName.Equals ("ripple", StringComparison.OrdinalIgnoreCase)) {
+										continue;
+									}
 									if (minimizedItems.Any (x => x.TargetHwnd == appInfo.Hwnd)) {
 										continue;
 									}
-									string title = appInfo.Title;
-									if (title.Length > 24) {
+									string title = !string.IsNullOrEmpty (appInfo.Title) ? appInfo.Title : appInfo.ProcessName;
+									if (title != null && title.Length > 24) {
 										title = appInfo.ProcessName;
 									}
 									DockItemConfig config = new DockItemConfig {
@@ -12281,7 +12048,7 @@ namespace MacStyleDock
 
 								foreach (DockItemControl item2 in runningItems) {
 
-									if (activeRunningApps.Any ((ProcessWindowInfo x) => x.ProcessName.ToLower () == item2.Config.ProcessName.ToLower ())) {
+									if (item2.Config != null && item2.Config.ProcessName != null && activeRunningApps.Any ((ProcessWindowInfo x) => x.ProcessName != null && string.Equals (x.ProcessName, item2.Config.ProcessName, StringComparison.OrdinalIgnoreCase))) {
 
 										continue;
 
@@ -12289,9 +12056,9 @@ namespace MacStyleDock
 
 									listToRemove.Add (item2);
 
-									if (!settings.Items.Any ((DockItemConfig p) => p.ProcessName.ToLower () == item2.Config.ProcessName.ToLower ())) {
+									if (item2.Config != null && item2.Config.ProcessName != null && !recentApps.Any ((DockItemConfig x) => x.ProcessName != null && string.Equals (x.ProcessName, item2.Config.ProcessName, StringComparison.OrdinalIgnoreCase))) {
 
-										recentApps.RemoveAll ((DockItemConfig x) => x.ProcessName.ToLower () == item2.Config.ProcessName.ToLower ());
+										recentApps.RemoveAll ((DockItemConfig x) => x.ProcessName != null && string.Equals (x.ProcessName, item2.Config.ProcessName, StringComparison.OrdinalIgnoreCase));
 
 										recentApps.Insert (0, item2.Config);
 
@@ -12318,18 +12085,23 @@ namespace MacStyleDock
 								}
 
 								foreach (ProcessWindowInfo appInfo in activeRunningApps) {
+									if (appInfo.ProcessName != null && appInfo.ProcessName.Equals ("ripple", StringComparison.OrdinalIgnoreCase)) {
+										continue;
+									}
 
-									if (runningItems.Any ((DockItemControl x) => x.Config.ProcessName.ToLower () == appInfo.ProcessName.ToLower ())) {
+									if (appInfo.ProcessName != null && runningItems.Any ((DockItemControl x) => x.Config != null && x.Config.ProcessName != null && string.Equals (x.Config.ProcessName, appInfo.ProcessName, StringComparison.OrdinalIgnoreCase))) {
 
 										continue;
 
 									}
 
-									recentApps.RemoveAll ((DockItemConfig x) => x.ProcessName.ToLower () == appInfo.ProcessName.ToLower ());
+									if (appInfo.ProcessName != null) {
+										recentApps.RemoveAll ((DockItemConfig x) => x.ProcessName != null && string.Equals (x.ProcessName, appInfo.ProcessName, StringComparison.OrdinalIgnoreCase));
+									}
 
-									string text3 = appInfo.Title;
+									string text3 = !string.IsNullOrEmpty (appInfo.Title) ? appInfo.Title : appInfo.ProcessName;
 
-									if (text3.Length > 24) {
+									if (text3 != null && text3.Length > 24) {
 
 										text3 = appInfo.ProcessName;
 
@@ -12595,6 +12367,109 @@ namespace MacStyleDock
 
 		}
 
+		private void KillProcessAndChildren (int pid)
+		{
+			try {
+				using (var searcher = new System.Management.ManagementObjectSearcher ("Select * From Win32_Process Where ParentProcessId = " + pid)) {
+					using (var moc = searcher.Get ()) {
+						foreach (System.Management.ManagementObject mo in moc) {
+							try {
+								int childPid = Convert.ToInt32 (mo ["ProcessID"]);
+								KillProcessAndChildren (childPid);
+							} catch { }
+						}
+					}
+				}
+			} catch { }
+			try {
+				var proc = System.Diagnostics.Process.GetProcessById (pid);
+				proc.Kill ();
+			} catch { }
+		}
+
+		private void CleanOrphanedMediaProcesses ()
+		{
+			try {
+				using (var searcher = new System.Management.ManagementObjectSearcher ("Select * From Win32_Process Where Name = 'powershell.exe'")) {
+					using (var moc = searcher.Get ()) {
+						foreach (System.Management.ManagementObject mo in moc) {
+							try {
+								string cmdLine = mo ["CommandLine"] as string;
+								if (cmdLine != null && cmdLine.Contains ("GlobalSystemMediaTransportControlsSessionManager")) {
+									int pid = Convert.ToInt32 (mo ["ProcessID"]);
+									try {
+										var proc = System.Diagnostics.Process.GetProcessById (pid);
+										proc.Kill ();
+									} catch { }
+								}
+							} catch { }
+						}
+					}
+				}
+			} catch { }
+		}
+
+		private void ManageRippleState ()
+		{
+			try {
+				CleanOrphanedMediaProcesses ();
+				if (settings.EnableDynamicIsland) {
+					string rippleDir = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Ripple");
+					string rippleExe = System.IO.Path.Combine (rippleDir, "ripple.exe");
+					if (System.IO.File.Exists (rippleExe)) {
+						bool isRunning = false;
+						foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("ripple")) {
+							isRunning = true;
+							break;
+						}
+						if (!isRunning) {
+							// Perf fix: give the dock's own startup a moment to finish laying out
+							// and rendering before we cold-start the ~200MB Chromium-based Ripple
+							// helper. Launching both heavy processes at the exact same instant was
+							// the main cause of the multi-second system-wide stutter on startup.
+							// We're already on a background thread here, so sleeping is safe.
+							Thread.Sleep (2500);
+							try {
+								var rippleProcess = System.Diagnostics.Process.Start (new System.Diagnostics.ProcessStartInfo (rippleExe) {
+									WorkingDirectory = rippleDir,
+									UseShellExecute = true
+								});
+								// Keep Ripple's own cold-start (Chromium/GPU init) from competing
+								// for CPU with the desktop compositor and other apps.
+								if (rippleProcess != null) {
+									rippleProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
+								}
+							} catch { }
+						}
+						SetRippleVisibility (true);
+					}
+				} else {
+					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("ripple")) {
+						try { KillProcessAndChildren (proc.Id); } catch { }
+					}
+				}
+			} catch { }
+		}
+
+		[DllImport ("user32.dll", EntryPoint = "GetWindowLong")]
+		private static extern int GetWindowLong32 (IntPtr hWnd, int nIndex);
+
+		[DllImport ("user32.dll", EntryPoint = "SetWindowLong")]
+		private static extern int SetWindowLong32 (IntPtr hWnd, int nIndex, int dwNewLong);
+
+		private static void HideFromTaskbar (IntPtr hwnd)
+		{
+			try {
+				int exStyle = GetWindowLong32 (hwnd, -20);
+				if ((exStyle & 0x00040000) != 0 || (exStyle & 0x00000080) == 0) {
+					SetWindowLong32 (hwnd, -20, (exStyle | 0x00000080) & ~0x00040000);
+				}
+			} catch { }
+		}
+
+		private void SetRippleVisibility (bool visible)
+		{
+		}
 	}
 
 	public class DockItemControl : Grid
@@ -12707,24 +12582,20 @@ namespace MacStyleDock
 
 
 		public System.Windows.Shapes.Path DownloadArc { get; private set; }
+		public System.Windows.Shapes.Ellipse DownloadTrack { get; set; }
 
 
 
 		public double DownloadProgress {
-
 			get {
-
 				return _downloadProgress;
-
 			}
-
 			set {
-
 				_downloadProgress = value;
-
 			}
-
 		}
+		public double CurrentVisualProgress { get; set; }
+		public double IndeterminateAngle { get; set; }
 
 
 
@@ -12964,86 +12835,44 @@ namespace MacStyleDock
 
 			VisualContainer.Children.Add (BadgeBorder);
 
-			DownloadArc = new System.Windows.Shapes.Path {
-
-				Stroke = new SolidColorBrush (System.Windows.Media.Color.FromRgb (30, 160, byte.MaxValue)),
-
-				StrokeThickness = 5.5,
-
-				StrokeStartLineCap = PenLineCap.Round,
-
-				StrokeEndLineCap = PenLineCap.Round,
-
+			DownloadTrack = new System.Windows.Shapes.Ellipse {
+				Stroke = new SolidColorBrush (System.Windows.Media.Color.FromArgb (85, 0, 0, 0)),
+				StrokeThickness = 3.5,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
-
 				VerticalAlignment = VerticalAlignment.Stretch,
-
 				Visibility = Visibility.Collapsed,
+				IsHitTestVisible = false
+			};
+			VisualContainer.Children.Add (DownloadTrack);
 
+			DownloadArc = new System.Windows.Shapes.Path {
+				Stroke = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
+				StrokeThickness = 3.5,
+				StrokeStartLineCap = PenLineCap.Round,
+				StrokeEndLineCap = PenLineCap.Round,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+				VerticalAlignment = VerticalAlignment.Stretch,
+				Visibility = Visibility.Collapsed,
 				IsHitTestVisible = false,
-
-				Opacity = 0.9
-
+				Opacity = 1.0
 			};
 
 			if (DockWindow.Instance == null || DockWindow.Instance.settings == null || !DockWindow.Instance.settings.PerformanceMode) {
-
 				DownloadArc.Effect = new DropShadowEffect {
-
-					BlurRadius = 10.0,
-
+					BlurRadius = 6.0,
 					ShadowDepth = 0.0,
-
-					Opacity = 0.8,
-
-					Color = System.Windows.Media.Color.FromRgb (30, 160, byte.MaxValue)
-
+					Opacity = 0.6,
+					Color = System.Windows.Media.Color.FromRgb (0, 122, 255)
 				};
-
 			}
 
 			VisualContainer.Children.Add (DownloadArc);
 
 			_downloadLabel = new TextBlock {
-
 				Text = "",
-
-				Foreground = System.Windows.Media.Brushes.White,
-
-				FontSize = 9.5,
-
-				FontWeight = FontWeights.Bold,
-
-				FontFamily = new System.Windows.Media.FontFamily ("Segoe UI, Arial, sans-serif"),
-
-				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-
-				VerticalAlignment = VerticalAlignment.Center,
-
-				TextAlignment = TextAlignment.Center,
-
 				Visibility = Visibility.Collapsed,
-
 				IsHitTestVisible = false
-
 			};
-
-			if (DockWindow.Instance == null || DockWindow.Instance.settings == null || !DockWindow.Instance.settings.PerformanceMode) {
-
-				_downloadLabel.Effect = new DropShadowEffect {
-
-					BlurRadius = 3.0,
-
-					ShadowDepth = 1.0,
-
-					Opacity = 0.9,
-
-					Color = Colors.Black
-
-				};
-
-			}
-
 			VisualContainer.Children.Add (_downloadLabel);
 
 			System.Windows.Media.Color color = System.Windows.Media.Color.FromRgb (0, 210, byte.MaxValue);
@@ -13122,10 +12951,12 @@ namespace MacStyleDock
 				try {
 					System.Windows.Point curPos = e.GetPosition (this);
 					double dt = (DateTime.Now - _lastMouseMoveTime).TotalSeconds;
-					if (dt > 0.005) {
+					if (dt > 0.05) {
 						double vx = (curPos.X - _lastMousePos.X) / dt;
-						double targetTilt = Math.Min (14.0, Math.Max (-14.0, vx * 0.015));
-						TiltTransform.BeginAnimation (SkewTransform.AngleXProperty, new DoubleAnimation (targetTilt, TimeSpan.FromMilliseconds (60)));
+						double targetTilt = Math.Min (12.0, Math.Max (-12.0, vx * 0.01));
+						if (Math.Abs (targetTilt) > 1.0) {
+							TiltTransform.BeginAnimation (SkewTransform.AngleXProperty, new DoubleAnimation (targetTilt, TimeSpan.FromMilliseconds (120)), HandoffBehavior.SnapshotAndReplace);
+						}
 						_lastMousePos = curPos;
 						_lastMouseMoveTime = DateTime.Now;
 					}
@@ -15025,45 +14856,23 @@ namespace MacStyleDock
 			}
 
 			if (Config != null && Config.FilePath == "action:weather") {
-
 				try {
-
-					string weatherExe = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Weather", "Weather.exe");
-
-					if (File.Exists (weatherExe)) {
-
-						Process.Start (new ProcessStartInfo (weatherExe) {
-
+					string weatherOSExe = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Weather", "WeatherOS.exe");
+					if (File.Exists (weatherOSExe)) {
+						Process.Start (new ProcessStartInfo (weatherOSExe) {
 							UseShellExecute = true,
-
-							WorkingDirectory = System.IO.Path.GetDirectoryName (weatherExe)
-
+							WorkingDirectory = System.IO.Path.GetDirectoryName (weatherOSExe)
 						});
-
-					} else {
-
-						try {
-
-							Process.Start (new ProcessStartInfo ("ms-weather:") { UseShellExecute = true });
-
-						} catch {
-
-							Process.Start (new ProcessStartInfo ("https://weather.com") { UseShellExecute = true });
-
-						}
-
 					}
-
 					return;
+				} catch { }
+			}
 
-				} catch (Exception exWeather) {
-
-					System.Windows.MessageBox.Show ("Could not open Weather app: " + exWeather.Message, "Launch Error", MessageBoxButton.OK, MessageBoxImage.Hand);
-
-					return;
-
+			if (Config != null && Config.FilePath == "action:f1") {
+				if (Window.GetWindow (this) is DockWindow dockWindowF1) {
+					dockWindowF1.ShowF1Overlay (this);
 				}
-
+				return;
 			}
 
 			string targetPath = (Config != null && !string.IsNullOrEmpty (Config.FilePath)) ? System.Environment.ExpandEnvironmentVariables (Config.FilePath) : "";
@@ -15101,15 +14910,15 @@ namespace MacStyleDock
 
 				try {
 
-					IntPtr rootTarget = GenieEffect.GetRootHwnd (TargetHwnd);
+					IntPtr rootTarget = DockWindow.GetRootHwnd (TargetHwnd);
 
-					IntPtr rootFg = GenieEffect.GetRootHwnd (DockWindow.GetForegroundWindow ());
+					IntPtr rootFg = DockWindow.GetRootHwnd (DockWindow.GetForegroundWindow ());
 
 
 
 					if (rootFg == rootTarget || DockWindow.GetForegroundWindow () == TargetHwnd) {
 
-						GenieEffect.PlayMinimizeAnimation (rootTarget);
+						DockWindow.ShowWindow (rootTarget, 6); // SW_MINIMIZE
 
 						return;
 
@@ -15119,7 +14928,8 @@ namespace MacStyleDock
 
 					if (DockWindow.IsIconic (rootTarget)) {
 
-						GenieEffect.PlayRestoreAnimation (rootTarget);
+						DockWindow.ShowWindow (rootTarget, 9); // SW_RESTORE
+						DockWindow.SetForegroundWindow (rootTarget);
 
 					} else {
 
@@ -15401,66 +15211,39 @@ namespace MacStyleDock
 
 
 
+		private static readonly System.Collections.Concurrent.ConcurrentDictionary<ImageSource, System.Windows.Media.Color> _dominantColorCache = new System.Collections.Concurrent.ConcurrentDictionary<ImageSource, System.Windows.Media.Color> ();
+
 		private System.Windows.Media.Color ExtractDominantColor (ImageSource imgSource)
-
 		{
-
-			if (imgSource is BitmapSource bitmapSource) {
-
-				try {
-
-					TransformedBitmap transformedBitmap = new TransformedBitmap (bitmapSource, new ScaleTransform (16.0 / (double)bitmapSource.PixelWidth, 16.0 / (double)bitmapSource.PixelHeight));
-
-					int num = transformedBitmap.PixelWidth * 4;
-
-					byte[] array = new byte[transformedBitmap.PixelHeight * num];
-
-					transformedBitmap.CopyPixels (array, num, 0);
-
-					long num2 = 0L;
-
-					long num3 = 0L;
-
-					long num4 = 0L;
-
-					long num5 = 0L;
-
-					for (int i = 0; i < array.Length; i += 4) {
-
-						byte b = array [i];
-
-						byte b2 = array [i + 1];
-
-						byte b3 = array [i + 2];
-
-						if (array [i + 3] > 30 && (Math.Abs (b3 - b2) > 10 || Math.Abs (b3 - b) > 10 || Math.Abs (b2 - b) > 10)) {
-
-							num2 += b3;
-
-							num3 += b2;
-
-							num4 += b;
-
-							num5++;
-
-						}
-
-					}
-
-					if (num5 > 0) {
-
-						return System.Windows.Media.Color.FromRgb ((byte)(num2 / num5), (byte)(num3 / num5), (byte)(num4 / num5));
-
-					}
-
-				} catch {
-
-				}
-
+			if (imgSource == null) return System.Windows.Media.Color.FromRgb (0, 122, byte.MaxValue);
+			if (_dominantColorCache.TryGetValue (imgSource, out var cachedColor)) {
+				return cachedColor;
 			}
-
-			return System.Windows.Media.Color.FromRgb (0, 122, byte.MaxValue);
-
+			if (imgSource is BitmapSource bitmapSource) {
+				try {
+					if (bitmapSource.PixelWidth > 0 && bitmapSource.PixelHeight > 0) {
+						TransformedBitmap transformedBitmap = new TransformedBitmap (bitmapSource, new ScaleTransform (16.0 / (double)bitmapSource.PixelWidth, 16.0 / (double)bitmapSource.PixelHeight));
+						int num = transformedBitmap.PixelWidth * 4;
+						byte[] array = new byte[transformedBitmap.PixelHeight * num];
+						transformedBitmap.CopyPixels (array, num, 0);
+						long num2 = 0L, num3 = 0L, num4 = 0L, num5 = 0L;
+						for (int i = 0; i < array.Length; i += 4) {
+							byte b = array [i], b2 = array [i + 1], b3 = array [i + 2];
+							if (array [i + 3] > 30 && (Math.Abs (b3 - b2) > 10 || Math.Abs (b3 - b) > 10 || Math.Abs (b2 - b) > 10)) {
+								num2 += b3; num3 += b2; num4 += b; num5++;
+							}
+						}
+						if (num5 > 0) {
+							var col = System.Windows.Media.Color.FromRgb ((byte)(num2 / num5), (byte)(num3 / num5), (byte)(num4 / num5));
+							_dominantColorCache [imgSource] = col;
+							return col;
+						}
+					}
+				} catch { }
+			}
+			var fallback = System.Windows.Media.Color.FromRgb (0, 122, byte.MaxValue);
+			_dominantColorCache [imgSource] = fallback;
+			return fallback;
 		}
 
 
@@ -15759,98 +15542,64 @@ namespace MacStyleDock
 			return null;
 		}
 
-		public static ImageSource GetHighQualityIcon (string path, int size)
+		private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ImageSource> _iconExtractCache = new System.Collections.Concurrent.ConcurrentDictionary<string, ImageSource> (StringComparer.OrdinalIgnoreCase);
 
+		public static ImageSource GetHighQualityIcon (string path, int size)
 		{
+			if (string.IsNullOrEmpty (path)) return null;
+			string cacheKey = "hq_" + size + "_" + path;
+			if (_iconExtractCache.TryGetValue (cacheKey, out ImageSource cachedImg)) return cachedImg;
 
 			try {
-
 				if (File.Exists (path) || Directory.Exists (path) || (!string.IsNullOrEmpty (path) && path.StartsWith ("shell:", StringComparison.OrdinalIgnoreCase))) {
-
 					IntPtr[] array = new IntPtr[1];
-
 					uint[] piconid = new uint[1];
-
 					if (PrivateExtractIcons (path, 0, size, size, array, piconid, 1u, 0u) != 0 && array [0] != IntPtr.Zero) {
-
 						try {
-
 							BitmapSource bitmapSource = Imaging.CreateBitmapSourceFromHIcon (array [0], Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions ());
-
 							bitmapSource.Freeze ();
-
+							_iconExtractCache [cacheKey] = bitmapSource;
 							return bitmapSource;
-
 						} finally {
-
 							DestroyIcon (array [0]);
-
 						}
-
 					}
-
 				}
-
-			} catch {
-
-			}
-
+			} catch { }
 			return null;
-
 		}
 
 
 
 		public static ImageSource GetJumboIcon (string path)
-
 		{
+			if (string.IsNullOrEmpty (path)) return null;
+			string cacheKey = "jumbo_" + path;
+			if (_iconExtractCache.TryGetValue (cacheKey, out ImageSource cachedImg)) return cachedImg;
 
 			try {
-
 				if (File.Exists (path) || Directory.Exists (path) || (!string.IsNullOrEmpty (path) && path.StartsWith ("shell:", StringComparison.OrdinalIgnoreCase))) {
-
 					SHFILEINFO psfi = default(SHFILEINFO);
-
 					if (SHGetFileInfo (path, 0u, ref psfi, (uint)Marshal.SizeOf (psfi), 16384u) != IntPtr.Zero) {
-
 						int iIcon = psfi.iIcon;
-
 						Guid riid = new Guid ("46EB2DE8-BE82-11D1-8A3A-00C04FC2978D");
-
 						if (SHGetImageList (4, ref riid, out var ppv) == 0 && ppv != null) {
-
 							IntPtr picon = IntPtr.Zero;
-
 							if (ppv.GetIcon (iIcon, 1, ref picon) == 0 && picon != IntPtr.Zero) {
-
 								try {
-
 									BitmapSource bitmapSource = Imaging.CreateBitmapSourceFromHIcon (picon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions ());
-
 									bitmapSource.Freeze ();
-
+									_iconExtractCache [cacheKey] = bitmapSource;
 									return bitmapSource;
-
 								} finally {
-
 									DestroyIcon (picon);
-
 								}
-
 							}
-
 						}
-
 					}
-
 				}
-
-			} catch {
-
-			}
-
+			} catch { }
 			return null;
-
 		}
 
 		public static ImageSource GetShellItemIcon (string path)
@@ -15924,40 +15673,28 @@ namespace MacStyleDock
 
 
 
+		private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _shortcutCache = new System.Collections.Concurrent.ConcurrentDictionary<string, string> (StringComparer.OrdinalIgnoreCase);
+
 		public static string ResolveShortcut (string lnkPath)
-
 		{
-
-			try {
-
-				Type typeFromProgID = Type.GetTypeFromProgID ("WScript.Shell");
-
-				if (typeFromProgID != null) {
-
-					dynamic val = Activator.CreateInstance (typeFromProgID);
-
-					dynamic val2 = val.CreateShortcut (lnkPath);
-
-					string text = val2.TargetPath;
-
-					if (!string.IsNullOrEmpty (text)) {
-
-						return text;
-
-					}
-
-					return lnkPath;
-
-				}
-
-				return lnkPath;
-
-			} catch {
-
-				return lnkPath;
-
+			if (string.IsNullOrEmpty (lnkPath)) return lnkPath;
+			if (_shortcutCache.TryGetValue (lnkPath, out var cachedPath)) {
+				return cachedPath;
 			}
-
+			string result = lnkPath;
+			try {
+				Type typeFromProgID = Type.GetTypeFromProgID ("WScript.Shell");
+				if (typeFromProgID != null) {
+					dynamic val = Activator.CreateInstance (typeFromProgID);
+					dynamic val2 = val.CreateShortcut (lnkPath);
+					string text = val2.TargetPath;
+					if (!string.IsNullOrEmpty (text)) {
+						result = text;
+					}
+				}
+			} catch { }
+			_shortcutCache [lnkPath] = result;
+			return result;
 		}
 
 
@@ -17205,15 +16942,7 @@ namespace MacStyleDock
 
 			});
 
-			BindToggle ("GenieEffect", settings.EnableGenieEffect, delegate(bool v) {
 
-				settings.EnableGenieEffect = v;
-
-				GenieEffect.IsEnabled = v;
-
-				ownerWindow.ApplySettings (settings);
-
-			});
 
 			BindSlider ("AnimationSpeed", settings.AnimationSpeedValue, delegate(double v) {
 
@@ -17267,6 +16996,24 @@ namespace MacStyleDock
 
 				settings.EnableControlCenter = v;
 
+			});
+
+			BindToggle ("DynamicIsland", settings.EnableDynamicIsland, delegate(bool v) {
+
+				settings.EnableDynamicIsland = v;
+
+			});
+
+			BindToggle ("EnableF1Widget", settings.EnableF1Widget, delegate(bool v) {
+				settings.EnableF1Widget = v;
+				if (v && !settings.Items.Any ((DockItemConfig i) => i.FilePath == "action:f1")) {
+					settings.Items.Add (new DockItemConfig {
+						Name = "F1 Widget",
+						FilePath = "action:f1",
+						ProcessName = "F1Widget"
+					});
+				}
+				ownerWindow.ApplySettings (settings);
 			});
 
 			BindToggle ("SpotifyArt", settings.ShowSpotifyAlbumArt, delegate(bool v) {
@@ -18138,17 +17885,7 @@ namespace MacStyleDock
 
 
 		static MediaOverlayWindow ()
-
 		{
-
-			try {
-
-				Timeline.DesiredFrameRateProperty.OverrideMetadata (typeof(Timeline), new FrameworkPropertyMetadata (240));
-
-			} catch {
-
-			}
-
 		}
 
 
@@ -24869,18 +24606,12 @@ namespace MacStyleDock
 
 			base.MouseLeftButtonDown += delegate {
 				try {
-					string weatherExe = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Weather", "Weather.exe");
-					if (File.Exists (weatherExe)) {
-						Process.Start (new ProcessStartInfo (weatherExe) {
+					string weatherOSExe = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Weather", "WeatherOS.exe");
+					if (File.Exists (weatherOSExe)) {
+						Process.Start (new ProcessStartInfo (weatherOSExe) {
 							UseShellExecute = true,
-							WorkingDirectory = System.IO.Path.GetDirectoryName (weatherExe)
+							WorkingDirectory = System.IO.Path.GetDirectoryName (weatherOSExe)
 						});
-					} else {
-						try {
-							Process.Start (new ProcessStartInfo ("ms-weather:") { UseShellExecute = true });
-						} catch {
-							Process.Start (new ProcessStartInfo ("https://weather.com") { UseShellExecute = true });
-						}
 					}
 					this.Hide ();
 				} catch {}
@@ -30672,7 +30403,10 @@ namespace MacStyleDock
 
 				stackPanel2.Children.Add (CreateFlipCard ("00", "SECONDS", out var secsGrid, out var secsText));
 
-				listPanel.Children.Add (grid);
+				if (countdownTimer != null) {
+					countdownTimer.Stop ();
+					countdownTimer = null;
+				}
 
 				countdownTimer = new DispatcherTimer (DispatcherPriority.Render) {
 
@@ -48149,6 +47883,7 @@ namespace MacStyleDock
 			}
 
 			OpenF1Weather openF1Weather = list.OrderByDescending ((OpenF1Weather w) => w.date).FirstOrDefault ();
+			if (openF1Weather == null) return;
 
 			Grid grid = new Grid {
 
@@ -49442,6 +49177,7 @@ namespace MacStyleDock
 			}
 
 			OpenF1CarData openF1CarData = list.OrderByDescending ((OpenF1CarData c) => c.date).FirstOrDefault ();
+			if (openF1CarData == null) return;
 
 			Grid grid = new Grid {
 
@@ -51734,6 +51470,7 @@ namespace MacStyleDock
 	{
 		private DockWindow parent;
 		private Border mainBorder;
+		private Border shadowBorder;
 		private Border innerGlowBorder;
 		private Grid notchGrid;
 		private StackPanel compactContent;
@@ -51747,6 +51484,8 @@ namespace MacStyleDock
 		private System.Windows.Controls.Button playPauseBtn;
 		private DispatcherTimer mediaTimer;
 		private System.Windows.Shapes.Rectangle[] spectrumBars;
+		private ScaleTransform[] barScaleTransforms;
+		private const double BAR_MAX_HEIGHT = 17.0;
 		private double[] currentBarHeights;
 		private double[] barVelocities;
 		private double[] barPhaseOffsets;
@@ -51791,7 +51530,28 @@ namespace MacStyleDock
 			// Outer container: centered, with room for shadow to breathe
 			Grid rootGrid = new Grid ();
 
-			// Main pill border — multi-layer glass
+			// Shadow layer — SEPARATE from animated content so shadow bitmap never recomputes
+			shadowBorder = new Border {
+				Width = 240.0,
+				Height = 38.0,
+				CornerRadius = new CornerRadius (19.0),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Top,
+				Margin = new Thickness (0, 10, 0, 0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (220, 0, 0, 0)),
+				Effect = new DropShadowEffect {
+					BlurRadius = 28.0,
+					ShadowDepth = 5.0,
+					Opacity = 0.55,
+					Color = Colors.Black,
+					Direction = 270
+				},
+				IsHitTestVisible = false
+			};
+			shadowBorder.CacheMode = new BitmapCache ();
+			rootGrid.Children.Add (shadowBorder);
+
+			// Main pill border — NO Effect here, children animate freely
 			mainBorder = new Border {
 				Width = 240.0,
 				Height = 38.0,
@@ -51812,13 +51572,6 @@ namespace MacStyleDock
 					new System.Windows.Point (0.5, 1)
 				),
 				BorderThickness = new Thickness (0.8),
-				Effect = new DropShadowEffect {
-					BlurRadius = 28.0,
-					ShadowDepth = 6.0,
-					Opacity = 0.6,
-					Color = Colors.Black,
-					Direction = 270
-				},
 				Cursor = System.Windows.Input.Cursors.Hand,
 				ClipToBounds = false
 			};
@@ -51906,10 +51659,12 @@ namespace MacStyleDock
 			};
 
 			spectrumBars = new System.Windows.Shapes.Rectangle[barCount];
+			barScaleTransforms = new ScaleTransform[barCount];
 			for (int b = 0; b < barCount; b++) {
+				barScaleTransforms[b] = new ScaleTransform (1.0, currentBarHeights[b] / BAR_MAX_HEIGHT);
 				spectrumBars[b] = new System.Windows.Shapes.Rectangle {
 					Width = 3.0,
-					Height = 3.0,
+					Height = BAR_MAX_HEIGHT,
 					Margin = new Thickness (1.2, 0, 1.2, 0),
 					Fill = new LinearGradientBrush (
 						System.Windows.Media.Color.FromRgb (30, 215, 96),
@@ -51919,7 +51674,9 @@ namespace MacStyleDock
 					),
 					RadiusX = 1.5,
 					RadiusY = 1.5,
-					VerticalAlignment = VerticalAlignment.Center
+					VerticalAlignment = VerticalAlignment.Center,
+					RenderTransform = barScaleTransforms[b],
+					RenderTransformOrigin = new System.Windows.Point (0.5, 0.5)
 				};
 				specPanel.Children.Add (spectrumBars[b]);
 			}
@@ -52022,6 +51779,7 @@ namespace MacStyleDock
 
 			rootGrid.Children.Add (mainBorder);
 			base.Content = rootGrid;
+			mainBorder.CacheMode = new BitmapCache ();
 
 			mainBorder.MouseLeftButtonDown += delegate { ToggleExpand (); };
 
@@ -52135,7 +51893,7 @@ namespace MacStyleDock
 				if (currentBarHeights[i] < 2.5) { currentBarHeights[i] = 2.5; barVelocities[i] = 0; }
 				if (currentBarHeights[i] > 17.0) { currentBarHeights[i] = 17.0; barVelocities[i] = 0; }
 
-				spectrumBars[i].Height = currentBarHeights[i];
+				barScaleTransforms[i].ScaleY = currentBarHeights[i] / BAR_MAX_HEIGHT;
 			}
 		}
 
@@ -52274,6 +52032,13 @@ namespace MacStyleDock
 			mainBorder.BeginAnimation (FrameworkElement.HeightProperty, animH);
 			mainBorder.CornerRadius = new CornerRadius (targetCorner);
 			innerGlowBorder.CornerRadius = new CornerRadius (targetCorner - 1);
+
+			// Keep shadow in sync
+			DoubleAnimation shadowW = new DoubleAnimation (targetW, dur) { EasingFunction = ease };
+			DoubleAnimation shadowH = new DoubleAnimation (targetH, dur) { EasingFunction = ease };
+			shadowBorder.BeginAnimation (FrameworkElement.WidthProperty, shadowW);
+			shadowBorder.BeginAnimation (FrameworkElement.HeightProperty, shadowH);
+			shadowBorder.CornerRadius = new CornerRadius (targetCorner);
 		}
 	}
 }

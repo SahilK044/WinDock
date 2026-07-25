@@ -7,7 +7,6 @@
              d:DesignHeight="400" d:DesignWidth="600"
              Loaded="UserControl_Loaded">
 
-
     <Grid Background="Transparent">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
@@ -16,27 +15,29 @@
 
         <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center">
             
-            <!-- Animated Checkmark -->
-            <Viewbox Width="60" Height="60" Margin="0,0,0,24">
-                <Path x:Name="CheckmarkPath" 
-                      Data="M 6,13 L 11,18 L 20,7" 
-                      Stroke="{DynamicResource PodiumGoldBrush}" 
-                      StrokeThickness="3" 
-                      StrokeEndLineCap="Round" 
-                      StrokeStartLineCap="Round" 
-                      StrokeLineJoin="Round"
-                      RenderTransformOrigin="0.5,0.5">
-                    <Path.RenderTransform>
-                        <ScaleTransform x:Name="CheckmarkScale" ScaleX="1.0" ScaleY="1.0" />
-                    </Path.RenderTransform>
-                </Path>
-            </Viewbox>
+            <!-- Checkmark Icon in glowing circle -->
+            <Border Width="64" Height="64" CornerRadius="32" Background="#1A10B981" BorderBrush="#3310B981" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,24">
+                <Viewbox Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Path x:Name="CheckmarkPath" 
+                          Data="M 5,13 L 10,18 L 20,7" 
+                          Stroke="{DynamicResource TelemetryCyanBrush}" 
+                          StrokeThickness="2.5" 
+                          StrokeEndLineCap="Round" 
+                          StrokeStartLineCap="Round" 
+                          StrokeLineJoin="Round"
+                          RenderTransformOrigin="0.5,0.5">
+                        <Path.RenderTransform>
+                            <ScaleTransform x:Name="CheckmarkScale" ScaleX="1.0" ScaleY="1.0" />
+                        </Path.RenderTransform>
+                    </Path>
+                </Viewbox>
+            </Border>
 
             <!-- Title -->
             <TextBlock x:Name="TitleText"
-                       Text="WinDock installed" 
+                       Text="WinDock is Ready" 
                        FontFamily="{DynamicResource DisplayFontFamily}" 
-                       FontSize="22" 
+                       FontSize="24" FontWeight="Bold"
                        Foreground="{DynamicResource FogWhiteBrush}" 
                        HorizontalAlignment="Center" 
                        Margin="0,0,0,8"
@@ -44,9 +45,9 @@
 
             <!-- Subtitle -->
             <TextBlock x:Name="SubtitleText"
-                       Text="Your dock is ready to launch." 
+                       Text="Installation completed successfully." 
                        FontFamily="{DynamicResource BodyFontFamily}" 
-                       FontSize="13" 
+                       FontSize="14" 
                        Foreground="{DynamicResource FogWhite70Brush}" 
                        HorizontalAlignment="Center" 
                        Margin="0,0,0,24"
@@ -62,13 +63,13 @@
         </StackPanel>
 
         <!-- Bottom Button Row -->
-        <Border Grid.Row="1" Margin="24">
+        <Grid Grid.Row="1" Margin="12,0,12,0">
             <Button x:Name="FinishButton" 
-                    Content="Finish" 
+                    Content="Launch &amp; Finish" 
                     Style="{StaticResource PrimaryButtonStyle}" 
                     HorizontalAlignment="Right" 
                     Click="FinishButton_Click"
                     Opacity="0" />
-        </Border>
+        </Grid>
     </Grid>
 </UserControl>

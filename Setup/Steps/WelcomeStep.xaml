@@ -18,7 +18,7 @@
         </Grid.RowDefinitions>
 
         <!-- Logo -->
-        <Image x:Name="LogoImage" Grid.Row="1" Source="/windock_logo.png" Width="72" Height="72" HorizontalAlignment="Center" Margin="0,0,0,24" Opacity="0" RenderTransformOrigin="0.5,0.5">
+        <Image x:Name="LogoImage" Grid.Row="1" Source="/windock_logo.png" Width="68" Height="68" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0" RenderTransformOrigin="0.5,0.5">
             <Image.RenderTransform>
                 <ScaleTransform x:Name="LogoScale" ScaleX="0.96" ScaleY="0.96"/>
             </Image.RenderTransform>
@@ -26,18 +26,18 @@
 
         <!-- Title -->
         <TextBlock x:Name="TitleText" Grid.Row="2" Text="Welcome to WinDock" 
-                   FontFamily="{StaticResource DisplayFontFamily}" FontSize="26" 
+                   FontFamily="{StaticResource DisplayFontFamily}" FontSize="28" FontWeight="Bold"
                    Foreground="{StaticResource FogWhiteBrush}" 
                    HorizontalAlignment="Center" Margin="0,0,0,8" Opacity="0"/>
 
         <!-- Subtitle -->
-        <TextBlock x:Name="SubtitleText" Grid.Row="3" Text="A macOS-style dock for Windows." 
+        <TextBlock x:Name="SubtitleText" Grid.Row="3" Text="A macOS-style dock &amp; Dynamic Island for Windows." 
                    FontFamily="{StaticResource BodyFontFamily}" FontSize="14" 
                    Foreground="{StaticResource FogWhite70Brush}" 
                    HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Opacity="0"/>
 
-        <!-- High-tech telemetry spec card -->
-        <Border x:Name="SpecPanel" Grid.Row="4" Background="{StaticResource FrostPanelBackgroundBrush}" BorderBrush="{StaticResource FrostPanelBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16,14" VerticalAlignment="Center" Margin="24,0,24,0" Opacity="0">
+        <!-- High-tech spec card -->
+        <Border x:Name="SpecPanel" Grid.Row="4" Background="{StaticResource FrostPanelBackgroundBrush}" BorderBrush="{StaticResource FrostPanelBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20,16" VerticalAlignment="Center" Margin="28,0,28,0" Opacity="0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -48,22 +48,22 @@
                 </Grid.ColumnDefinitions>
                 
                 <StackPanel Grid.Column="0" HorizontalAlignment="Center">
-                    <TextBlock Text="PERFORMANCE" FontFamily="{StaticResource MonoFontFamily}" FontSize="8.5" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="60FPS GPU" FontFamily="{StaticResource BodyFontFamily}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TelemetryCyanBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="PERFORMANCE" FontFamily="{StaticResource MonoFontFamily}" FontSize="9" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="60 FPS GPU" FontFamily="{StaticResource BodyFontFamily}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TelemetryCyanBrush}" HorizontalAlignment="Center"/>
                 </StackPanel>
                 
                 <Border Grid.Column="1" Background="{StaticResource FrostPanelBorderBrush}" Margin="0,2"/>
                 
                 <StackPanel Grid.Column="2" HorizontalAlignment="Center">
-                    <TextBlock Text="MEMORY" FontFamily="{StaticResource MonoFontFamily}" FontSize="8.5" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="&lt;15MB RAM" FontFamily="{StaticResource BodyFontFamily}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource FogWhiteBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="MEMORY" FontFamily="{StaticResource MonoFontFamily}" FontSize="9" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="&lt;15MB RAM" FontFamily="{StaticResource BodyFontFamily}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource FogWhiteBrush}" HorizontalAlignment="Center"/>
                 </StackPanel>
                 
                 <Border Grid.Column="3" Background="{StaticResource FrostPanelBorderBrush}" Margin="0,2"/>
                 
                 <StackPanel Grid.Column="4" HorizontalAlignment="Center">
-                    <TextBlock Text="INTEGRATION" FontFamily="{StaticResource MonoFontFamily}" FontSize="8.5" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="NATIVE DWM" FontFamily="{StaticResource BodyFontFamily}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource FogWhiteBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="DYNAMIC ISLAND" FontFamily="{StaticResource MonoFontFamily}" FontSize="9" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="UNIVERSAL MEDIA" FontFamily="{StaticResource BodyFontFamily}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource FogWhiteBrush}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -78,7 +78,7 @@
                   Visibility="Collapsed"/>
 
         <!-- Buttons Area -->
-        <Grid x:Name="ButtonsPanel" Grid.Row="5" Margin="0,32,0,0" Opacity="0">
+        <Grid x:Name="ButtonsPanel" Grid.Row="5" Margin="0,24,0,0" Opacity="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -87,7 +87,7 @@
             
             <Button x:Name="CancelBtn" Grid.Column="0" Style="{StaticResource GhostButtonStyle}" Content="Cancel" Click="CancelBtn_Click"/>
             
-            <TextBlock Grid.Column="1" Text="v1.0" FontFamily="{StaticResource MonoFontFamily}" FontSize="10" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="v2.0" FontFamily="{StaticResource MonoFontFamily}" FontSize="10" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
             <Button x:Name="ContinueBtn" Grid.Column="2" Style="{StaticResource PrimaryButtonStyle}" Content="Continue →" Click="ContinueBtn_Click"/>
         </Grid>

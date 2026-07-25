@@ -293,19 +293,28 @@ namespace WinDockSetup.Steps
         {
             Assembly asm = Assembly.GetExecutingAssembly();
             string[] names = asm.GetManifestResourceNames();
-            string resourceName = names.FirstOrDefault(n => n.EndsWith(".app_payload.zip"));
+            List<string> payloadParts = names.Where(n => n.Contains("app_payload")).OrderBy(n => n).ToList();
             
-            if (string.IsNullOrEmpty(resourceName))
+            if (payloadParts.Count == 0)
             {
-                Log("Warning: app_payload.zip not found in embedded resources.");
+                Log("Warning: app_payload resources not found in embedded resources.");
                 return;
             }
 
-            using (Stream stream = asm.GetManifestResourceStream(resourceName))
+            using (MemoryStream ms = new MemoryStream())
             {
-                if (stream == null) return;
-                
-                using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Read))
+                foreach (string partName in payloadParts)
+                {
+                    using (Stream partStream = asm.GetManifestResourceStream(partName))
+                    {
+                        if (partStream != null)
+                        {
+                            await partStream.CopyToAsync(ms);
+                        }
+                    }
+                }
+                ms.Position = 0;
+                using (ZipArchive archive = new ZipArchive(ms, ZipArchiveMode.Read))
                 {
                     int total = archive.Entries.Count;
                     int current = 0;

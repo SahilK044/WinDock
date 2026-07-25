@@ -2,70 +2,53 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ═══════════════════════════════════════════════════════════════
-         DESIGN TOKENS  ·  WinDock Setup
-         All colours, brushes, typography, radii, and control styles.
+         DESIGN TOKENS  ·  WinDock Minimalist Setup
          ═══════════════════════════════════════════════════════════════ -->
 
-    <!-- ── Brush Tokens ─────────────────────────────────────────────── -->
+    <!-- Base Brushes -->
+    <SolidColorBrush x:Key="GraphiteVoidBrush"          Color="#090A0F"/>
+    <SolidColorBrush x:Key="FrostPanelBackgroundBrush"  Color="#12151C"/>
+    <SolidColorBrush x:Key="FrostPanelBorderBrush"      Color="#1F2530"/>
 
-    <!-- Base window background — Graphite Void -->
-    <SolidColorBrush x:Key="GraphiteVoidBrush"          Color="#0D0F12"/>
+    <!-- Accent Color: Emerald Glow -->
+    <SolidColorBrush x:Key="TelemetryCyanBrush"         Color="#10B981"/>
+    <SolidColorBrush x:Key="TelemetryCyan26Brush"       Color="#2610B981"/>
+    <SolidColorBrush x:Key="PodiumGoldBrush"            Color="#F59E0B"/>
+    <SolidColorBrush x:Key="SignalRedBrush"             Color="#EF4444"/>
 
-    <!-- Frost-glass panel -->
-    <SolidColorBrush x:Key="FrostPanelBackgroundBrush"  Color="#0Dffffff"/>
-    <SolidColorBrush x:Key="FrostPanelBorderBrush"      Color="#17ffffff"/>
+    <!-- Text Hierarchy -->
+    <SolidColorBrush x:Key="FogWhiteBrush"              Color="#F9FAFB"/>
+    <SolidColorBrush x:Key="FogWhite70Brush"            Color="#9CA3AF"/>
+    <SolidColorBrush x:Key="FogWhite45Brush"            Color="#6B7280"/>
 
-    <!-- Primary accent — Telemetry Cyan -->
-    <SolidColorBrush x:Key="TelemetryCyanBrush"         Color="#35D6C7"/>
-    <SolidColorBrush x:Key="TelemetryCyan26Brush"       Color="#2635D6C7"/>
+    <!-- Overlays -->
+    <SolidColorBrush x:Key="HoverOverlayBrush"          Color="#1AFFFFFF"/>
+    <SolidColorBrush x:Key="PressOverlayBrush"          Color="#26FFFFFF"/>
 
-    <!-- Success / finish — Podium Gold -->
-    <SolidColorBrush x:Key="PodiumGoldBrush"            Color="#E8B84B"/>
+    <!-- Colors -->
+    <Color x:Key="TelemetryCyanColor">#10B981</Color>
+    <Color x:Key="PodiumGoldColor">#F59E0B</Color>
+    <Color x:Key="SignalRedColor">#EF4444</Color>
+    <Color x:Key="GraphiteVoidColor">#090A0F</Color>
+    <Color x:Key="FogWhiteColor">#F9FAFB</Color>
+    <Color x:Key="FrostPanelBgColor">#12151C</Color>
+    <Color x:Key="StepDotInactiveColor">#26FFFFFF</Color>
 
-    <!-- Cancel / errors — Signal Red -->
-    <SolidColorBrush x:Key="SignalRedBrush"             Color="#E3483D"/>
+    <!-- Typography -->
+    <FontFamily x:Key="DisplayFontFamily">Segoe UI Variable Display, Segoe UI, sans-serif</FontFamily>
+    <FontFamily x:Key="BodyFontFamily">Segoe UI Variable Text, Segoe UI, sans-serif</FontFamily>
+    <FontFamily x:Key="MonoFontFamily">Consolas, monospace</FontFamily>
 
-    <!-- Text hierarchy — Fog White at 100 / 70 / 45% -->
-    <SolidColorBrush x:Key="FogWhiteBrush"              Color="#EDEFF2"/>
-    <SolidColorBrush x:Key="FogWhite70Brush"            Color="#B3B6BA"/>
-    <SolidColorBrush x:Key="FogWhite45Brush"            Color="#6B6E73"/>
-
-    <!-- Hover overlays -->
-    <SolidColorBrush x:Key="HoverOverlayBrush"          Color="#1Affffff"/>
-    <SolidColorBrush x:Key="PressOverlayBrush"          Color="#26ffffff"/>
-
-    <!-- ── Color Tokens (for ColorAnimation.To) ──────────────────── -->
-
-    <Color x:Key="TelemetryCyanColor">#35D6C7</Color>
-    <Color x:Key="PodiumGoldColor">#E8B84B</Color>
-    <Color x:Key="SignalRedColor">#E3483D</Color>
-    <Color x:Key="GraphiteVoidColor">#0D0F12</Color>
-    <Color x:Key="FogWhiteColor">#EDEFF2</Color>
-    <Color x:Key="FrostPanelBgColor">#0Dffffff</Color>
-    <Color x:Key="StepDotInactiveColor">#26ffffff</Color>
-
-    <!-- ── Typography ───────────────────────────────────────────────── -->
-
-    <FontFamily x:Key="DisplayFontFamily">Titillium Web, Segoe UI</FontFamily>
-    <FontFamily x:Key="BodyFontFamily">Segoe UI Variable Display, Segoe UI</FontFamily>
-    <FontFamily x:Key="MonoFontFamily">JetBrains Mono, Consolas</FontFamily>
-
-    <!-- ── Corner Radii ─────────────────────────────────────────────── -->
-
-    <CornerRadius x:Key="WindowCornerRadius">12</CornerRadius>
-    <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
-    <CornerRadius x:Key="ButtonCornerRadius">6</CornerRadius>
-    <CornerRadius x:Key="ToggleCornerRadius">10</CornerRadius>
-    <CornerRadius x:Key="InputCornerRadius">6</CornerRadius>
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         CONTROL STYLES
-         ═══════════════════════════════════════════════════════════════ -->
+    <!-- Radii -->
+    <CornerRadius x:Key="WindowCornerRadius">16</CornerRadius>
+    <CornerRadius x:Key="CardCornerRadius">12</CornerRadius>
+    <CornerRadius x:Key="ButtonCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="InputCornerRadius">8</CornerRadius>
 
     <!-- ── Primary Action Button ──────────────────────────────────── -->
     <Style x:Key="PrimaryButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource TelemetryCyanBrush}"/>
-        <Setter Property="Foreground" Value="#0D0F12"/>
+        <Setter Property="Foreground" Value="#090A0F"/>
         <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}"/>
         <Setter Property="FontSize" Value="13.5"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -90,62 +73,26 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#059669"/>
                             <Trigger.EnterActions>
                                 <BeginStoryboard>
                                     <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                         To="1.03" Duration="0:0:0.120">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                         To="1.03" Duration="0:0:0.120">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.02" Duration="0:0:0.1"/>
+                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.02" Duration="0:0:0.1"/>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </Trigger.EnterActions>
                             <Trigger.ExitActions>
                                 <BeginStoryboard>
                                     <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                         To="1.0" Duration="0:0:0.120">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                         To="1.0" Duration="0:0:0.120">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.0" Duration="0:0:0.1"/>
+                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.0" Duration="0:0:0.1"/>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Trigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX"
-                                                         To="0.97" Duration="0:0:0.080">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                                         To="0.97" Duration="0:0:0.080">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
+                            <Setter TargetName="Bd" Property="Background" Value="#047857"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4"/>
@@ -159,23 +106,19 @@
     <!-- ── Ghost / Secondary Button ───────────────────────────────── -->
     <Style x:Key="GhostButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Foreground" Value="{StaticResource FogWhite45Brush}"/>
+        <Setter Property="Foreground" Value="{StaticResource FogWhite70Brush}"/>
         <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}"/>
         <Setter Property="FontSize" Value="13"/>
-        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="Padding" Value="18,10"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-        <Setter Property="RenderTransform">
-            <Setter.Value>
-                <ScaleTransform ScaleX="1" ScaleY="1"/>
-            </Setter.Value>
-        </Setter>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Bd"
                             Background="{TemplateBinding Background}"
                             CornerRadius="{StaticResource ButtonCornerRadius}"
+                            BorderThickness="1"
+                            BorderBrush="{StaticResource FrostPanelBorderBrush}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center"
@@ -184,7 +127,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverOverlayBrush}"/>
-                            <Setter Property="Foreground" Value="{StaticResource FogWhite70Brush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource FogWhiteBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource PressOverlayBrush}"/>
@@ -204,9 +147,9 @@
         <Setter Property="Foreground" Value="{StaticResource FogWhiteBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource FrostPanelBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="FontFamily" Value="{StaticResource MonoFontFamily}"/>
-        <Setter Property="FontSize" Value="12.5"/>
-        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="12,10"/>
         <Setter Property="CaretBrush" Value="{StaticResource TelemetryCyanBrush}"/>
         <Setter Property="SelectionBrush" Value="{StaticResource TelemetryCyanBrush}"/>
         <Setter Property="Template">
@@ -217,8 +160,7 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{StaticResource InputCornerRadius}"
                             SnapsToDevicePixels="True">
-                        <ScrollViewer x:Name="PART_ContentHost"
-                                      Margin="{TemplateBinding Padding}"/>
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsFocused" Value="True">
@@ -230,7 +172,7 @@
         </Setter>
     </Style>
 
-    <!-- ── Custom CheckBox (Finish step) ──────────────────────────── -->
+    <!-- ── Custom CheckBox ──────────────────────────────────── -->
     <Style x:Key="CyanCheckBoxStyle" TargetType="CheckBox">
         <Setter Property="Foreground" Value="{StaticResource FogWhiteBrush}"/>
         <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}"/>
@@ -241,15 +183,15 @@
                 <ControlTemplate TargetType="CheckBox">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Border x:Name="Box"
-                                Width="18" Height="18"
-                                CornerRadius="4"
+                                Width="20" Height="20"
+                                CornerRadius="5"
                                 BorderThickness="1.5"
                                 BorderBrush="{StaticResource FrostPanelBorderBrush}"
                                 Background="Transparent"
                                 VerticalAlignment="Center"
                                 Margin="0,0,10,0">
                             <Path x:Name="Check"
-                                  Data="M 3,9 L 7,13 L 14,5"
+                                  Data="M 4,10 L 8,14 L 15,6"
                                   Stroke="{StaticResource GraphiteVoidBrush}"
                                   StrokeThickness="2"
                                   StrokeLineJoin="Round"
@@ -268,7 +210,7 @@
                             <Setter TargetName="Check" Property="Opacity" Value="1"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource FogWhite45Brush}"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource FogWhite70Brush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

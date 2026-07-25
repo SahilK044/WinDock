@@ -29,6 +29,10 @@ ilspy7.zip
 # Installer packaging content
 PackageContent/
 app_payload.zip
+app_payload_part*.dat
+hist_test*.db
+RemoveWindowsAI/
+WeatherApp/
 
 # Flag assets (not used)
 flags/

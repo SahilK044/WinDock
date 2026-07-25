@@ -103,6 +103,12 @@ WinDock/
 
 ---
 
+## 🙏 Credits & Acknowledgments
+
+- **Dynamic Island**: Special thanks to **[Ripple](https://github.com/TopMyster/Ripple)** by TopMyster for inspiring and providing the foundation for the Dynamic Island widget experience.
+
+---
+
 ## 📄 License
 
 This project is licensed under the MIT License.

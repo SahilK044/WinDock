@@ -5,43 +5,43 @@
         AllowsTransparency="True"
         Background="Transparent"
         Height="520"
-        Width="620"
+        Width="640"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize">
 
-    <Border CornerRadius="12"
+    <Border CornerRadius="16"
             BorderThickness="1"
             Margin="12">
         <Border.Background>
             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="#CC0A0C0E" Offset="0"/>
-                <GradientStop Color="#E6050608" Offset="1"/>
+                <GradientStop Color="#F2090A0F" Offset="0"/>
+                <GradientStop Color="#FA06070B" Offset="1"/>
             </LinearGradientBrush>
         </Border.Background>
         <Border.BorderBrush>
             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Color="#30FFFFFF" Offset="0"/>
-                <GradientStop Color="#10FFFFFF" Offset="0.5"/>
-                <GradientStop Color="#1A35D6C7" Offset="1"/>
+                <GradientStop Color="#25FFFFFF" Offset="0"/>
+                <GradientStop Color="#0DFFFFFF" Offset="0.5"/>
+                <GradientStop Color="#1A10B981" Offset="1"/>
             </LinearGradientBrush>
         </Border.BorderBrush>
         <Border.Effect>
-            <DropShadowEffect BlurRadius="28" ShadowDepth="3" Opacity="0.6" Color="Black"/>
+            <DropShadowEffect BlurRadius="32" ShadowDepth="4" Opacity="0.55" Color="Black"/>
         </Border.Effect>
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="36"/>
+                <RowDefinition Height="40"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Row 0 — Title Bar -->
-            <Grid Grid.Row="0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Background="#05FFFFFF">
+            <!-- Row 0 — Minimalist Title Bar -->
+            <Grid Grid.Row="0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Background="#03FFFFFF">
                 <!-- Centered Title -->
-                <TextBlock Text="W I N D O C K   S E T U P" 
+                <TextBlock Text="WinDock Setup" 
                            FontFamily="{StaticResource DisplayFontFamily}" 
-                           FontSize="10" 
-                           FontWeight="Bold"
+                           FontSize="11" 
+                           FontWeight="SemiBold"
                            Foreground="{StaticResource FogWhite45Brush}"
                            HorizontalAlignment="Center" 
                            VerticalAlignment="Center"/>
@@ -50,23 +50,21 @@
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
-                            Margin="0,0,8,0">
+                            Margin="0,0,10,0">
                     <!-- Minimize -->
                     <Button x:Name="MinBtn" Click="MinBtn_Click"
-                            Width="30" Height="30"
+                            Width="28" Height="28"
                             Foreground="{StaticResource FogWhite45Brush}"
-                            FontSize="14"
+                            FontSize="13"
                             Content="–">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
-                                <Border x:Name="Bd" Background="Transparent"
-                                        CornerRadius="4">
-                                    <ContentPresenter HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"/>
+                                <Border x:Name="Bd" Background="Transparent" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#1Affffff"/>
+                                        <Setter TargetName="Bd" Property="Background" Value="#1AFFFFFF"/>
                                         <Setter Property="Foreground" Value="{StaticResource FogWhiteBrush}"/>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
@@ -75,21 +73,18 @@
                     </Button>
                     <!-- Close -->
                     <Button x:Name="CloseBtn" Click="CloseBtn_Click"
-                            Width="30" Height="30"
+                            Width="28" Height="28"
                             Foreground="{StaticResource FogWhite45Brush}"
                             FontSize="11"
                             Content="✕">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
-                                <Border x:Name="Bd" Background="Transparent"
-                                        CornerRadius="4">
-                                    <ContentPresenter HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,1,0,0"/>
+                                <Border x:Name="Bd" Background="Transparent" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#E3483D"/>
+                                        <Setter TargetName="Bd" Property="Background" Value="#EF4444"/>
                                         <Setter Property="Foreground" Value="White"/>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
@@ -110,17 +105,17 @@
                 <StackPanel x:Name="StepDotsPanel" Grid.Row="0"
                             Orientation="Horizontal"
                             HorizontalAlignment="Center"
-                            Margin="0,12,0,0">
-                    <Ellipse x:Name="StepDot1" Width="6" Height="6" Fill="{StaticResource TelemetryCyanBrush}"  Margin="0,0,8,0"/>
-                    <Ellipse x:Name="StepDot2" Width="6" Height="6" Fill="#26ffffff" Margin="0,0,8,0"/>
-                    <Ellipse x:Name="StepDot3" Width="6" Height="6" Fill="#26ffffff" Margin="0,0,8,0"/>
-                    <Ellipse x:Name="StepDot4" Width="6" Height="6" Fill="#26ffffff" Margin="0,0,8,0"/>
+                            Margin="0,10,0,0">
+                    <Ellipse x:Name="StepDot1" Width="7" Height="7" Fill="{StaticResource TelemetryCyanBrush}"  Margin="0,0,8,0"/>
+                    <Ellipse x:Name="StepDot2" Width="7" Height="7" Fill="#26FFFFFF" Margin="0,0,8,0"/>
+                    <Ellipse x:Name="StepDot3" Width="7" Height="7" Fill="#26FFFFFF" Margin="0,0,8,0"/>
+                    <Ellipse x:Name="StepDot4" Width="7" Height="7" Fill="#26FFFFFF" Margin="0,0,8,0"/>
                 </StackPanel>
 
                 <!-- Step content host -->
                 <ContentControl x:Name="StepHost"
                                 Grid.Row="1"
-                                Margin="40,24,40,24"/>
+                                Margin="44,20,44,24"/>
             </Grid>
         </Grid>
     </Border>

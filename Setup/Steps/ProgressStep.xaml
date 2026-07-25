@@ -19,16 +19,16 @@
         </Storyboard>
     </UserControl.Resources>
 
-    <Grid Margin="0,10,0,0">
+    <Grid Margin="12,0,12,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Row 0: Header (Title & Status stacked) -->
+            <RowDefinition Height="Auto"/> <!-- Row 0: Header -->
             <RowDefinition Height="Auto"/> <!-- Row 1: Glowing Progress Bar Card -->
-            <RowDefinition Height="*"/>    <!-- Row 2: Terminal Console Log -->
-            <RowDefinition Height="Auto"/> <!-- Row 3: Action Buttons -->
+            <RowDefinition Height="*"/>    <!-- Row 2: Console Log -->
+            <RowDefinition Height="Auto"/> <!-- Row 3: Buttons -->
         </Grid.RowDefinitions>
 
-        <!-- Row 0: Step Header Stack (prevents text overlap) -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,24">
+        <!-- Row 0: Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
             <TextBlock x:Name="TitleText"
                        Text="Installing WinDock"
                        FontFamily="{StaticResource DisplayFontFamily}"
@@ -44,14 +44,14 @@
                        Foreground="{StaticResource FogWhite70Brush}"/>
         </StackPanel>
 
-        <!-- Row 1: Glowing Progress Bar Card -->
+        <!-- Row 1: Progress Card -->
         <Border Grid.Row="1"
                 Background="{StaticResource FrostPanelBackgroundBrush}"
                 BorderBrush="{StaticResource FrostPanelBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="8"
-                Padding="16,14"
-                Margin="0,0,0,20">
+                CornerRadius="12"
+                Padding="18,16"
+                Margin="0,0,0,16">
             <StackPanel>
                 <Grid Margin="0,0,0,10">
                     <TextBlock Text="INSTALLATION PROGRESS"
@@ -64,7 +64,7 @@
                     <TextBlock x:Name="PercentText"
                                Text="0%"
                                FontFamily="{StaticResource MonoFontFamily}"
-                               FontSize="11"
+                               FontSize="12"
                                FontWeight="Bold"
                                Foreground="{StaticResource TelemetryCyanBrush}"
                                HorizontalAlignment="Right"
@@ -90,13 +90,13 @@
             </StackPanel>
         </Border>
 
-        <!-- Row 2: Terminal Console Log -->
+        <!-- Row 2: Console Log -->
         <Border Grid.Row="2"
-                Background="#0A000000"
+                Background="#08FFFFFF"
                 BorderBrush="{StaticResource FrostPanelBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="8"
-                Padding="14,12"
+                CornerRadius="12"
+                Padding="16,14"
                 Margin="0,0,0,16">
             <ScrollViewer x:Name="LogScrollViewer" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                 <TextBlock x:Name="LogText"
@@ -108,8 +108,8 @@
             </ScrollViewer>
         </Border>
 
-        <!-- Row 3: Action Buttons Row -->
-        <Grid Grid.Row="3" Margin="0,4,0,0">
+        <!-- Row 3: Action Buttons -->
+        <Grid Grid.Row="3" Margin="0,0,0,0">
             <Button x:Name="CancelBtn"
                     Content="Cancel"
                     Style="{StaticResource GhostButtonStyle}"

@@ -1,5 +1,4 @@
 {
-
   "AccentColor": null,
   "AmbientWallpaperTint": true,
   "AnimationSpeedValue": 3,
@@ -95,7 +94,6 @@
   ],
   "MaxSize": 82,
   "MonitorIndex": 0,
-
   "PerformanceMode": false,
   "Position": "Bottom",
   "Range": 160,
@@ -115,5 +113,6 @@
   "Theme": "dark",
   "VoiceRecognitionCulture": "en-IN,en-US",
   "WeatherLocation": "Auto",
-  "WeatherUnit": "celsius"
+  "WeatherUnit": "celsius",
+  "EnableF1Widget": true
 }

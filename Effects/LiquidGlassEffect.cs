@@ -23,6 +23,14 @@ namespace MacStyleDock
             ShaderRenderMode = ShaderRenderMode.HardwareOnly
         };
 
+        static LiquidGlassEffect()
+        {
+            PixelShader.InvalidPixelShaderEncountered += (sender, args) => {
+                // Silently handle invalid pixel shaders to prevent crashes on incompatible hardware
+            };
+        }
+
+
         public LiquidGlassEffect()
         {
             PixelShader = _pixelShader;
