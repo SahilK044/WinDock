@@ -168,7 +168,6 @@ implementation_plan.md
 # =============================================
 # ALWAYS KEEP these project files
 # =============================================
-!config.json
 !config.example.json
 !MacSettings.txt
 !LICENSE
