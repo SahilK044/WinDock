@@ -6747,7 +6747,21 @@ namespace MacStyleDock
 				CreateItemContextMenu (itemControl);
 
 				if (config.FilePath == "action:weather") {
-					// Standalone WeatherOS app handles weather interaction
+
+					DockItemControl closureItemWeather = itemControl;
+
+					itemControl.MouseEnter += delegate {
+
+						ShowWeatherOverlay (closureItemWeather);
+
+					};
+
+					itemControl.MouseLeave += delegate {
+
+						StartHideWeatherOverlay ();
+
+					};
+
 				} else if (config.FilePath == "action:f1") {
 
 					DockItemControl closureItem2 = itemControl;
