@@ -14912,13 +14912,10 @@ namespace MacStyleDock
 
 			if (Config != null && (Config.FilePath == "action:airdrop" || Config.FilePath == "action:phonelink")) {
 				try {
-					Process.Start (new ProcessStartInfo ("ms-phone-link:") { UseShellExecute = true });
-				} catch {
-					try {
-						Process.Start (new ProcessStartInfo ("https://www.microsoft.com/p/phone-link/9nmpj99vjbwv") { UseShellExecute = true });
-					} catch (Exception ex) {
-						System.Windows.MessageBox.Show ("Could not open Phone Link: " + ex.Message, "Launch Error", MessageBoxButton.OK, MessageBoxImage.Hand);
-					}
+					AirDropWindow adw = new AirDropWindow ();
+					adw.Show ();
+				} catch (Exception ex) {
+					System.Windows.MessageBox.Show ("Could not open AirDrop: " + ex.Message, "AirDrop Error", MessageBoxButton.OK, MessageBoxImage.Hand);
 				}
 				return;
 			}
@@ -52061,8 +52058,15 @@ namespace MacStyleDock
 							string rawTitle = parent.bgSpotifyTrackKey;
 							bool isPlaying = parent.bgSpotifyIsPlaying;
 
+							float livePeak = audioMeter != null ? audioMeter.GetAudioPeak () : 0f;
+							bool hasAudioSound = livePeak > 0.012f;
+
 							if (string.IsNullOrEmpty (rawTitle) || !isPlaying || rawTitle == "Spotify" || rawTitle == "Spotify Premium" || rawTitle == "Spotify Free") {
-								SetMediaState (false, "", "");
+								if (hasAudioSound) {
+									SetMediaState (true, "System Audio", "Playing Media");
+								} else {
+									SetMediaState (false, "", "");
+								}
 								return;
 							}
 
@@ -52351,6 +52355,151 @@ namespace MacStyleDock
 				}
 			}
 			return heights;
+		}
+	}
+
+	public class AirDropWindow : Window
+	{
+		public AirDropWindow ()
+		{
+			base.WindowStyle = WindowStyle.None;
+			base.AllowsTransparency = true;
+			base.Background = System.Windows.Media.Brushes.Transparent;
+			base.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+			base.Topmost = true;
+			base.Title = "AirDrop & Phone Link";
+			base.Width = 420.0;
+			base.Height = 360.0;
+
+			Border card = new Border {
+				CornerRadius = new CornerRadius (24.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (245, 20, 20, 26)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (45, 255, 255, 255)),
+				BorderThickness = new Thickness (1),
+				Effect = new System.Windows.Media.Effects.DropShadowEffect {
+					BlurRadius = 35, ShadowDepth = 10, Opacity = 0.45, Color = System.Windows.Media.Colors.Black
+				}
+			};
+
+			Grid root = new Grid { Margin = new Thickness (24) };
+			root.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto });
+			root.RowDefinitions.Add (new RowDefinition { Height = new GridLength (1.0, GridUnitType.Star) });
+			root.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto });
+
+			StackPanel headSp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+			TextBlock iconT = new TextBlock {
+				Text = "\uE709",
+				FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
+				FontSize = 20, Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
+				VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness (0, 0, 10, 0)
+			};
+			TextBlock titleT = new TextBlock {
+				Text = "AirDrop & Phone Link",
+				FontSize = 18, FontWeight = FontWeights.Bold, Foreground = System.Windows.Media.Brushes.White,
+				VerticalAlignment = VerticalAlignment.Center
+			};
+			headSp.Children.Add (iconT);
+			headSp.Children.Add (titleT);
+
+			System.Windows.Controls.Button closeBtn = new System.Windows.Controls.Button {
+				Content = "✕", Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 255, 255, 255)),
+				Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness (0),
+				FontSize = 14, Cursor = System.Windows.Input.Cursors.Hand, HorizontalAlignment = System.Windows.HorizontalAlignment.Right
+			};
+			closeBtn.Click += (s, e) => base.Close ();
+
+			Grid headGrid = new Grid ();
+			headGrid.Children.Add (headSp);
+			headGrid.Children.Add (closeBtn);
+			Grid.SetRow (headGrid, 0);
+			root.Children.Add (headGrid);
+
+			Border dropZone = new Border {
+				CornerRadius = new CornerRadius (16),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 255, 255, 255)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (70, 0, 122, 255)),
+				BorderThickness = new Thickness (1.5),
+				Margin = new Thickness (0, 18, 0, 18),
+				AllowDrop = true
+			};
+			StackPanel dzSp = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = System.Windows.HorizontalAlignment.Center };
+			TextBlock dzIcon = new TextBlock {
+				Text = "\uE898", FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
+				FontSize = 36, Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center, Margin = new Thickness (0, 0, 0, 8)
+			};
+			TextBlock dzText = new TextBlock {
+				Text = "Drop files here to share with Phone / Mac",
+				FontSize = 13.5, FontWeight = FontWeights.Medium, Foreground = System.Windows.Media.Brushes.White,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+			};
+			TextBlock dzSub = new TextBlock {
+				Text = "Nearby Devices: iPhone / Android Connected",
+				FontSize = 11, Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (140, 255, 255, 255)),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center, Margin = new Thickness (0, 4, 0, 0)
+			};
+			dzSp.Children.Add (dzIcon);
+			dzSp.Children.Add (dzText);
+			dzSp.Children.Add (dzSub);
+			dropZone.Child = dzSp;
+
+			dropZone.Drop += (s, e) => {
+				if (e.Data.GetDataPresent (System.Windows.DataFormats.FileDrop)) {
+					string[] files = (string[])e.Data.GetData (System.Windows.DataFormats.FileDrop);
+					if (files != null && files.Length > 0) {
+						dzText.Text = $"Sending {files.Length} file(s)...";
+						dzSub.Text = System.IO.Path.GetFileName (files[0]);
+					}
+				}
+			};
+
+			Grid.SetRow (dropZone, 1);
+			root.Children.Add (dropZone);
+
+			StackPanel btnSp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
+
+			System.Windows.Controls.Button crossDevBtn = new System.Windows.Controls.Button {
+				Content = "Device Settings",
+				Padding = new Thickness (14, 8, 14, 8),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (40, 255, 255, 255)),
+				Foreground = System.Windows.Media.Brushes.White,
+				BorderThickness = new Thickness (0),
+				Cursor = System.Windows.Input.Cursors.Hand,
+				Margin = new Thickness (0, 0, 10, 0)
+			};
+			crossDevBtn.Click += (s, e) => {
+				try {
+					Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true });
+				} catch {
+					try { Process.Start (new ProcessStartInfo ("ms-settings:bluetooth") { UseShellExecute = true }); } catch { }
+				}
+			};
+
+			System.Windows.Controls.Button phoneLinkBtn = new System.Windows.Controls.Button {
+				Content = "Open Phone Link",
+				Padding = new Thickness (16, 8, 16, 8),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
+				Foreground = System.Windows.Media.Brushes.White,
+				BorderThickness = new Thickness (0),
+				Cursor = System.Windows.Input.Cursors.Hand
+			};
+			phoneLinkBtn.Click += (s, e) => {
+				try {
+					Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true });
+				} catch {
+					try { Process.Start (new ProcessStartInfo ("https://linktopc.microsoft.com") { UseShellExecute = true }); } catch { }
+				}
+			};
+
+			btnSp.Children.Add (crossDevBtn);
+			btnSp.Children.Add (phoneLinkBtn);
+			Grid.SetRow (btnSp, 2);
+			root.Children.Add (btnSp);
+
+			card.Child = root;
+			base.Content = card;
+
+			base.MouseLeftButtonDown += (s, e) => { if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) base.DragMove (); };
 		}
 	}
 }
