@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -273,7 +274,20 @@ namespace WinDockSetup.Steps
                     File.SetAttributes(file, FileAttributes.Normal);
                     File.Delete(file);
                 }
-                catch { }
+                catch
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = $"/c del /f /q /a \"{file}\"",
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        })?.WaitForExit(500);
+                    }
+                    catch { }
+                }
             }
 
             // Delete all empty subdirectories (Ripple, Weather, Track, etc.)
@@ -284,7 +298,20 @@ namespace WinDockSetup.Steps
                     File.SetAttributes(dir, FileAttributes.Normal);
                     Directory.Delete(dir, true);
                 }
-                catch { }
+                catch
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = $"/c rmdir /s /q \"{dir}\"",
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        })?.WaitForExit(500);
+                    }
+                    catch { }
+                }
             }
 
             // Delete root directory if config is not preserved and uninstaller isn't running inside it

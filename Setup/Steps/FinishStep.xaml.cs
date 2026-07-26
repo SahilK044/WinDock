@@ -150,22 +150,25 @@ namespace WinDockSetup.Steps
                 {
                     string installPath = mainWindow.InstallPath;
                     string currentExe = Process.GetCurrentProcess().MainModule.FileName;
-                    if (!string.IsNullOrEmpty(currentExe) && currentExe.StartsWith(installPath, StringComparison.OrdinalIgnoreCase))
+                    bool keepConfig = mainWindow.KeepConfig;
+
+                    string delFilesCmd = keepConfig
+                        ? $"for %f in (\"{installPath}\\*\") do if /i not \"%~nxf\"==\"config.json\" del /f /q /a \"%f\""
+                        : $"del /f /q /a \"{installPath}\\*\"";
+
+                    string removeDirCmd = (!keepConfig || !File.Exists(Path.Combine(installPath, "config.json")))
+                        ? $"& rmdir /s /q \"{installPath}\""
+                        : "";
+
+                    string cmdArgs = $"/c timeout /t 1 /nobreak > NUL & {delFilesCmd} {removeDirCmd}";
+
+                    Process.Start(new ProcessStartInfo
                     {
-                        bool keepConfig = mainWindow.KeepConfig;
-                        string cmdArgs = $"/c timeout /t 2 /nobreak > NUL & del /f /q \"{currentExe}\"";
-                        if (!keepConfig || !File.Exists(Path.Combine(installPath, "config.json")))
-                        {
-                            cmdArgs += $" & rmdir /s /q \"{installPath}\"";
-                        }
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = "cmd.exe",
-                            Arguments = cmdArgs,
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        });
-                    }
+                        FileName = "cmd.exe",
+                        Arguments = cmdArgs,
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    });
                 }
                 catch { }
             }

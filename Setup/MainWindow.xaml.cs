@@ -28,17 +28,28 @@ namespace WinDockSetup
         public MainWindow()
         {
             InitializeComponent();
-            InstallPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "WinDock");
+
+            string currentExePath = Process.GetCurrentProcess().MainModule.FileName;
+            string currentExeName = System.IO.Path.GetFileName(currentExePath);
+            string currentExeDir = System.IO.Path.GetDirectoryName(currentExePath);
 
             _stepDots = new[] { StepDot1, StepDot2, StepDot3, StepDot4 };
 
             // Detect uninstall mode
-            string currentExeName = System.IO.Path.GetFileName(Process.GetCurrentProcess().MainModule.FileName);
-            bool isUninstallFile = currentExeName.Equals("Uninstall.exe", StringComparison.OrdinalIgnoreCase);
             string[] args = Environment.GetCommandLineArgs();
+            bool isUninstallFile = currentExeName.Equals("Uninstall.exe", StringComparison.OrdinalIgnoreCase);
             if (isUninstallFile || args.Contains("/uninstall", StringComparer.OrdinalIgnoreCase))
             {
                 IsUninstallMode = true;
+                if (!string.IsNullOrEmpty(currentExeDir) && Directory.Exists(currentExeDir))
+                {
+                    InstallPath = currentExeDir;
+                }
+            }
+
+            if (string.IsNullOrEmpty(InstallPath))
+            {
+                InstallPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "WinDock");
             }
 
             // Create steps
