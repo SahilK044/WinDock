@@ -12,7 +12,7 @@
     <Resource Include="..\windock_logo.png" Link="windock_logo.png" />
     <Compile Include="..\NativeBlur.cs" Link="NativeBlur.cs" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="Exists('..\app_payload_part1.dat')">
     <EmbeddedResource Include="..\app_payload_part1.dat" Link="app_payload_part1.dat" />
     <EmbeddedResource Include="..\app_payload_part2.dat" Link="app_payload_part2.dat" />
   </ItemGroup>
