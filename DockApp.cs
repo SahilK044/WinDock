@@ -13339,6 +13339,13 @@ namespace MacStyleDock
 									});
 								}
 							});
+						} else if (Config.FilePath == "action:airdrop" || Config.FilePath == "action:phonelink") {
+							try {
+								var fileCollection = new System.Collections.Specialized.StringCollection ();
+								fileCollection.AddRange (array);
+								System.Windows.Clipboard.SetFileDropList (fileCollection);
+								Process.Start (new ProcessStartInfo ("ms-phone-link:") { UseShellExecute = true });
+							} catch {}
 						} else if (Config.FilePath != "action:trash") {
 							try {
 								Process.Start (new ProcessStartInfo (Config.FilePath, "\"" + array [0] + "\"") {
@@ -15959,12 +15966,36 @@ namespace MacStyleDock
 
 			}
 
-			renderTargetBitmap.Render (drawingVisual);
-
-			renderTargetBitmap.Freeze ();
-
 			return renderTargetBitmap;
 
+		}
+
+		public static ImageSource CreateAirDropIcon ()
+		{
+			int num = 128;
+			RenderTargetBitmap renderTargetBitmap = new RenderTargetBitmap (num, num, 96.0, 96.0, PixelFormats.Pbgra32);
+			DrawingVisual drawingVisual = new DrawingVisual ();
+			using (DrawingContext dc = drawingVisual.RenderOpen ()) {
+				LinearGradientBrush brush = new LinearGradientBrush (
+					System.Windows.Media.Color.FromRgb (37, 99, 235), 
+					System.Windows.Media.Color.FromRgb (29, 78, 216), 
+					new System.Windows.Point (0.0, 0.0), 
+					new System.Windows.Point (1.0, 1.0)
+				);
+				dc.DrawEllipse (brush, new System.Windows.Media.Pen (new SolidColorBrush (System.Windows.Media.Color.FromArgb (100, byte.MaxValue, byte.MaxValue, byte.MaxValue)), 2.0), new System.Windows.Point ((double)num / 2.0, (double)num / 2.0), (double)num / 2.0 - 4.0, (double)num / 2.0 - 4.0);
+
+				System.Windows.Media.Pen pen = new System.Windows.Media.Pen (System.Windows.Media.Brushes.White, 3.5);
+				pen.StartLineCap = PenLineCap.Round;
+				pen.EndLineCap = PenLineCap.Round;
+
+				dc.DrawEllipse (null, pen, new System.Windows.Point (64.0, 64.0), 16.0, 16.0);
+				dc.DrawEllipse (null, new System.Windows.Media.Pen (System.Windows.Media.Brushes.White, 3.0), new System.Windows.Point (64.0, 64.0), 28.0, 28.0);
+				dc.DrawEllipse (null, new System.Windows.Media.Pen (new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, byte.MaxValue, byte.MaxValue, byte.MaxValue)), 2.5), new System.Windows.Point (64.0, 64.0), 40.0, 40.0);
+				dc.DrawEllipse (System.Windows.Media.Brushes.White, null, new System.Windows.Point (64.0, 64.0), 5.0, 5.0);
+			}
+			renderTargetBitmap.Render (drawingVisual);
+			renderTargetBitmap.Freeze ();
+			return renderTargetBitmap;
 		}
 
 
@@ -52091,6 +52122,76 @@ namespace MacStyleDock
 			shadowBorder.BeginAnimation (FrameworkElement.WidthProperty, shadowW);
 			shadowBorder.BeginAnimation (FrameworkElement.HeightProperty, shadowH);
 			shadowBorder.CornerRadius = new CornerRadius (targetCorner);
+		}
+	}
+
+	public class WasapiAudioMeter
+	{
+		[ComImport, Guid ("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+		private class MMDeviceEnumeratorComObject { }
+
+		[ComImport, Guid ("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType (ComInterfaceType.InterfaceIsIUnknown)]
+		private interface IMMDeviceEnumerator
+		{
+			int EnumAudioEndpoints (int dataFlow, int stateMask, out IntPtr ppDevices);
+			int GetDefaultAudioEndpoint (int dataFlow, int role, out IMMDevice ppDevice);
+		}
+
+		[ComImport, Guid ("D6660630-158F-4410-9431-3068BB5F9A4B"), InterfaceType (ComInterfaceType.InterfaceIsIUnknown)]
+		private interface IMMDevice
+		{
+			int Activate (ref Guid iid, int dwClsCtx, IntPtr pActivationParams, [MarshalAs (UnmanagedType.IUnknown)] out object ppInterface);
+		}
+
+		[ComImport, Guid ("C02216C6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType (ComInterfaceType.InterfaceIsIUnknown)]
+		private interface IAudioMeterInformation
+		{
+			int GetPeakValue (out float pfPeak);
+		}
+
+		private IAudioMeterInformation _meter;
+
+		public WasapiAudioMeter ()
+		{
+			try {
+				var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject ();
+				Guid iid = typeof (IAudioMeterInformation).GUID;
+				if (enumerator.GetDefaultAudioEndpoint (0, 1, out var device) == 0 && device != null) {
+					device.Activate (ref iid, 23, IntPtr.Zero, out var meterObj);
+					_meter = meterObj as IAudioMeterInformation;
+				}
+			} catch { }
+		}
+
+		public float GetAudioPeak ()
+		{
+			if (_meter != null) {
+				try {
+					if (_meter.GetPeakValue (out float peak) == 0) {
+						return Math.Max (0.0f, Math.Min (1.0f, peak));
+					}
+				} catch { }
+			}
+			return 0.0f;
+		}
+
+		public double[] GetEqualizerHeights (int barCount, double maxBarHeight, bool isPlaying)
+		{
+			double[] heights = new double[barCount];
+			float peak = GetAudioPeak ();
+			double intensity = (peak > 0.005f) ? peak : (isPlaying ? 0.35 : 0.0);
+			double time = DateTime.Now.TimeOfDay.TotalSeconds * 8.0;
+
+			for (int i = 0; i < barCount; i++) {
+				if (intensity <= 0.01) {
+					heights[i] = 3.0;
+				} else {
+					double wave = Math.Abs (Math.Sin (time + (double)i * 0.7) * Math.Cos (time * 0.5 + (double)i * 1.3));
+					double height = 4.0 + (maxBarHeight - 4.0) * intensity * (0.4 + 0.6 * wave);
+					heights[i] = Math.Max (3.0, Math.Min (maxBarHeight, height));
+				}
+			}
+			return heights;
 		}
 	}
 }
