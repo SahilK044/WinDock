@@ -51595,7 +51595,10 @@ namespace MacStyleDock
 		private DispatcherTimer mediaTimer;
 		private System.Windows.Shapes.Rectangle[] spectrumBars;
 		private ScaleTransform[] barScaleTransforms;
+		private System.Windows.Shapes.Rectangle[] expandedSpectrumBars;
+		private ScaleTransform[] expandedBarScaleTransforms;
 		private const double BAR_MAX_HEIGHT = 17.0;
+		private const double EXP_BAR_MAX_HEIGHT = 22.0;
 		private double[] currentBarHeights;
 		private double[] barVelocities;
 		private double[] barPhaseOffsets;
@@ -51607,10 +51610,12 @@ namespace MacStyleDock
 		private DateTime lastFrameTime = DateTime.Now;
 		private double smoothedPeak = 0.0;
 		private double peakVelocity = 0.0;
+		private WasapiAudioMeter audioMeter;
 
 		public DynamicNotchWindow (DockWindow parentDock)
 		{
 			parent = parentDock;
+			audioMeter = new WasapiAudioMeter ();
 			base.WindowStyle = WindowStyle.None;
 			base.AllowsTransparency = true;
 			base.Background = System.Windows.Media.Brushes.Transparent;
@@ -51883,6 +51888,36 @@ namespace MacStyleDock
 			ctrlSp.Children.Add (playPauseBtn);
 			ctrlSp.Children.Add (nextBtn);
 
+			// ===== EXPANDED WASAPI EQUALIZER BARS =====
+			StackPanel expSpecPanel = new StackPanel {
+				Orientation = System.Windows.Controls.Orientation.Horizontal,
+				VerticalAlignment = VerticalAlignment.Center,
+				Margin = new Thickness (12, 0, 0, 0)
+			};
+			expandedSpectrumBars = new System.Windows.Shapes.Rectangle[barCount];
+			expandedBarScaleTransforms = new ScaleTransform[barCount];
+			for (int b = 0; b < barCount; b++) {
+				expandedBarScaleTransforms[b] = new ScaleTransform (1.0, currentBarHeights[b] / EXP_BAR_MAX_HEIGHT);
+				expandedSpectrumBars[b] = new System.Windows.Shapes.Rectangle {
+					Width = 3.5,
+					Height = EXP_BAR_MAX_HEIGHT,
+					Margin = new Thickness (1.2, 0, 1.2, 0),
+					Fill = new LinearGradientBrush (
+						System.Windows.Media.Color.FromRgb (30, 215, 96),
+						System.Windows.Media.Color.FromRgb (80, 255, 140),
+						new System.Windows.Point (0, 1),
+						new System.Windows.Point (0, 0)
+					),
+					RadiusX = 1.6,
+					RadiusY = 1.6,
+					VerticalAlignment = VerticalAlignment.Center,
+					RenderTransform = expandedBarScaleTransforms[b],
+					RenderTransformOrigin = new System.Windows.Point (0.5, 0.5)
+				};
+				expSpecPanel.Children.Add (expandedSpectrumBars[b]);
+			}
+			ctrlSp.Children.Add (expSpecPanel);
+
 			Grid.SetColumn (ctrlSp, 2);
 			expandedContent.Children.Add (ctrlSp);
 			notchGrid.Children.Add (expandedContent);
@@ -51956,8 +51991,8 @@ namespace MacStyleDock
 			lastFrameTime = now;
 
 			// Smooth the raw audio peak with spring-damper physics
-			float rawPeak = DockWindow.SharedAudioPeak;
-			if (!isPlayingMedia) rawPeak = 0.0f;
+			float rawPeak = audioMeter != null ? audioMeter.GetAudioPeak () : DockWindow.SharedAudioPeak;
+			if (rawPeak < 0.005f && !isPlayingMedia) rawPeak = 0.0f;
 
 			double targetPeak = Math.Min (1.0, rawPeak * 2.0);
 			// Spring: fast attack, slow release
@@ -51978,16 +52013,13 @@ namespace MacStyleDock
 			for (int i = 0; i < spectrumBars.Length; i++) {
 				double targetH;
 
-				if (isPlayingMedia && smoothedPeak > 0.02) {
+				if (smoothedPeak > 0.015 || isPlayingMedia) {
 					// Active audio — bars respond to peak with organic wave offsets
 					double wave = Math.Sin (animPhase * speedMult[i] + barPhaseOffsets[i]);
-					double barEnergy = smoothedPeak * freqMult[i];
+					double activeEnergy = (smoothedPeak > 0.015) ? smoothedPeak : 0.35;
+					double barEnergy = activeEnergy * freqMult[i];
 					targetH = 3.5 + barEnergy * 13.0 * (0.55 + 0.45 * wave);
 					targetH = Math.Max (3.5, Math.Min (16.0, targetH));
-				} else if (isPlayingMedia) {
-					// Playing but silent/quiet — gentle breathing idle animation
-					double breath = Math.Sin (animPhase * 1.8 + barPhaseOffsets[i]);
-					targetH = 4.0 + 3.5 * (0.5 + 0.5 * breath);
 				} else {
 					// Not playing — tiny resting dots
 					targetH = 3.0;
@@ -52003,7 +52035,12 @@ namespace MacStyleDock
 				if (currentBarHeights[i] < 2.5) { currentBarHeights[i] = 2.5; barVelocities[i] = 0; }
 				if (currentBarHeights[i] > 17.0) { currentBarHeights[i] = 17.0; barVelocities[i] = 0; }
 
-				barScaleTransforms[i].ScaleY = currentBarHeights[i] / BAR_MAX_HEIGHT;
+				if (barScaleTransforms != null && i < barScaleTransforms.Length && barScaleTransforms[i] != null) {
+					barScaleTransforms[i].ScaleY = currentBarHeights[i] / BAR_MAX_HEIGHT;
+				}
+				if (expandedBarScaleTransforms != null && i < expandedBarScaleTransforms.Length && expandedBarScaleTransforms[i] != null) {
+					expandedBarScaleTransforms[i].ScaleY = (currentBarHeights[i] * (EXP_BAR_MAX_HEIGHT / BAR_MAX_HEIGHT)) / EXP_BAR_MAX_HEIGHT;
+				}
 			}
 		}
 
