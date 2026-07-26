@@ -1,0 +1,9 @@
+# =============================================
+# GitHub Linguist Language Detection Configuration
+# =============================================
+
+# Mark Chromium third-party licenses and web assets as vendored
+LICENSES.chromium.html linguist-vendored
+*.html linguist-vendored
+Ripple/** linguist-vendored
+Weather/** linguist-vendored
