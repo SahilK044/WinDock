@@ -97,9 +97,22 @@ scratch/
 # =============================================
 *.log
 *.txt
+*.env
+*.env.*
+!.env.example
 *.jsonStream
 *.json
 crash.txt
+config.local.json
+config.*.local.json
+*.secret
+*.secrets
+*.key
+*.pem
+*.pfx
+*.p12
+*.crt
+*.cer
 openf1_token.txt
 openf1_test.json
 sportsdb_test.json
@@ -146,6 +159,10 @@ test.exe
 test_exec.exe
 test_intents.exe
 
+# Extracted third-party app bundles. Keep packaged runtime assets instead.
+Ripple/resources/app_extracted/
+Weather/resources/app_extracted/
+
 # Dev tools
 replace.ps1
 fix_mojibake.ps1
@@ -178,3 +195,4 @@ implementation_plan.md
 !scripts/compile.ps1
 !scripts/restart_dock.bat
 !scripts/toggle_radio.ps1
+
