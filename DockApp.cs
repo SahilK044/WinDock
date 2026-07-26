@@ -1394,6 +1394,8 @@ namespace MacStyleDock
 
 		public DockItemControl trashItemControl;
 
+		public DockItemControl airdropItemControl;
+
 
 
 		public DockItemControl clockItemControl;
@@ -7362,6 +7364,16 @@ namespace MacStyleDock
 
 			SafeAdd (dockPanel, trashItemControl, "dockPanel.Add(trashItem)");
 			QueryRecycleBinState ();
+
+			if (airdropItemControl == null) {
+				DockItemConfig configAirDrop = new DockItemConfig {
+					Name = "Phone Link Drop Zone",
+					FilePath = "action:airdrop",
+					ProcessName = "AirDrop"
+				};
+				airdropItemControl = CreateDockItemControlHelper (configAirDrop, canDrag: false);
+			}
+			SafeAdd (dockPanel, airdropItemControl, "dockPanel.Add(airdropItem)");
 
 			if (settings.ShowCalendarWidget) {
 				DockItemConfig config3 = new DockItemConfig {
@@ -14309,9 +14321,11 @@ namespace MacStyleDock
 			}
 
 			if (imageSource == null && Config != null && Config.FilePath == "action:search") {
-
 				imageSource = IconExtractor.CreateSearchIcon ();
+			}
 
+			if (imageSource == null && Config != null && (Config.FilePath == "action:airdrop" || Config.FilePath == "action:phonelink")) {
+				imageSource = IconExtractor.CreateAirDropIcon ();
 			}
 
 			if (imageSource == null && Config != null && Config.FilePath == "action:weather") {
