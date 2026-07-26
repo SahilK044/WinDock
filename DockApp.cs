@@ -52129,6 +52129,9 @@ namespace MacStyleDock
 										bmp.EndInit ();
 										compactArtImage.Source = bmp;
 										albumArtImage.Source = bmp;
+
+										System.Windows.Media.Color extractedC = ExtractDominantColor (bmp);
+										ApplyAccentColor (extractedC);
 									} catch { }
 								});
 							}
@@ -52186,6 +52189,98 @@ namespace MacStyleDock
 			shadowBorder.BeginAnimation (FrameworkElement.WidthProperty, shadowW);
 			shadowBorder.BeginAnimation (FrameworkElement.HeightProperty, shadowH);
 			shadowBorder.CornerRadius = new CornerRadius (targetCorner);
+		}
+
+		public static System.Windows.Media.Color ExtractDominantColor (BitmapSource bitmapSource)
+		{
+			try {
+				if (bitmapSource == null) return System.Windows.Media.Color.FromRgb (30, 215, 96);
+				FormatConvertedBitmap src = new FormatConvertedBitmap ();
+				src.BeginInit ();
+				src.Source = bitmapSource;
+				src.DestinationFormat = System.Windows.Media.PixelFormats.Bgr32;
+				src.EndInit ();
+
+				int width = Math.Min (src.PixelWidth, 32);
+				int height = Math.Min (src.PixelHeight, 32);
+				if (width <= 0 || height <= 0) return System.Windows.Media.Color.FromRgb (30, 215, 96);
+
+				int stride = width * 4;
+				byte[] pixels = new byte[height * stride];
+				src.CopyPixels (new System.Windows.Int32Rect (0, 0, width, height), pixels, stride, 0);
+
+				long totalR = 0, totalG = 0, totalB = 0, count = 0;
+				double maxSat = -1.0;
+				byte bestR = 30, bestG = 215, bestB = 96;
+
+				for (int i = 0; i < pixels.Length; i += 4) {
+					byte b = pixels[i];
+					byte g = pixels[i + 1];
+					byte r = pixels[i + 2];
+
+					int maxVal = Math.Max (r, Math.Max (g, b));
+					int minVal = Math.Min (r, Math.Min (g, b));
+					int delta = maxVal - minVal;
+					double sat = maxVal > 0 ? (double)delta / maxVal : 0.0;
+					double lum = (maxVal + minVal) / 510.0;
+
+					if (lum > 0.15 && lum < 0.88 && sat > 0.18) {
+						if (sat > maxSat) {
+							maxSat = sat;
+							bestR = r; bestG = g; bestB = b;
+						}
+						totalR += r; totalG += g; totalB += b; count++;
+					}
+				}
+
+				if (maxSat > 0.2) {
+					return System.Windows.Media.Color.FromRgb (bestR, bestG, bestB);
+				} else if (count > 0) {
+					return System.Windows.Media.Color.FromRgb ((byte)(totalR / count), (byte)(totalG / count), (byte)(totalB / count));
+				}
+			} catch { }
+			return System.Windows.Media.Color.FromRgb (30, 215, 96);
+		}
+
+		public void ApplyAccentColor (System.Windows.Media.Color targetColor)
+		{
+			try {
+				byte r = targetColor.R;
+				byte g = targetColor.G;
+				byte b = targetColor.B;
+
+				System.Windows.Media.Color brightColor = System.Windows.Media.Color.FromRgb (
+					(byte)Math.Min (255, r + 60),
+					(byte)Math.Min (255, g + 60),
+					(byte)Math.Min (255, b + 60)
+				);
+
+				LinearGradientBrush barBrush = new LinearGradientBrush (
+					targetColor, brightColor,
+					new System.Windows.Point (0, 1),
+					new System.Windows.Point (0, 0)
+				);
+
+				if (spectrumBars != null) {
+					foreach (var bar in spectrumBars) {
+						if (bar != null) bar.Fill = barBrush;
+					}
+				}
+				if (expandedSpectrumBars != null) {
+					foreach (var bar in expandedSpectrumBars) {
+						if (bar != null) bar.Fill = barBrush;
+					}
+				}
+
+				if (innerGlowBorder != null) {
+					innerGlowBorder.Background = new LinearGradientBrush (
+						System.Windows.Media.Color.FromArgb (45, r, g, b),
+						System.Windows.Media.Color.FromArgb (0, 0, 0, 0),
+						new System.Windows.Point (0.5, 0),
+						new System.Windows.Point (0.5, 0.7)
+					);
+				}
+			} catch { }
 		}
 	}
 
