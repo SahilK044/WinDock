@@ -25653,9 +25653,9 @@ namespace MacStyleDock
 
 				Grid grid19 = new Grid {
 
-					Margin = new Thickness (12.0),
+					Margin = new Thickness (10.0, 8.0, 10.0, 6.0),
 
-					ClipToBounds = true
+					ClipToBounds = false
 
 				};
 
@@ -26077,7 +26077,7 @@ namespace MacStyleDock
 
 			StackPanel stackPanel5 = new StackPanel {
 
-				VerticalAlignment = VerticalAlignment.Center
+				VerticalAlignment = VerticalAlignment.Top
 
 			};
 
@@ -26087,9 +26087,11 @@ namespace MacStyleDock
 
 				Foreground = System.Windows.Media.Brushes.White,
 
-				FontSize = 36.0,
+				FontSize = 30.0,
 
-				FontWeight = FontWeights.Medium
+				FontWeight = FontWeights.Medium,
+
+				Margin = new Thickness (0.0, -2.0, 0.0, 0.0)
 
 			});
 
@@ -26101,19 +26103,19 @@ namespace MacStyleDock
 
 				Foreground = System.Windows.Media.Brushes.White,
 
-				FontSize = 16.0,
+				FontSize = 15.0,
 
 				FontWeight = FontWeights.Medium,
 
-				Margin = new Thickness (0.0, 0.0, 0.0, 4.0)
+				Margin = new Thickness (0.0, 0.0, 0.0, 2.0)
 
 			});
 
 			Grid grid10 = new Grid {
 
-				Height = 14.0,
+				Height = 12.0,
 
-				Margin = new Thickness (0.0, 0.0, 0.0, 0.0)
+				Margin = new Thickness (0.0, 2.0, 0.0, 2.0)
 
 			};
 
@@ -26159,7 +26161,7 @@ namespace MacStyleDock
 
 				Margin = new Thickness (5.0, 0.0, 5.0, 0.0),
 
-				Height = 14.0
+				Height = 12.0
 
 			};
 
@@ -26227,11 +26229,11 @@ namespace MacStyleDock
 
 				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, byte.MaxValue, byte.MaxValue, byte.MaxValue)),
 
-				FontSize = 12.0,
+				FontSize = 11.0,
 
 				TextWrapping = TextWrapping.Wrap,
 
-				Margin = new Thickness (0.0, 4.0, 0.0, 0.0),
+				Margin = new Thickness (0.0, 2.0, 0.0, 0.0),
 
 				FontFamily = new System.Windows.Media.FontFamily ("Segoe UI, Arial, sans-serif")
 
@@ -26523,7 +26525,7 @@ namespace MacStyleDock
 
 			StackPanel stackPanel8 = new StackPanel {
 
-				VerticalAlignment = VerticalAlignment.Center
+				VerticalAlignment = VerticalAlignment.Top
 
 			};
 
@@ -26533,9 +26535,11 @@ namespace MacStyleDock
 
 				Foreground = System.Windows.Media.Brushes.White,
 
-				FontSize = 36.0,
+				FontSize = 30.0,
 
-				FontWeight = FontWeights.Medium
+				FontWeight = FontWeights.Medium,
+
+				Margin = new Thickness (0.0, -2.0, 0.0, 0.0)
 
 			});
 
@@ -26581,19 +26585,19 @@ namespace MacStyleDock
 
 				Foreground = System.Windows.Media.Brushes.White,
 
-				FontSize = 16.0,
+				FontSize = 15.0,
 
 				FontWeight = FontWeights.Medium,
 
-				Margin = new Thickness (0.0, 0.0, 0.0, 4.0)
+				Margin = new Thickness (0.0, 0.0, 0.0, 2.0)
 
 			});
 
 			Grid grid13 = new Grid {
 
-				Height = 14.0,
+				Height = 12.0,
 
-				Margin = new Thickness (0.0, 0.0, 0.0, 0.0)
+				Margin = new Thickness (0.0, 2.0, 0.0, 2.0)
 
 			};
 
@@ -26637,7 +26641,7 @@ namespace MacStyleDock
 
 				Margin = new Thickness (5.0, 0.0, 5.0, 0.0),
 
-				Height = 14.0
+				Height = 12.0
 
 			};
 
@@ -26703,11 +26707,11 @@ namespace MacStyleDock
 
 				Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (180, byte.MaxValue, byte.MaxValue, byte.MaxValue)),
 
-				FontSize = 12.0,
+				FontSize = 11.0,
 
 				TextWrapping = TextWrapping.Wrap,
 
-				Margin = new Thickness (0.0, 4.0, 0.0, 0.0),
+				Margin = new Thickness (0.0, 2.0, 0.0, 0.0),
 
 				FontFamily = new System.Windows.Media.FontFamily ("Segoe UI, Arial, sans-serif")
 
