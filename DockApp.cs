@@ -52515,11 +52515,12 @@ namespace MacStyleDock
 
 		private DispatcherTimer animTimer;
 		private Canvas mainCanvas;
+		private StackPanel eqPanel;
 		private System.Windows.Shapes.Rectangle[] bars = new System.Windows.Shapes.Rectangle[5];
 		private System.Windows.Shapes.Ellipse[] auraRings = new System.Windows.Shapes.Ellipse[3];
 		private double phase = 0;
-		private System.Windows.Media.Color accentColor = System.Windows.Media.Color.FromRgb(30, 215, 96);
-		private System.Windows.Media.Color targetAccentColor = System.Windows.Media.Color.FromRgb(30, 215, 96);
+		private System.Windows.Media.Color accentColor = System.Windows.Media.Color.FromRgb(225, 45, 45);
+		private System.Windows.Media.Color targetAccentColor = System.Windows.Media.Color.FromRgb(225, 45, 45);
 
 		public VisualizerOverlayWindow()
 		{
@@ -52528,7 +52529,7 @@ namespace MacStyleDock
 			Background = System.Windows.Media.Brushes.Transparent;
 			Topmost = true;
 			ShowInTaskbar = false;
-			Width = 400;
+			Width = 500;
 			Height = 120;
 			Left = (SystemParameters.PrimaryScreenWidth - Width) / 2.0;
 			Top = 0;
@@ -52541,36 +52542,36 @@ namespace MacStyleDock
 			{
 				var ring = new System.Windows.Shapes.Ellipse
 				{
-					Width = 70 + i * 45,
-					Height = 35 + i * 22,
+					Width = 80 + i * 45,
+					Height = 36 + i * 20,
 					Stroke = new SolidColorBrush(accentColor),
 					StrokeThickness = 1.5 - i * 0.4,
 					Opacity = 0
 				};
 				Canvas.SetLeft(ring, (Width - ring.Width) / 2.0);
-				Canvas.SetTop(ring, 10 - i * 5);
+				Canvas.SetTop(ring, 8 - i * 4);
 				mainCanvas.Children.Add(ring);
 				auraRings[i] = ring;
 			}
 
-			StackPanel eqPanel = new StackPanel
+			eqPanel = new StackPanel
 			{
 				Orientation = System.Windows.Controls.Orientation.Horizontal,
-				Height = 24,
+				Height = 20,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center
 			};
-			Canvas.SetLeft(eqPanel, (Width - 45) / 2.0);
+			Canvas.SetLeft(eqPanel, 335);
 			Canvas.SetTop(eqPanel, 8);
 
 			for (int i = 0; i < 5; i++)
 			{
 				bars[i] = new System.Windows.Shapes.Rectangle
 				{
-					Width = 4.5,
+					Width = 3.5,
 					Height = 4,
-					Margin = new Thickness(2, 0, 2, 0),
-					RadiusX = 2,
-					RadiusY = 2,
+					Margin = new Thickness(1.5, 0, 1.5, 0),
+					RadiusX = 1.5,
+					RadiusY = 1.5,
 					Fill = new SolidColorBrush(accentColor),
 					VerticalAlignment = System.Windows.VerticalAlignment.Bottom
 				};
@@ -52601,7 +52602,7 @@ namespace MacStyleDock
 
 		private void AnimTimer_Tick(object sender, EventArgs e)
 		{
-			phase += 0.08;
+			phase += 0.09;
 
 			accentColor = System.Windows.Media.Color.FromRgb(
 				(byte)(accentColor.R + (targetAccentColor.R - accentColor.R) * 0.05),
@@ -52612,28 +52613,40 @@ namespace MacStyleDock
 			var brush = new SolidColorBrush(accentColor);
 
 			float peak = DockWindow.SharedAudioPeak;
-			bool isPlaying = peak > 0.012f;
+			bool isPlaying = peak > 0.01f;
+
+			// Position EQ panel right after the track title text on the right side of the pill
+			double textLen = 16;
+			try {
+				if (DockWindow.Instance != null && !string.IsNullOrEmpty(DockWindow.Instance.bgSpotifyTrackKey)) {
+					textLen = DockWindow.Instance.bgSpotifyTrackKey.Length;
+				}
+			} catch { }
+
+			double pillHalfWidth = Math.Min(140, Math.Max(50, textLen * 4.2 + 15));
+			Canvas.SetLeft(eqPanel, 250 + pillHalfWidth - 28);
+			Canvas.SetTop(eqPanel, 7);
 
 			double[] heights = new double[]
 			{
-				4 + Math.Sin(phase * 1.2) * 8 + peak * 14,
-				6 + Math.Cos(phase * 1.5) * 10 + peak * 16,
-				3 + Math.Sin(phase * 1.8) * 12 + peak * 18,
-				5 + Math.Cos(phase * 1.1) * 9 + peak * 15,
-				4 + Math.Sin(phase * 1.4) * 8 + peak * 13
+				3 + Math.Sin(phase * 1.2) * 6 + peak * 12,
+				5 + Math.Cos(phase * 1.5) * 8 + peak * 14,
+				3 + Math.Sin(phase * 1.8) * 10 + peak * 16,
+				4 + Math.Cos(phase * 1.1) * 7 + peak * 13,
+				3 + Math.Sin(phase * 1.4) * 6 + peak * 11
 			};
 
 			for (int i = 0; i < 5; i++)
 			{
 				if (isPlaying)
 				{
-					bars[i].Height = Math.Max(3, Math.Min(22, heights[i]));
+					bars[i].Height = Math.Max(3, Math.Min(18, heights[i]));
 					bars[i].Fill = brush;
 				}
 				else
 				{
 					bars[i].Height = 3;
-					bars[i].Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(90, 255, 255, 255));
+					bars[i].Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(80, 255, 255, 255));
 				}
 			}
 
@@ -52643,11 +52656,11 @@ namespace MacStyleDock
 				{
 					double rPhase = (phase * 0.5 + i * 1.2) % (Math.PI * 2);
 					double scale = 1.0 + Math.Sin(rPhase) * 0.2 + peak * 0.3;
-					auraRings[i].Width = (70 + i * 45) * scale;
-					auraRings[i].Height = (35 + i * 22) * scale;
+					auraRings[i].Width = (80 + i * 45) * scale;
+					auraRings[i].Height = (36 + i * 20) * scale;
 					Canvas.SetLeft(auraRings[i], (Width - auraRings[i].Width) / 2.0);
 					auraRings[i].Stroke = brush;
-					auraRings[i].Opacity = Math.Max(0, 0.45 - i * 0.12) * (0.5 + peak * 0.5);
+					auraRings[i].Opacity = Math.Max(0, 0.4 - i * 0.1) * (0.5 + peak * 0.5);
 				}
 				else
 				{
