@@ -24,8 +24,12 @@ namespace WinDockSetup.Steps
 
         private async void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
-            var sb = (Storyboard)FindResource("ShimmerAnimation");
-            sb.Begin();
+            try
+            {
+                var sb = (Storyboard)FindResource("SmoothShimmerStoryboard");
+                sb?.Begin();
+            }
+            catch { }
 
             await RunProcessAsync();
         }
@@ -184,14 +188,22 @@ namespace WinDockSetup.Steps
         {
             string installPath = mainWindow.InstallPath;
 
-            // Kill any running WinDock processes first
+            // Kill all running suite processes (WinDock, Ripple, Weather)
             try
             {
-                foreach (var proc in System.Diagnostics.Process.GetProcessesByName("WinDock").Concat(System.Diagnostics.Process.GetProcessesByName("WinDockConsole")))
+                string[] procsToKill = new[] { "WinDock", "WinDockConsole", "ripple", "Ripple", "weather", "Weather", "node", "electron" };
+                foreach (string procName in procsToKill)
                 {
-                    try { proc.Kill(); } catch { }
+                    try
+                    {
+                        foreach (var proc in System.Diagnostics.Process.GetProcessesByName(procName))
+                        {
+                            try { proc.Kill(); } catch { }
+                        }
+                    }
+                    catch { }
                 }
-                await Task.Delay(400);
+                await Task.Delay(500);
             }
             catch { }
 
@@ -231,46 +243,71 @@ namespace WinDockSetup.Steps
                 bool keepConfig = mainWindow.KeepConfig;
                 string currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
 
-                foreach (string file in Directory.GetFiles(installPath))
-                {
-                    string name = Path.GetFileName(file);
-                    if (keepConfig && name.Equals("config.json", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue; // Preserve config.json
-                    }
-                    if (!string.IsNullOrEmpty(currentExe) && string.Equals(file, currentExe, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue; // Skip currently running uninstaller binary
-                    }
-                    try { File.Delete(file); } catch { }
-                }
-                
-                foreach (string dir in Directory.GetDirectories(installPath))
-                {
-                    try { Directory.Delete(dir, true); } catch { }
-                }
-
-                // Only delete the folder if config.json was deleted and uninstaller is not running inside it
-                if (!keepConfig || !File.Exists(Path.Combine(installPath, "config.json")))
-                {
-                    try
-                    {
-                        if (string.IsNullOrEmpty(currentExe) || !currentExe.StartsWith(installPath, StringComparison.OrdinalIgnoreCase))
-                        {
-                            Directory.Delete(installPath, true);
-                        }
-                    }
-                    catch { }
-                }
+                // Force clear attributes & delete all files including inside subdirectories (Ripple, Weather, etc.)
+                ForceDeleteDirectoryTree(installPath, keepConfig, currentExe);
             }
             await Task.Delay(400);
             
             UpdateStatus("Uninstallation complete.", "COMPLETE", "100% · Done", 100, mainWindow);
         }
 
+        private void ForceDeleteDirectoryTree(string rootPath, bool keepConfig, string currentExe)
+        {
+            if (!Directory.Exists(rootPath)) return;
+
+            // Delete all files in root and subdirectories
+            foreach (string file in Directory.GetFiles(rootPath, "*", SearchOption.AllDirectories))
+            {
+                string name = Path.GetFileName(file);
+                if (keepConfig && name.Equals("config.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue; // Preserve config.json
+                }
+                if (!string.IsNullOrEmpty(currentExe) && string.Equals(file, currentExe, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue; // Skip running uninstaller executable
+                }
+
+                try
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                    File.Delete(file);
+                }
+                catch { }
+            }
+
+            // Delete all empty subdirectories (Ripple, Weather, Track, etc.)
+            foreach (string dir in Directory.GetDirectories(rootPath, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
+            {
+                try
+                {
+                    File.SetAttributes(dir, FileAttributes.Normal);
+                    Directory.Delete(dir, true);
+                }
+                catch { }
+            }
+
+            // Delete root directory if config is not preserved and uninstaller isn't running inside it
+            if (!keepConfig || !File.Exists(Path.Combine(rootPath, "config.json")))
+            {
+                try
+                {
+                    if (string.IsNullOrEmpty(currentExe) || !currentExe.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Directory.Delete(rootPath, true);
+                    }
+                }
+                catch { }
+            }
+        }
+
         private void UpdateStatus(string message, string action, string detail, int percent, dynamic mainWindow)
         {
             StatusText.Text = message;
+            if (CurrentFileText != null)
+            {
+                CurrentFileText.Text = message;
+            }
             Log(message);
             PercentText.Text = percent + "%";
 
@@ -341,17 +378,30 @@ namespace WinDockSetup.Steps
                             entry.ExtractToFile(destPath, true);
                         }
 
-                        mainWindow.UpdateTelemetry("EXTRACTING", $"{(int)pct}% · {entry.Name}", (int)pct);
-                        PercentText.Text = (int)pct + "%";
+                        string currentFile = entry.FullName;
+                        if (current % 10 == 0 || current == total)
+                        {
+                            if (CurrentFileText != null)
+                            {
+                                CurrentFileText.Text = $"Extracting: {currentFile}";
+                            }
+                            Log($"Copied: {currentFile}");
 
-                        if (ProgressTrackContainer != null && ProgressTrackContainer.ActualWidth > 0)
-                        {
-                            double targetWidth = Math.Max(0, (ProgressTrackContainer.ActualWidth * pct) / 100.0);
-                            ProgressBarFill.Width = targetWidth;
-                        }
-                        
-                        if (current % 5 == 0)
-                        {
+                            mainWindow.UpdateTelemetry("EXTRACTING", $"{(int)pct}% · {entry.Name}", (int)pct);
+                            PercentText.Text = (int)pct + "%";
+
+                            if (ProgressTrackContainer != null && ProgressTrackContainer.ActualWidth > 0)
+                            {
+                                double targetWidth = Math.Max(0, (ProgressTrackContainer.ActualWidth * pct) / 100.0);
+                                DoubleAnimation widthAnim = new DoubleAnimation
+                                {
+                                    To = targetWidth,
+                                    Duration = TimeSpan.FromMilliseconds(150),
+                                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                                };
+                                ProgressBarFill.BeginAnimation(FrameworkElement.WidthProperty, widthAnim);
+                            }
+
                             await Task.Delay(10);
                         }
                     }

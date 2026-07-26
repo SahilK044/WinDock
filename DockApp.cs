@@ -25645,13 +25645,31 @@ namespace MacStyleDock
 
 					CornerRadius = new CornerRadius (16.0),
 
-					Margin = new Thickness (5.0)
+					Margin = new Thickness (5.0),
+
+					ClipToBounds = true
 
 				};
 
 				Grid grid19 = new Grid {
 
-					Margin = new Thickness (12.0)
+					Margin = new Thickness (12.0),
+
+					ClipToBounds = true
+
+				};
+
+				grid19.SizeChanged += delegate(object s, SizeChangedEventArgs e) {
+
+					grid19.Clip = new RectangleGeometry {
+
+						RadiusX = 16.0,
+
+						RadiusY = 16.0,
+
+						Rect = new Rect (0.0, 0.0, e.NewSize.Width, e.NewSize.Height)
+
+					};
 
 				};
 
@@ -26245,7 +26263,23 @@ namespace MacStyleDock
 
 			};
 
-			Grid obj5 = (Grid)(border5.Child = new Grid ());
+			Grid obj5 = (Grid)(border5.Child = new Grid {
+				ClipToBounds = true
+			});
+
+			obj5.SizeChanged += delegate(object s, SizeChangedEventArgs e) {
+
+				obj5.Clip = new RectangleGeometry {
+
+					RadiusX = 16.0,
+
+					RadiusY = 16.0,
+
+					Rect = new Rect (0.0, 0.0, e.NewSize.Width, e.NewSize.Height)
+
+				};
+
+			};
 
 			Ellipse element20 = new Ellipse {
 

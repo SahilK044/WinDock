@@ -5,50 +5,59 @@
          DESIGN TOKENS  ·  WinDock Minimalist Setup
          ═══════════════════════════════════════════════════════════════ -->
 
-    <!-- Base Brushes -->
-    <SolidColorBrush x:Key="GraphiteVoidBrush"          Color="#090A0F"/>
-    <SolidColorBrush x:Key="FrostPanelBackgroundBrush"  Color="#12151C"/>
-    <SolidColorBrush x:Key="FrostPanelBorderBrush"      Color="#1F2530"/>
+    <!-- Base Brushes (Clean Light Mode) -->
+    <SolidColorBrush x:Key="GraphiteVoidBrush"          Color="#F8FAFC"/>
+    <SolidColorBrush x:Key="FrostPanelBackgroundBrush"  Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="FrostPanelBorderBrush"      Color="#E2E8F0"/>
 
-    <!-- Accent Color: Emerald Glow -->
-    <SolidColorBrush x:Key="TelemetryCyanBrush"         Color="#10B981"/>
-    <SolidColorBrush x:Key="TelemetryCyan26Brush"       Color="#2610B981"/>
-    <SolidColorBrush x:Key="PodiumGoldBrush"            Color="#F59E0B"/>
-    <SolidColorBrush x:Key="SignalRedBrush"             Color="#EF4444"/>
+    <!-- Accent Color: Royal Blue Glow -->
+    <SolidColorBrush x:Key="TelemetryCyanBrush"         Color="#2563EB"/>
+    <SolidColorBrush x:Key="TelemetryCyan26Brush"       Color="#1F2563EB"/>
+    <SolidColorBrush x:Key="OceanCyanBrush"             Color="#1D4ED8"/>
+    <SolidColorBrush x:Key="PodiumGoldBrush"            Color="#D97706"/>
+    <SolidColorBrush x:Key="SignalRedBrush"             Color="#DC2626"/>
 
-    <!-- Text Hierarchy -->
-    <SolidColorBrush x:Key="FogWhiteBrush"              Color="#F9FAFB"/>
-    <SolidColorBrush x:Key="FogWhite70Brush"            Color="#9CA3AF"/>
-    <SolidColorBrush x:Key="FogWhite45Brush"            Color="#6B7280"/>
+    <!-- Text Hierarchy (High Contrast Slate/Charcoal) -->
+    <SolidColorBrush x:Key="FogWhiteBrush"              Color="#0F172A"/>
+    <SolidColorBrush x:Key="FogWhite70Brush"            Color="#475569"/>
+    <SolidColorBrush x:Key="FogWhite45Brush"            Color="#64748B"/>
 
     <!-- Overlays -->
-    <SolidColorBrush x:Key="HoverOverlayBrush"          Color="#1AFFFFFF"/>
-    <SolidColorBrush x:Key="PressOverlayBrush"          Color="#26FFFFFF"/>
+    <SolidColorBrush x:Key="HoverOverlayBrush"          Color="#0F000000"/>
+    <SolidColorBrush x:Key="PressOverlayBrush"          Color="#1A000000"/>
 
     <!-- Colors -->
-    <Color x:Key="TelemetryCyanColor">#10B981</Color>
-    <Color x:Key="PodiumGoldColor">#F59E0B</Color>
-    <Color x:Key="SignalRedColor">#EF4444</Color>
-    <Color x:Key="GraphiteVoidColor">#090A0F</Color>
-    <Color x:Key="FogWhiteColor">#F9FAFB</Color>
-    <Color x:Key="FrostPanelBgColor">#12151C</Color>
-    <Color x:Key="StepDotInactiveColor">#26FFFFFF</Color>
+    <Color x:Key="TelemetryCyanColor">#2563EB</Color>
+    <Color x:Key="OceanCyanColor">#1D4ED8</Color>
+    <Color x:Key="PodiumGoldColor">#D97706</Color>
+    <Color x:Key="SignalRedColor">#DC2626</Color>
+    <Color x:Key="GraphiteVoidColor">#F8FAFC</Color>
+    <Color x:Key="FogWhiteColor">#0F172A</Color>
+    <Color x:Key="FrostPanelBgColor">#FFFFFF</Color>
+    <Color x:Key="StepDotInactiveColor">#CBD5E1</Color>
 
     <!-- Typography -->
     <FontFamily x:Key="DisplayFontFamily">Segoe UI Variable Display, Segoe UI, sans-serif</FontFamily>
     <FontFamily x:Key="BodyFontFamily">Segoe UI Variable Text, Segoe UI, sans-serif</FontFamily>
-    <FontFamily x:Key="MonoFontFamily">Consolas, monospace</FontFamily>
+    <FontFamily x:Key="MonoFontFamily">Consolas, Cascadia Code, monospace</FontFamily>
 
     <!-- Radii -->
     <CornerRadius x:Key="WindowCornerRadius">16</CornerRadius>
     <CornerRadius x:Key="CardCornerRadius">12</CornerRadius>
-    <CornerRadius x:Key="ButtonCornerRadius">8</CornerRadius>
-    <CornerRadius x:Key="InputCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="ButtonCornerRadius">10</CornerRadius>
+    <CornerRadius x:Key="InputCornerRadius">10</CornerRadius>
+
+    <!-- Linear Gradients -->
+    <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#2563EB" Offset="0"/>
+        <GradientStop Color="#1D4ED8" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="GlassCardBackgroundBrush" Color="#FFFFFF"/>
 
     <!-- ── Primary Action Button ──────────────────────────────────── -->
     <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource TelemetryCyanBrush}"/>
-        <Setter Property="Foreground" Value="#090A0F"/>
+        <Setter Property="Background" Value="{StaticResource AccentGradientBrush}"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
         <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}"/>
         <Setter Property="FontSize" Value="13.5"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -174,43 +183,43 @@
 
     <!-- ── Custom CheckBox ──────────────────────────────────── -->
     <Style x:Key="CyanCheckBoxStyle" TargetType="CheckBox">
-        <Setter Property="Foreground" Value="{StaticResource FogWhiteBrush}"/>
+        <Setter Property="Foreground" Value="#0F172A"/>
         <Setter Property="FontFamily" Value="{StaticResource BodyFontFamily}"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="13.5"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Border x:Name="Box"
-                                Width="20" Height="20"
+                                Width="18" Height="18"
                                 CornerRadius="5"
                                 BorderThickness="1.5"
-                                BorderBrush="{StaticResource FrostPanelBorderBrush}"
-                                Background="Transparent"
+                                BorderBrush="#CBD5E1"
+                                Background="#FFFFFF"
                                 VerticalAlignment="Center"
                                 Margin="0,0,10,0">
-                            <Path x:Name="Check"
-                                  Data="M 4,10 L 8,14 L 15,6"
-                                  Stroke="{StaticResource GraphiteVoidBrush}"
-                                  StrokeThickness="2"
-                                  StrokeLineJoin="Round"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round"
-                                  Opacity="0"
-                                  VerticalAlignment="Center"
-                                  HorizontalAlignment="Center"/>
+                            <Viewbox Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Path x:Name="Check"
+                                      Data="M 2,7 L 6,11 L 14,3"
+                                      Stroke="#FFFFFF"
+                                      StrokeThickness="2.5"
+                                      StrokeLineJoin="Round"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Opacity="0"/>
+                            </Viewbox>
                         </Border>
                         <ContentPresenter VerticalAlignment="Center"/>
                     </StackPanel>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Box" Property="Background" Value="{StaticResource TelemetryCyanBrush}"/>
-                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource TelemetryCyanBrush}"/>
+                            <Setter TargetName="Box" Property="Background" Value="#2563EB"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="#2563EB"/>
                             <Setter TargetName="Check" Property="Opacity" Value="1"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource FogWhite70Brush}"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="#94A3B8"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

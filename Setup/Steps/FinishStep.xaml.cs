@@ -25,14 +25,16 @@ namespace WinDockSetup.Steps
                 TitleText.Text = "WinDock removed";
                 SubtitleText.Text = "WinDock has been removed from your system.";
                 LaunchCheckBox.Visibility = Visibility.Collapsed;
+                FinishButton.Content = "Finish";
                 
                 mainWindow.UpdateTelemetry("REMOVED", "COMPLETE", 100.0);
             }
             else
             {
-                TitleText.Text = "WinDock installed";
-                SubtitleText.Text = "Your dock is ready to launch.";
+                TitleText.Text = "WinDock Suite is Ready";
+                SubtitleText.Text = "WinDock, Ripple, and Weather App installed successfully.";
                 LaunchCheckBox.Visibility = Visibility.Visible;
+                FinishButton.Content = "Launch & Finish";
                 
                 mainWindow.UpdateTelemetry("INSTALLED", "COMPLETE", 100.0);
             }

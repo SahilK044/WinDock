@@ -4,69 +4,82 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             d:DesignHeight="400" d:DesignWidth="600"
+             d:DesignHeight="450" d:DesignWidth="680"
              Loaded="UserControl_Loaded">
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Logo -->
-        <Image x:Name="LogoImage" Grid.Row="1" Source="/windock_logo.png" Width="68" Height="68" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0" RenderTransformOrigin="0.5,0.5">
-            <Image.RenderTransform>
-                <ScaleTransform x:Name="LogoScale" ScaleX="0.96" ScaleY="0.96"/>
-            </Image.RenderTransform>
-        </Image>
+        <!-- Suite Badge -->
+        <Border Grid.Row="0" HorizontalAlignment="Center" Margin="0,4,0,14" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="12" Padding="14,5">
+            <TextBlock Text="WINDOCK SUITE v2.0  ·  ALL-IN-ONE EDITION" FontFamily="{StaticResource MonoFontFamily}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TelemetryCyanBrush}"/>
+        </Border>
 
         <!-- Title -->
-        <TextBlock x:Name="TitleText" Grid.Row="2" Text="Welcome to WinDock" 
+        <TextBlock x:Name="TitleText" Grid.Row="1" Text="Welcome to WinDock Suite" 
                    FontFamily="{StaticResource DisplayFontFamily}" FontSize="28" FontWeight="Bold"
                    Foreground="{StaticResource FogWhiteBrush}" 
                    HorizontalAlignment="Center" Margin="0,0,0,8" Opacity="0"/>
 
         <!-- Subtitle -->
-        <TextBlock x:Name="SubtitleText" Grid.Row="3" Text="A macOS-style dock &amp; Dynamic Island for Windows." 
+        <TextBlock x:Name="SubtitleText" Grid.Row="2" Text="An integrated macOS Dock, Dynamic Island, and Live Weather experience for Windows." 
                    FontFamily="{StaticResource BodyFontFamily}" FontSize="14" 
                    Foreground="{StaticResource FogWhite70Brush}" 
                    HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Opacity="0"/>
 
-        <!-- High-tech spec card -->
-        <Border x:Name="SpecPanel" Grid.Row="4" Background="{StaticResource FrostPanelBackgroundBrush}" BorderBrush="{StaticResource FrostPanelBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20,16" VerticalAlignment="Center" Margin="28,0,28,0" Opacity="0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="1"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="1"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                
-                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
-                    <TextBlock Text="PERFORMANCE" FontFamily="{StaticResource MonoFontFamily}" FontSize="9" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="60 FPS GPU" FontFamily="{StaticResource BodyFontFamily}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TelemetryCyanBrush}" HorizontalAlignment="Center"/>
+        <!-- High-tech Integrated Apps Cards -->
+        <Grid x:Name="SpecPanel" Grid.Row="3" Margin="0,20,0,20" VerticalAlignment="Center" Opacity="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="14"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="14"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Card 1: WinDock -->
+            <Border Grid.Column="0" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="16,20">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.06" Color="#000000"/>
+                </Border.Effect>
+                <StackPanel HorizontalAlignment="Center">
+                    <TextBlock Text="🍏" FontSize="26" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Text="WinDock" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="macOS Dock &amp; Spotlight" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </StackPanel>
-                
-                <Border Grid.Column="1" Background="{StaticResource FrostPanelBorderBrush}" Margin="0,2"/>
-                
-                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
-                    <TextBlock Text="MEMORY" FontFamily="{StaticResource MonoFontFamily}" FontSize="9" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="&lt;15MB RAM" FontFamily="{StaticResource BodyFontFamily}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource FogWhiteBrush}" HorizontalAlignment="Center"/>
+            </Border>
+
+            <!-- Card 2: Ripple -->
+            <Border Grid.Column="2" Background="#FFFFFF" BorderBrush="#93C5FD" BorderThickness="1.5" CornerRadius="12" Padding="16,20">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="3" Opacity="0.08" Color="#2563EB"/>
+                </Border.Effect>
+                <StackPanel HorizontalAlignment="Center">
+                    <TextBlock Text="🌊" FontSize="26" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Text="Ripple" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#2563EB" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="Dynamic Island &amp; Media" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </StackPanel>
-                
-                <Border Grid.Column="3" Background="{StaticResource FrostPanelBorderBrush}" Margin="0,2"/>
-                
-                <StackPanel Grid.Column="4" HorizontalAlignment="Center">
-                    <TextBlock Text="DYNAMIC ISLAND" FontFamily="{StaticResource MonoFontFamily}" FontSize="9" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="UNIVERSAL MEDIA" FontFamily="{StaticResource BodyFontFamily}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource FogWhiteBrush}" HorizontalAlignment="Center"/>
+            </Border>
+
+            <!-- Card 3: Weather -->
+            <Border Grid.Column="4" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="16,20">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.06" Color="#000000"/>
+                </Border.Effect>
+                <StackPanel HorizontalAlignment="Center">
+                    <TextBlock Text="⛅" FontSize="26" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Text="Weather" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="Live Forecast Overlay" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </StackPanel>
-            </Grid>
-        </Border>
+            </Border>
+        </Grid>
 
         <!-- Keep settings checkbox (uninstall mode only) -->
         <CheckBox x:Name="KeepConfigCheckBox" Grid.Row="4"
@@ -78,16 +91,14 @@
                   Visibility="Collapsed"/>
 
         <!-- Buttons Area -->
-        <Grid x:Name="ButtonsPanel" Grid.Row="5" Margin="0,24,0,0" Opacity="0">
+        <Grid x:Name="ButtonsPanel" Grid.Row="5" Margin="0,8,0,0" Opacity="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            
+
             <Button x:Name="CancelBtn" Grid.Column="0" Style="{StaticResource GhostButtonStyle}" Content="Cancel" Click="CancelBtn_Click"/>
-            
-            <TextBlock Grid.Column="1" Text="v2.0" FontFamily="{StaticResource MonoFontFamily}" FontSize="10" Foreground="{StaticResource FogWhite45Brush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
             <Button x:Name="ContinueBtn" Grid.Column="2" Style="{StaticResource PrimaryButtonStyle}" Content="Continue →" Click="ContinueBtn_Click"/>
         </Grid>

@@ -42,21 +42,6 @@ namespace WinDockSetup.Steps
 
             if (animationsEnabled)
             {
-                // Logo animation
-                var logoFade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
-                var logoScaleX = new DoubleAnimation(0.96, 1.0, TimeSpan.FromMilliseconds(200))
-                {
-                    EasingFunction = new BackEase { Amplitude = 0.3, EasingMode = EasingMode.EaseOut }
-                };
-                var logoScaleY = new DoubleAnimation(0.96, 1.0, TimeSpan.FromMilliseconds(200))
-                {
-                    EasingFunction = new BackEase { Amplitude = 0.3, EasingMode = EasingMode.EaseOut }
-                };
-
-                LogoImage.BeginAnimation(UIElement.OpacityProperty, logoFade);
-                LogoScale.BeginAnimation(ScaleTransform.ScaleXProperty, logoScaleX);
-                LogoScale.BeginAnimation(ScaleTransform.ScaleYProperty, logoScaleY);
-
                 // Title
                 var titleFade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)) { BeginTime = TimeSpan.FromMilliseconds(80) };
                 TitleText.BeginAnimation(UIElement.OpacityProperty, titleFade);
@@ -82,9 +67,6 @@ namespace WinDockSetup.Steps
             }
             else
             {
-                LogoImage.Opacity = 1;
-                LogoScale.ScaleX = 1;
-                LogoScale.ScaleY = 1;
                 TitleText.Opacity = 1;
                 SubtitleText.Opacity = 1;
                 SpecPanel.Opacity = 1;

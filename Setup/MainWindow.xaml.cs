@@ -85,33 +85,68 @@ namespace WinDockSetup
         public void NavigateToStep(int index)
         {
             if (index < 0 || index >= _steps.Length) return;
+
+            bool isForward = index >= _currentStep;
             _currentStep = index;
 
-            var step = _steps[index];
-            step.Opacity = 0;
-            step.RenderTransform = new TranslateTransform(24, 0);
-            StepHost.Content = step;
-
-            // Update step dots
+            // Update step dots with light mode active/inactive colors
             for (int i = 0; i < _stepDots.Length; i++)
             {
                 _stepDots[i].Fill = i == index
-                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#35D6C7"))
-                    : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#26ffffff"));
+                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB"))
+                    : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CBD5E1"));
             }
 
-            // Animate in
-            var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(220))
+            var oldStep = StepHost.Content as UserControl;
+            var newStep = _steps[index];
+
+            double enterStartPos = isForward ? 60.0 : -60.0;
+            double exitEndPos = isForward ? -50.0 : 50.0;
+
+            if (oldStep != null && oldStep != newStep)
+            {
+                if (!(oldStep.RenderTransform is TranslateTransform))
+                {
+                    oldStep.RenderTransform = new TranslateTransform(0, 0);
+                }
+                var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(130));
+                var slideOut = new DoubleAnimation(0, exitEndPos, TimeSpan.FromMilliseconds(130))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
+                };
+
+                fadeOut.Completed += (s, e) =>
+                {
+                    ShowNewStep(newStep, enterStartPos);
+                };
+
+                oldStep.BeginAnimation(OpacityProperty, fadeOut);
+                ((TranslateTransform)oldStep.RenderTransform).BeginAnimation(TranslateTransform.XProperty, slideOut);
+            }
+            else
+            {
+                ShowNewStep(newStep, enterStartPos);
+            }
+        }
+
+        private void ShowNewStep(UserControl newStep, double enterStartPos)
+        {
+            newStep.Opacity = 0;
+            var transform = new TranslateTransform(enterStartPos, 0);
+            newStep.RenderTransform = transform;
+            StepHost.Content = newStep;
+
+            var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(240))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
-            var slideIn = new DoubleAnimation(24, 0, TimeSpan.FromMilliseconds(220))
+            var slideIn = new DoubleAnimation(enterStartPos, 0, TimeSpan.FromMilliseconds(240))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
 
-            step.BeginAnimation(OpacityProperty, fadeIn);
-            ((TranslateTransform)step.RenderTransform).BeginAnimation(TranslateTransform.XProperty, slideIn);
+            newStep.BeginAnimation(OpacityProperty, fadeIn);
+            transform.BeginAnimation(TranslateTransform.XProperty, slideIn);
         }
 
         public void GoNext()

@@ -7,15 +7,15 @@
              d:DesignHeight="400" d:DesignWidth="600"
              Loaded="UserControl_Loaded">
     <UserControl.Resources>
-        <Storyboard x:Key="ShimmerAnimation" RepeatBehavior="Forever">
-            <DoubleAnimation Storyboard.TargetName="ShimmerLine"
-                             Storyboard.TargetProperty="Opacity"
-                             From="0.3" To="0.75"
-                             Duration="0:0:1.2" AutoReverse="True">
-                <DoubleAnimation.EasingFunction>
-                    <CubicEase EasingMode="EaseInOut"/>
-                </DoubleAnimation.EasingFunction>
-            </DoubleAnimation>
+        <Storyboard x:Key="SmoothShimmerStoryboard" RepeatBehavior="Forever" Timeline.DesiredFrameRate="60">
+            <PointAnimation Storyboard.TargetName="ShimmerGradient"
+                            Storyboard.TargetProperty="StartPoint"
+                            From="-1.5,0" To="1.5,0"
+                            Duration="0:0:1.5"/>
+            <PointAnimation Storyboard.TargetName="ShimmerGradient"
+                            Storyboard.TargetProperty="EndPoint"
+                            From="-0.5,0" To="2.5,0"
+                            Duration="0:0:1.5"/>
         </Storyboard>
     </UserControl.Resources>
 
@@ -28,72 +28,89 @@
         </Grid.RowDefinitions>
 
         <!-- Row 0: Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock x:Name="TitleText"
-                       Text="Installing WinDock"
+                       Text="Installing WinDock Suite"
                        FontFamily="{StaticResource DisplayFontFamily}"
                        FontSize="22"
                        FontWeight="Bold"
-                       Foreground="{StaticResource FogWhiteBrush}"
-                       Margin="0,0,0,6"/>
+                       Foreground="#0F172A"
+                       Margin="0,0,0,4"/>
 
             <TextBlock x:Name="StatusText"
                        Text="Preparing installation directory..."
                        FontFamily="{StaticResource BodyFontFamily}"
                        FontSize="13.5"
-                       Foreground="{StaticResource FogWhite70Brush}"/>
+                       Foreground="#475569"/>
         </StackPanel>
 
-        <!-- Row 1: Progress Card -->
+        <!-- Row 1: Progress Card with Shimmer & Live File Label -->
         <Border Grid.Row="1"
-                Background="{StaticResource FrostPanelBackgroundBrush}"
-                BorderBrush="{StaticResource FrostPanelBorderBrush}"
+                Background="#FFFFFF"
+                BorderBrush="#E2E8F0"
                 BorderThickness="1"
                 CornerRadius="12"
-                Padding="18,16"
-                Margin="0,0,0,16">
+                Padding="20,16"
+                Margin="0,0,0,14">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.06" Color="#000000"/>
+            </Border.Effect>
             <StackPanel>
                 <Grid Margin="0,0,0,10">
                     <TextBlock Text="INSTALLATION PROGRESS"
                                FontFamily="{StaticResource MonoFontFamily}"
                                FontSize="9.5"
                                FontWeight="Bold"
-                               Foreground="{StaticResource FogWhite45Brush}"
+                               Foreground="#64748B"
                                VerticalAlignment="Center"/>
 
                     <TextBlock x:Name="PercentText"
                                Text="0%"
                                FontFamily="{StaticResource MonoFontFamily}"
-                               FontSize="12"
+                               FontSize="13"
                                FontWeight="Bold"
-                               Foreground="{StaticResource TelemetryCyanBrush}"
+                               Foreground="#2563EB"
                                HorizontalAlignment="Right"
                                VerticalAlignment="Center"/>
                 </Grid>
 
-                <Grid x:Name="ProgressTrackContainer" Height="6">
-                    <!-- Progress Track -->
-                    <Border CornerRadius="3" Background="#1AFFFFFF"/>
-                    <!-- Progress Fill -->
+                <!-- Progress Bar Container -->
+                <Grid x:Name="ProgressTrackContainer" Height="10" Margin="0,0,0,10">
+                    <!-- Track Background -->
+                    <Border CornerRadius="5" Background="#E2E8F0"/>
+                    
+                    <!-- Progress Fill Container -->
                     <Border x:Name="ProgressBarFill"
                             HorizontalAlignment="Left"
                             Width="0"
-                            CornerRadius="3"
-                            Background="{StaticResource TelemetryCyanBrush}"/>
-                    <!-- Shimmer Glow Line -->
-                    <Rectangle x:Name="ShimmerLine"
-                               Height="6"
-                               Fill="{StaticResource TelemetryCyanBrush}"
-                               Opacity="0.4"
-                               RadiusX="3" RadiusY="3"/>
+                            CornerRadius="5">
+                        <Border.Background>
+                            <LinearGradientBrush x:Name="ShimmerGradient" StartPoint="-1.5,0" EndPoint="-0.5,0">
+                                <GradientStop Color="#1D4ED8" Offset="0.0"/>
+                                <GradientStop Color="#2563EB" Offset="0.3"/>
+                                <GradientStop Color="#BFDBFE" Offset="0.5"/>
+                                <GradientStop Color="#2563EB" Offset="0.7"/>
+                                <GradientStop Color="#1D4ED8" Offset="1.0"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
                 </Grid>
+
+                <!-- Live File Being Copied Label -->
+                <TextBlock x:Name="CurrentFileText"
+                           Text="Copying files..."
+                           FontFamily="{StaticResource MonoFontFamily}"
+                           FontSize="11"
+                           Foreground="#2563EB"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,2,0,0"/>
             </StackPanel>
         </Border>
 
         <!-- Row 2: Console Log -->
         <Border Grid.Row="2"
-                Background="#08FFFFFF"
-                BorderBrush="{StaticResource FrostPanelBorderBrush}"
+                Background="#F8FAFC"
+                BorderBrush="#E2E8F0"
                 BorderThickness="1"
                 CornerRadius="12"
                 Padding="16,14"
@@ -102,7 +119,7 @@
                 <TextBlock x:Name="LogText"
                            FontFamily="{StaticResource MonoFontFamily}"
                            FontSize="11"
-                           Foreground="{StaticResource FogWhite45Brush}"
+                           Foreground="#475569"
                            TextWrapping="Wrap"
                            LineHeight="18"/>
             </ScrollViewer>

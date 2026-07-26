@@ -23,6 +23,9 @@ if ($buildExit -eq 0) {
             Copy-Item -Path "bin\Release\net48\WinDock.pdb" -Destination "WinDock.pdb" -Force
         }
         Copy-Item -Path "bin\Release\net48\WinDock.exe" -Destination "WinDockConsole.exe" -Force
+        if (Test-Path "Ripple\resources\app.asar") {
+            Copy-Item -Path "Ripple\resources\app.asar" -Destination "bin\Release\net48\Ripple\resources\app.asar" -Force
+        }
     }
     elseif (Test-Path "bin\Debug\net48\WinDock.exe") {
         Copy-Item -Path "bin\Debug\net48\WinDock.exe" -Destination "WinDock.exe" -Force
