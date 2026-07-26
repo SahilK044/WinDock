@@ -3973,6 +3973,7 @@ namespace MacStyleDock
 
 				_isPresentationSourceValid = true;
 				SetupFullscreenWatcher ();
+				try { new VisualizerOverlayWindow().Show(); } catch { }
 
 				// Perf fix: ManageRippleState() runs a WMI process query and (on first run)
 				// launches the ~200MB Chromium-based Ripple helper process. Doing that
@@ -52502,5 +52503,157 @@ namespace MacStyleDock
 			base.MouseLeftButtonDown += (s, e) => { if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) base.DragMove (); };
 		}
 	}
-}
 
+
+	public class VisualizerOverlayWindow : Window
+	{
+		[System.Runtime.InteropServices.DllImport("user32.dll")]
+		private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+		[System.Runtime.InteropServices.DllImport("user32.dll")]
+		private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+		private DispatcherTimer animTimer;
+		private Canvas mainCanvas;
+		private System.Windows.Shapes.Rectangle[] bars = new System.Windows.Shapes.Rectangle[5];
+		private System.Windows.Shapes.Ellipse[] auraRings = new System.Windows.Shapes.Ellipse[3];
+		private double phase = 0;
+		private System.Windows.Media.Color accentColor = System.Windows.Media.Color.FromRgb(30, 215, 96);
+		private System.Windows.Media.Color targetAccentColor = System.Windows.Media.Color.FromRgb(30, 215, 96);
+
+		public VisualizerOverlayWindow()
+		{
+			WindowStyle = WindowStyle.None;
+			AllowsTransparency = true;
+			Background = System.Windows.Media.Brushes.Transparent;
+			Topmost = true;
+			ShowInTaskbar = false;
+			Width = 400;
+			Height = 120;
+			Left = (SystemParameters.PrimaryScreenWidth - Width) / 2.0;
+			Top = 0;
+			IsHitTestVisible = false;
+
+			mainCanvas = new Canvas { Width = Width, Height = Height };
+			Content = mainCanvas;
+
+			for (int i = 0; i < 3; i++)
+			{
+				var ring = new System.Windows.Shapes.Ellipse
+				{
+					Width = 70 + i * 45,
+					Height = 35 + i * 22,
+					Stroke = new SolidColorBrush(accentColor),
+					StrokeThickness = 1.5 - i * 0.4,
+					Opacity = 0
+				};
+				Canvas.SetLeft(ring, (Width - ring.Width) / 2.0);
+				Canvas.SetTop(ring, 10 - i * 5);
+				mainCanvas.Children.Add(ring);
+				auraRings[i] = ring;
+			}
+
+			StackPanel eqPanel = new StackPanel
+			{
+				Orientation = System.Windows.Controls.Orientation.Horizontal,
+				Height = 24,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+			};
+			Canvas.SetLeft(eqPanel, (Width - 45) / 2.0);
+			Canvas.SetTop(eqPanel, 8);
+
+			for (int i = 0; i < 5; i++)
+			{
+				bars[i] = new System.Windows.Shapes.Rectangle
+				{
+					Width = 4.5,
+					Height = 4,
+					Margin = new Thickness(2, 0, 2, 0),
+					RadiusX = 2,
+					RadiusY = 2,
+					Fill = new SolidColorBrush(accentColor),
+					VerticalAlignment = System.Windows.VerticalAlignment.Bottom
+				};
+				eqPanel.Children.Add(bars[i]);
+			}
+			mainCanvas.Children.Add(eqPanel);
+
+			animTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+			animTimer.Tick += AnimTimer_Tick;
+			animTimer.Start();
+
+			Loaded += (s, e) =>
+			{
+				try
+				{
+					var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+					int extendedStyle = GetWindowLong(hwnd, -20);
+					SetWindowLong(hwnd, -20, extendedStyle | 0x00000020 | 0x00000080);
+				}
+				catch { }
+			};
+		}
+
+		public void UpdateAccentColor(System.Windows.Media.Color color)
+		{
+			targetAccentColor = color;
+		}
+
+		private void AnimTimer_Tick(object sender, EventArgs e)
+		{
+			phase += 0.08;
+
+			accentColor = System.Windows.Media.Color.FromRgb(
+				(byte)(accentColor.R + (targetAccentColor.R - accentColor.R) * 0.05),
+				(byte)(accentColor.G + (targetAccentColor.G - accentColor.G) * 0.05),
+				(byte)(accentColor.B + (targetAccentColor.B - accentColor.B) * 0.05)
+			);
+
+			var brush = new SolidColorBrush(accentColor);
+
+			float peak = DockWindow.SharedAudioPeak;
+			bool isPlaying = peak > 0.012f;
+
+			double[] heights = new double[]
+			{
+				4 + Math.Sin(phase * 1.2) * 8 + peak * 14,
+				6 + Math.Cos(phase * 1.5) * 10 + peak * 16,
+				3 + Math.Sin(phase * 1.8) * 12 + peak * 18,
+				5 + Math.Cos(phase * 1.1) * 9 + peak * 15,
+				4 + Math.Sin(phase * 1.4) * 8 + peak * 13
+			};
+
+			for (int i = 0; i < 5; i++)
+			{
+				if (isPlaying)
+				{
+					bars[i].Height = Math.Max(3, Math.Min(22, heights[i]));
+					bars[i].Fill = brush;
+				}
+				else
+				{
+					bars[i].Height = 3;
+					bars[i].Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(90, 255, 255, 255));
+				}
+			}
+
+			for (int i = 0; i < 3; i++)
+			{
+				if (isPlaying)
+				{
+					double rPhase = (phase * 0.5 + i * 1.2) % (Math.PI * 2);
+					double scale = 1.0 + Math.Sin(rPhase) * 0.2 + peak * 0.3;
+					auraRings[i].Width = (70 + i * 45) * scale;
+					auraRings[i].Height = (35 + i * 22) * scale;
+					Canvas.SetLeft(auraRings[i], (Width - auraRings[i].Width) / 2.0);
+					auraRings[i].Stroke = brush;
+					auraRings[i].Opacity = Math.Max(0, 0.45 - i * 0.12) * (0.5 + peak * 0.5);
+				}
+				else
+				{
+					auraRings[i].Opacity = 0;
+				}
+			}
+		}
+	}
+}
