@@ -14910,6 +14910,19 @@ namespace MacStyleDock
 				return;
 			}
 
+			if (Config != null && (Config.FilePath == "action:airdrop" || Config.FilePath == "action:phonelink")) {
+				try {
+					Process.Start (new ProcessStartInfo ("ms-phone-link:") { UseShellExecute = true });
+				} catch {
+					try {
+						Process.Start (new ProcessStartInfo ("https://www.microsoft.com/p/phone-link/9nmpj99vjbwv") { UseShellExecute = true });
+					} catch (Exception ex) {
+						System.Windows.MessageBox.Show ("Could not open Phone Link: " + ex.Message, "Launch Error", MessageBoxButton.OK, MessageBoxImage.Hand);
+					}
+				}
+				return;
+			}
+
 			string targetPath = (Config != null && !string.IsNullOrEmpty (Config.FilePath)) ? System.Environment.ExpandEnvironmentVariables (Config.FilePath) : "";
 			if (string.IsNullOrEmpty (targetPath) && Config != null && Config.Name != null && (Config.Name.Contains ("Download") || Config.Name.Contains ("Folder") || Config.Name.Contains ("Document"))) {
 				targetPath = System.Environment.GetFolderPath (System.Environment.SpecialFolder.UserProfile) + "\\Downloads";
