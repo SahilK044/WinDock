@@ -52382,12 +52382,8 @@ public class AirDropWindow : Window
 			} catch { }
 
 			try {
-				Process.Start(new ProcessStartInfo("ms-phone-link:share") { UseShellExecute = true });
-			} catch {
-				try {
-					Process.Start(new ProcessStartInfo("cmd.exe", "/c start shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App") { CreateNoWindow = true, UseShellExecute = false });
-				} catch { }
-			}
+				Process.Start(new ProcessStartInfo("cmd.exe", "/c start shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App") { CreateNoWindow = true, UseShellExecute = false });
+			} catch { }
 
 			var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
 			timer.Tick += (st, ev) => {
