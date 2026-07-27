@@ -5,9 +5,7 @@
 
 ## 🎥 Video Preview
 
-<p align="center">
-  <video src="https://github.com/SahilK044/WinDock/raw/main/preview.mp4" width="100%" controls></video>
-</p>
+![WinDock Suite Preview](preview.gif)
 
 ---
 
