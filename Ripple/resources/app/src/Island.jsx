@@ -32,6 +32,21 @@ function rgbToCss(r, g, b, a = 1) { return `rgba(${clampByte(r) | 0}, ${clampByt
 
 // Downsamples the artwork to a tiny canvas and buckets pixels to find a
 // vivid "primary" color and a darker "secondary" color for gradients.
+function ensureMinBrightness(colorStr, minLuminance = 140) {
+  if (!colorStr) return "rgba(225, 45, 45, 1)";
+  const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (!match) return colorStr;
+  let r = Number(match[1]), g = Number(match[2]), b = Number(match[3]), a = match[4] !== undefined ? Number(match[4]) : 1;
+  let max = Math.max(r, g, b);
+  if (max < minLuminance) {
+    let scale = minLuminance / Math.max(1, max);
+    r = Math.min(255, r * scale);
+    g = Math.min(255, g * scale);
+    b = Math.min(255, b * scale);
+  }
+  return `rgba(${r | 0}, ${g | 0}, ${b | 0}, ${a})`;
+}
+
 function extractPaletteFromImage(img) {
   try {
     const c = document.createElement("canvas");
@@ -221,8 +236,8 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
       const t = now / 1000;
       const real = usingRealAudioRef.current;
       const palette = paletteRef?.current || { primary: "rgba(225,29,72,1)", secondary: "rgba(244,63,94,1)" };
-      const primaryColor = palette.primary || "rgba(225,29,72,1)";
-      const secondaryColor = palette.secondary || "rgba(244,63,94,1)";
+      const primaryColor = ensureMinBrightness(palette.primary || "rgba(225,29,72,1)", 150);
+      const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(244,63,94,1)", 110);
 
       ctx.clearRect(0, 0, width, height);
 
@@ -332,9 +347,9 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
       const gap = 2.5;
       const barWidth = (width - gap * (MINI_BAR_COUNT - 1)) / MINI_BAR_COUNT;
       const real = usingRealAudioRef.current;
-      const palette = paletteRef?.current || { primary: "#3b82f6", secondary: "#93c5fd" };
-      const primaryColor = palette.primary || "#3b82f6";
-      const secondaryColor = palette.secondary || "#93c5fd";
+      const palette = paletteRef?.current || { primary: "rgba(225,29,72,1)", secondary: "rgba(244,63,94,1)" };
+      const primaryColor = ensureMinBrightness(palette.primary || "rgba(225,29,72,1)", 150);
+      const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(244,63,94,1)", 110);
 
       ctx.clearRect(0, 0, width, height);
 

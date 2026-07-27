@@ -184,6 +184,20 @@ function parseCommand(input) {
 function launchWindows(input) {
   const trimmed = input.trim();
 
+  try {
+    const cacheFile = path.join(app.getPath("userData"), "app-cache.json");
+    if (fs.existsSync(cacheFile)) {
+      const data = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+      const match = data.find((a) => a.name && a.name.toLowerCase() === trimmed.toLowerCase() && a.path && !a.path.startsWith("shell:"));
+      if (match && match.path) {
+        shell.openPath(match.path).then((err) => {
+          if (err) exec(`start "" "${match.path}"`);
+        });
+        return;
+      }
+    }
+  } catch {}
+
   // UWP apps and schemes
   if (trimmed.startsWith("shell:")) {
     const safe = trimmed.replace(/'/g, "''");
@@ -821,6 +835,7 @@ try {
   // by @electron-forge/plugin-auto-unpack-natives when packaged.
   loopback = require("wasapi-loopback");
 } catch (err) {
+  console.error('[wasapi-loopback] Failed to load native WASAPI addon:', err);
   loopback = { available: false, start: () => false, stop: () => false };
 }
 
