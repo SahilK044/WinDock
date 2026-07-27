@@ -770,7 +770,7 @@ export default function Island() {
     )
   );
   let width = mode === "large"
-    ? (currentTab === 7 ? 495 : currentTab === 1 ? 480 : currentTab === 3 ? 330 : currentTab === 0 ? 405 : 380)
+    ? (currentTab === 7 ? 495 : currentTab === 1 ? 480 : currentTab === 3 ? 335 : currentTab === 0 ? 405 : 380)
     : (mode === "quick" && isPlaying && !alert && !chargingAlert && !bluetoothAlert && !cameraAlert && !microphoneAlert)
       ? nowPlayingWidth
       : (mode === "quick" || alert || chargingAlert || bluetoothAlert || cameraAlert || microphoneAlert)
@@ -778,7 +778,7 @@ export default function Island() {
         : isPlaying
           ? nowPlayingWidth
           : 170;
-  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 230 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
+  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 195 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
 
   const normalizeApps = (arr) => arr.map(a => typeof a === 'string' ? { name: a, launch: a } : a);
   const [quickApps, setQuickApps] = useState(() =>
@@ -2096,8 +2096,9 @@ export default function Island() {
                         justifyContent: 'flex-start',
                         width: '100%',
                         height: '100%',
-                        gap: '8px',
-                        paddingLeft: '17px',
+                        gap: '14px',
+                        padding: '14px 16px',
+                        boxSizing: 'border-box',
                         opacity: spotifyTrack.state === 'playing' ? 1 : 0.5,
                         filter: spotifyTrack.state === 'playing' ? 'none' : 'grayscale(1)',
                         transition: 'opacity 0.3s ease, filter 0.3s ease'
@@ -2127,7 +2128,7 @@ export default function Island() {
                             }
                           }}
                           style={{
-                            width: 110, height: 110, minWidth: 110,
+                            width: 96, height: 96, minWidth: 96,
                             flexShrink: 0,
                             borderRadius: 13, objectFit: 'cover',
                             boxShadow: albumHovered ? '0 8px 24px rgba(0,0,0,0.35)' : '0 4px 12px rgba(0,0,0,0.2)',
@@ -2139,7 +2140,7 @@ export default function Island() {
                         />
                       ) : (
                         <div style={{
-                          width: 110, height: 110, minWidth: 110,
+                          width: 96, height: 96, minWidth: 96,
                           flexShrink: 0,
                           borderRadius: 12, background: 'rgba(255,255,255,0.1)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2159,20 +2160,20 @@ export default function Island() {
                         minWidth: 0,
                       }}>
                         <div style={{ 
-                          width: '175px', 
+                          width: '185px', 
                           overflow: 'hidden',
-                          WebkitMaskImage: measureTextWidth(spotifyTrack.name, 18) > 175 
-                            ? 'linear-gradient(to right, transparent, black 15px, black 160px, transparent)' 
+                          WebkitMaskImage: measureTextWidth(spotifyTrack.name, 18) > 185 
+                            ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none',
-                          maskImage: measureTextWidth(spotifyTrack.name, 18) > 175 
-                            ? 'linear-gradient(to right, transparent, black 15px, black 160px, transparent)' 
+                          maskImage: measureTextWidth(spotifyTrack.name, 18) > 185 
+                            ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none'
                         }}>
                           <motion.h2
-                            animate={measureTextWidth(spotifyTrack.name, 18) > 175 ? { x: [0, -(measureTextWidth(spotifyTrack.name, 18) + 30)] } : {}}
+                            animate={measureTextWidth(spotifyTrack.name, 18) > 185 ? { x: [0, -(measureTextWidth(spotifyTrack.name, 18) + 30)] } : {}}
                             transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                             style={{
-                              margin: '0 0 0 5px',
+                              margin: '0 0 0 0px',
                               fontSize: 18,
                               fontWeight: 600,
                               whiteSpace: 'nowrap',
@@ -2180,27 +2181,27 @@ export default function Island() {
                               color: textColor,
                               fontFamily: theme === "win95" ? "w95" : "OpenRunde"
                             }}>
-                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.name, 18) > 175 ? 30 : 0 }}>{spotifyTrack.name || "Unknown Title"}</span>
-                            {measureTextWidth(spotifyTrack.name, 18) > 175 && (
+                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.name, 18) > 185 ? 30 : 0 }}>{spotifyTrack.name || "Unknown Title"}</span>
+                            {measureTextWidth(spotifyTrack.name, 18) > 185 && (
                               <span style={{ paddingRight: 30 }}>{spotifyTrack.name || "Unknown Title"}</span>
                             )}
                           </motion.h2>
                         </div>
                         <div style={{ 
-                          width: '175px', 
+                          width: '185px', 
                           overflow: 'hidden',
-                          WebkitMaskImage: measureTextWidth(spotifyTrack.artist, 13) > 175 
-                            ? 'linear-gradient(to right, transparent, black 15px, black 160px, transparent)' 
+                          WebkitMaskImage: measureTextWidth(spotifyTrack.artist, 13) > 185 
+                            ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none',
-                          maskImage: measureTextWidth(spotifyTrack.artist, 13) > 175 
-                            ? 'linear-gradient(to right, transparent, black 15px, black 160px, transparent)' 
+                          maskImage: measureTextWidth(spotifyTrack.artist, 13) > 185 
+                            ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none'
                         }}>
                           <motion.p
-                            animate={measureTextWidth(spotifyTrack.artist, 13) > 175 ? { x: [0, -(measureTextWidth(spotifyTrack.artist, 13) + 30)] } : {}}
+                            animate={measureTextWidth(spotifyTrack.artist, 13) > 185 ? { x: [0, -(measureTextWidth(spotifyTrack.artist, 13) + 30)] } : {}}
                             transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                             style={{
-                              margin: '4px 0 0 5px',
+                              margin: '2px 0 0 0px',
                               fontSize: 13,
                               opacity: 0.8,
                               whiteSpace: 'nowrap',
@@ -2208,21 +2209,21 @@ export default function Island() {
                               color: textColor,
                               fontFamily: theme === "win95" ? "w95" : "OpenRunde"
                             }}>
-                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.artist, 13) > 175 ? 30 : 0 }}>{spotifyTrack.artist || "Unknown Artist"}</span>
-                            {measureTextWidth(spotifyTrack.artist, 13) > 175 && (
+                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.artist, 13) > 185 ? 30 : 0 }}>{spotifyTrack.artist || "Unknown Artist"}</span>
+                            {measureTextWidth(spotifyTrack.artist, 13) > 185 && (
                               <span style={{ paddingRight: 30 }}>{spotifyTrack.artist || "Unknown Artist"}</span>
                             )}
                           </motion.p>
                         </div>
-                        <div style={{ marginTop: 6, marginBottom: 4, marginLeft: 5, display: 'flex', alignItems: 'center', minHeight: 32 }}>
+                        <div style={{ marginTop: 4, marginBottom: 4, marginLeft: 0, display: 'flex', alignItems: 'center', minHeight: 26, width: '185px' }}>
                           <AlbumAudioVisualizer
                             isPlaying={isPlaying}
                             paletteRef={albumPaletteRef}
-                            width={220}
-                            height={32}
+                            width={185}
+                            height={26}
                           />
                         </div>
-                        <div style={{ display: 'flex', gap: 24, marginTop: 10, alignItems: 'center', justifyContent: 'center', width: '220px' }}>
+                        <div style={{ display: 'flex', gap: 20, marginTop: 6, alignItems: 'center', justifyContent: 'center', width: '185px' }}>
                           <button
                             className="media-btn"
                             onClick={() => {
