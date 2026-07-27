@@ -771,7 +771,7 @@ export default function Island() {
     300,
     Math.max(
       122,
-      Math.ceil(textWidth + 24 + 6 + 20)
+      Math.ceil(textWidth + 24 + 6 + 26 + 20)
     )
   );
   let width = mode === "large"
@@ -1758,6 +1758,16 @@ export default function Island() {
                     )}
                   </motion.div>
                 </div>
+                {spotifyTrack && (
+                  <div style={{ marginLeft: 6, marginRight: 4, display: 'flex', alignItems: 'center', flexShrink: 0, zIndex: 10 }}>
+                    <MiniAudioVisualizer
+                      isPlaying={spotifyTrack.state === 'playing'}
+                      paletteRef={albumPaletteRef}
+                      width={22}
+                      height={16}
+                    />
+                  </div>
+                )}
                 <AnimatePresence>
                   {isHovered && (
                     <motion.button
