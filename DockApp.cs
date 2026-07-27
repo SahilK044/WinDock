@@ -52460,15 +52460,39 @@ namespace MacStyleDock
 
 			StackPanel btnSp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
 
+			Border crossDevBorder = new Border {
+				CornerRadius = new CornerRadius(10),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
+				Margin = new Thickness (0, 0, 10, 0)
+			};
 			System.Windows.Controls.Button crossDevBtn = new System.Windows.Controls.Button {
 				Content = "Device Settings",
 				Padding = new Thickness (14, 8, 14, 8),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (40, 255, 255, 255)),
+				Background = System.Windows.Media.Brushes.Transparent,
 				Foreground = System.Windows.Media.Brushes.White,
 				BorderThickness = new Thickness (0),
-				Cursor = System.Windows.Input.Cursors.Hand,
-				Margin = new Thickness (0, 0, 10, 0)
+				FontWeight = FontWeights.SemiBold,
+				Cursor = System.Windows.Input.Cursors.Hand
 			};
+			crossDevBorder.Child = crossDevBtn;
+
+			Border phoneLinkBorder = new Border {
+				CornerRadius = new CornerRadius(10),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
+				Effect = new System.Windows.Media.Effects.DropShadowEffect {
+					BlurRadius = 12, ShadowDepth = 2, Opacity = 0.35, Color = System.Windows.Media.Color.FromRgb (0, 122, 255)
+				}
+			};
+			System.Windows.Controls.Button phoneLinkBtn = new System.Windows.Controls.Button {
+				Content = "Open Phone Link",
+				Padding = new Thickness (16, 8, 16, 8),
+				Background = System.Windows.Media.Brushes.Transparent,
+				Foreground = System.Windows.Media.Brushes.White,
+				BorderThickness = new Thickness (0),
+				FontWeight = FontWeights.Bold,
+				Cursor = System.Windows.Input.Cursors.Hand
+			};
+			phoneLinkBorder.Child = phoneLinkBtn;
 			crossDevBtn.Click += (s, e) => {
 				try {
 					Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true });
@@ -52477,14 +52501,7 @@ namespace MacStyleDock
 				}
 			};
 
-			System.Windows.Controls.Button phoneLinkBtn = new System.Windows.Controls.Button {
-				Content = "Open Phone Link",
-				Padding = new Thickness (16, 8, 16, 8),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
-				Foreground = System.Windows.Media.Brushes.White,
-				BorderThickness = new Thickness (0),
-				Cursor = System.Windows.Input.Cursors.Hand
-			};
+
 			phoneLinkBtn.Click += (s, e) => {
 				try {
 					Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true });
@@ -52493,8 +52510,8 @@ namespace MacStyleDock
 				}
 			};
 
-			btnSp.Children.Add (crossDevBtn);
-			btnSp.Children.Add (phoneLinkBtn);
+			btnSp.Children.Add (crossDevBorder);
+			btnSp.Children.Add (phoneLinkBorder);
 			Grid.SetRow (btnSp, 2);
 			root.Children.Add (btnSp);
 

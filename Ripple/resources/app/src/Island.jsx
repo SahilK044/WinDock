@@ -2234,7 +2234,7 @@ export default function Island() {
                             onClick={() => {
                               window.electronAPI.controlSystemMedia('previous');
                             }}
-                            style={{ background: 'none', border: 'none', color: textColor, cursor: 'pointer', padding: 4, opacity: 0.8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 8, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
                           ><SkipBackIcon size={20} color={textColor} fill={textColor} /></button>
                           <button
                             className="media-btn"
@@ -2242,14 +2242,17 @@ export default function Island() {
                               window.electronAPI.controlSystemMedia('playpause');
                             }}
                             style={{
-                              background: 'none',
-                              border: 'none',
+                              background: 'rgba(255,255,255,0.18)',
+                              border: '1px solid rgba(255,255,255,0.25)',
+                              borderRadius: '50%',
                               color: textColor,
                               cursor: 'pointer',
-                              padding: 4,
+                              padding: 10,
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'center'
+                              justifyContent: 'center',
+                              transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                             }}
                           >
                             {spotifyTrack.state === 'playing' ? <Pause size={24} color={textColor} fill={textColor} /> : <Play size={24} color={textColor} fill={textColor} />}
@@ -2259,7 +2262,7 @@ export default function Island() {
                             onClick={() => {
                               window.electronAPI.controlSystemMedia('next');
                             }}
-                            style={{ background: 'none', border: 'none', color: textColor, cursor: 'pointer', padding: 4, opacity: 0.8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 8, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
                           ><SkipForwardIcon size={20} color={textColor} fill={textColor} /></button>
                         </div>
                       </div>
