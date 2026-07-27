@@ -2113,7 +2113,7 @@ export default function Island() {
                         <img
                           ref={albumRef}
                           src={spotifyTrack.artwork_url}
-                          onClick={() => openMusicPlayer(spotifyTrack.source)}
+                          onClick={(e) => { e.stopPropagation(); openMusicPlayer(spotifyTrack.source); }}
                           onMouseEnter={() => setAlbumHovered(true)}
                           onMouseLeave={() => {
                             setAlbumHovered(false);
@@ -2133,9 +2133,9 @@ export default function Island() {
                             }
                           }}
                           style={{
-                            width: 96, height: 96, minWidth: 96,
+                            width: 78, height: 78, minWidth: 78,
                             flexShrink: 0,
-                            borderRadius: 13, objectFit: 'cover',
+                            borderRadius: 12, objectFit: 'cover',
                             boxShadow: albumHovered ? '0 8px 24px rgba(0,0,0,0.35)' : '0 4px 12px rgba(0,0,0,0.2)',
                             cursor: 'pointer',
                             transition: 'transform 0.3s ease-out, box-shadow 0.3s ease-out',
@@ -2145,13 +2145,13 @@ export default function Island() {
                         />
                       ) : (
                         <div style={{
-                          width: 96, height: 96, minWidth: 96,
+                          width: 78, height: 78, minWidth: 78,
                           flexShrink: 0,
                           borderRadius: 12, background: 'rgba(255,255,255,0.1)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 24
                         }}>
-                          <Music size={40} color={textColor} />
+                          <Music size={32} color={textColor} />
                         </div>
                       )}
 
@@ -2167,27 +2167,27 @@ export default function Island() {
                         <div style={{ 
                           width: '185px', 
                           overflow: 'hidden',
-                          WebkitMaskImage: measureTextWidth(spotifyTrack.name, 18) > 185 
+                          WebkitMaskImage: measureTextWidth(spotifyTrack.name, 15) > 185 
                             ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none',
-                          maskImage: measureTextWidth(spotifyTrack.name, 18) > 185 
+                          maskImage: measureTextWidth(spotifyTrack.name, 15) > 185 
                             ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none'
                         }}>
                           <motion.h2
-                            animate={measureTextWidth(spotifyTrack.name, 18) > 185 ? { x: [0, -(measureTextWidth(spotifyTrack.name, 18) + 30)] } : {}}
+                            animate={measureTextWidth(spotifyTrack.name, 15) > 185 ? { x: [0, -(measureTextWidth(spotifyTrack.name, 15) + 30)] } : {}}
                             transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                             style={{
                               margin: '0 0 0 0px',
-                              fontSize: 18,
+                              fontSize: 15,
                               fontWeight: 600,
                               whiteSpace: 'nowrap',
                               display: 'inline-block',
                               color: textColor,
                               fontFamily: theme === "win95" ? "w95" : "OpenRunde"
                             }}>
-                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.name, 18) > 185 ? 30 : 0 }}>{spotifyTrack.name || "Unknown Title"}</span>
-                            {measureTextWidth(spotifyTrack.name, 18) > 185 && (
+                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.name, 15) > 185 ? 30 : 0 }}>{spotifyTrack.name || "Unknown Title"}</span>
+                            {measureTextWidth(spotifyTrack.name, 15) > 185 && (
                               <span style={{ paddingRight: 30 }}>{spotifyTrack.name || "Unknown Title"}</span>
                             )}
                           </motion.h2>
@@ -2195,50 +2195,52 @@ export default function Island() {
                         <div style={{ 
                           width: '185px', 
                           overflow: 'hidden',
-                          WebkitMaskImage: measureTextWidth(spotifyTrack.artist, 13) > 185 
+                          WebkitMaskImage: measureTextWidth(spotifyTrack.artist, 12) > 185 
                             ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none',
-                          maskImage: measureTextWidth(spotifyTrack.artist, 13) > 185 
+                          maskImage: measureTextWidth(spotifyTrack.artist, 12) > 185 
                             ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none'
                         }}>
                           <motion.p
-                            animate={measureTextWidth(spotifyTrack.artist, 13) > 185 ? { x: [0, -(measureTextWidth(spotifyTrack.artist, 13) + 30)] } : {}}
+                            animate={measureTextWidth(spotifyTrack.artist, 12) > 185 ? { x: [0, -(measureTextWidth(spotifyTrack.artist, 12) + 30)] } : {}}
                             transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                             style={{
-                              margin: '2px 0 0 0px',
-                              fontSize: 13,
+                              margin: '1px 0 0 0px',
+                              fontSize: 12,
                               opacity: 0.8,
                               whiteSpace: 'nowrap',
                               display: 'inline-block',
                               color: textColor,
                               fontFamily: theme === "win95" ? "w95" : "OpenRunde"
                             }}>
-                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.artist, 13) > 185 ? 30 : 0 }}>{spotifyTrack.artist || "Unknown Artist"}</span>
-                            {measureTextWidth(spotifyTrack.artist, 13) > 185 && (
+                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.artist, 12) > 185 ? 30 : 0 }}>{spotifyTrack.artist || "Unknown Artist"}</span>
+                            {measureTextWidth(spotifyTrack.artist, 12) > 185 && (
                               <span style={{ paddingRight: 30 }}>{spotifyTrack.artist || "Unknown Artist"}</span>
                             )}
                           </motion.p>
                         </div>
-                        <div style={{ marginTop: 2, marginBottom: 2, marginLeft: 0, display: 'flex', alignItems: 'center', minHeight: 20, width: '185px' }}>
+                        <div style={{ marginTop: 2, marginBottom: 2, marginLeft: 0, display: 'flex', alignItems: 'center', minHeight: 16, width: '185px' }}>
                           <AlbumAudioVisualizer
                             isPlaying={isPlaying}
                             paletteRef={albumPaletteRef}
                             width={185}
-                            height={20}
+                            height={16}
                           />
                         </div>
-                        <div style={{ display: 'flex', gap: 16, marginTop: 2, alignItems: 'center', justifyContent: 'center', width: '185px' }}>
+                        <div style={{ display: 'flex', gap: 14, marginTop: 2, alignItems: 'center', justifyContent: 'center', width: '185px' }}>
                           <button
                             className="media-btn"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               window.electronAPI.controlSystemMedia('previous');
                             }}
-                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 6, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
-                          ><SkipBackIcon size={18} color={textColor} fill={textColor} /></button>
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 5, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+                          ><SkipBackIcon size={16} color={textColor} fill={textColor} /></button>
                           <button
                             className="media-btn"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               window.electronAPI.controlSystemMedia('playpause');
                             }}
                             style={{
@@ -2247,7 +2249,7 @@ export default function Island() {
                               borderRadius: '50%',
                               color: textColor,
                               cursor: 'pointer',
-                              padding: 7,
+                              padding: 6,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -2255,15 +2257,16 @@ export default function Island() {
                               boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                             }}
                           >
-                            {spotifyTrack.state === 'playing' ? <Pause size={20} color={textColor} fill={textColor} /> : <Play size={20} color={textColor} fill={textColor} />}
+                            {spotifyTrack.state === 'playing' ? <Pause size={18} color={textColor} fill={textColor} /> : <Play size={18} color={textColor} fill={textColor} />}
                           </button>
                           <button
                             className="media-btn"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               window.electronAPI.controlSystemMedia('next');
                             }}
-                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 6, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
-                          ><SkipForwardIcon size={18} color={textColor} fill={textColor} /></button>
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 5, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+                          ><SkipForwardIcon size={16} color={textColor} fill={textColor} /></button>
                         </div>
                       </div>
                     </motion.div>
