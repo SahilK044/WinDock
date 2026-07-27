@@ -52371,6 +52371,7 @@ public class AirDropWindow : Window
 			borderFactory.Name = "border";
 			borderFactory.SetValue(Border.CornerRadiusProperty, cornerRadius);
 			borderFactory.SetValue(Border.BackgroundProperty, defaultBg);
+			borderFactory.SetBinding(Border.PaddingProperty, new System.Windows.Data.Binding("Padding") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
 
 			var presenterFactory = new FrameworkElementFactory(typeof(System.Windows.Controls.ContentPresenter));
 			presenterFactory.SetValue(System.Windows.Controls.ContentPresenter.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Center);
@@ -52497,8 +52498,7 @@ public class AirDropWindow : Window
 
 			System.Windows.Controls.Button crossDevBtn = new System.Windows.Controls.Button {
 				Content = "Device Settings",
-				Height = 36,
-				Padding = new Thickness (18, 0, 18, 0),
+				Padding = new Thickness (15, 8, 15, 8),
 				Foreground = System.Windows.Media.Brushes.White,
 				BorderThickness = new Thickness (0),
 				FontSize = 12,
@@ -52506,24 +52506,23 @@ public class AirDropWindow : Window
 				Cursor = System.Windows.Input.Cursors.Hand,
 				Margin = new Thickness (0, 0, 10, 0),
 				Template = CreateRoundedButtonTemplate(
-					new CornerRadius(18),
-					new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 255, 255, 255)),
-					new SolidColorBrush (System.Windows.Media.Color.FromArgb (55, 255, 255, 255)),
-					new SolidColorBrush (System.Windows.Media.Color.FromArgb (80, 255, 255, 255))
+					new CornerRadius(10),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (65, 255, 255, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (95, 255, 255, 255))
 				)
 			};
 
 			System.Windows.Controls.Button phoneLinkBtn = new System.Windows.Controls.Button {
 				Content = "Open Phone Link",
-				Height = 36,
-				Padding = new Thickness (20, 0, 20, 0),
+				Padding = new Thickness (18, 8, 18, 8),
 				Foreground = System.Windows.Media.Brushes.White,
 				BorderThickness = new Thickness (0),
 				FontSize = 12,
-				FontWeight = FontWeights.SemiBold,
+				FontWeight = FontWeights.Bold,
 				Cursor = System.Windows.Input.Cursors.Hand,
 				Template = CreateRoundedButtonTemplate(
-					new CornerRadius(18),
+					new CornerRadius(10),
 					new SolidColorBrush (System.Windows.Media.Color.FromRgb (10, 132, 255)),
 					new SolidColorBrush (System.Windows.Media.Color.FromRgb (35, 148, 255)),
 					new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 100, 210))
