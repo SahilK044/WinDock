@@ -2,6 +2,14 @@
 
 ![WinDock Banner](windock_logo.png)
 
+
+## 🎥 Video Preview
+
+https://github.com/SahilK044/WinDock/raw/main/preview.mp4
+
+---
+
+
 **WinDock Suite** is an all-in-one desktop enhancement suite for Windows 10 and 11. It combines a macOS-style dock, the Ripple Dynamic Island helper, and a live weather widget into a unified, high-performance Windows desktop experience.
 
 ---
