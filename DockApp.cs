@@ -52613,15 +52613,18 @@ namespace MacStyleDock
 			var brush = new SolidColorBrush(accentColor);
 
 			float peak = DockWindow.SharedAudioPeak;
-			bool isPlaying = peak > 0.01f;
-
-			// Position EQ panel right after the track title text on the right side of the pill
+			bool spotifyActive = false;
 			double textLen = 16;
 			try {
-				if (DockWindow.Instance != null && !string.IsNullOrEmpty(DockWindow.Instance.bgSpotifyTrackKey)) {
-					textLen = DockWindow.Instance.bgSpotifyTrackKey.Length;
+				if (DockWindow.Instance != null) {
+					spotifyActive = DockWindow.Instance.bgSpotifyIsPlaying;
+					if (!string.IsNullOrEmpty(DockWindow.Instance.bgSpotifyTrackKey)) {
+						textLen = DockWindow.Instance.bgSpotifyTrackKey.Length;
+					}
 				}
 			} catch { }
+
+			bool isPlaying = peak > 0.003f || spotifyActive;
 
 			double pillHalfWidth = Math.Min(140, Math.Max(50, textLen * 4.2 + 15));
 			Canvas.SetLeft(eqPanel, 250 + pillHalfWidth - 28);
@@ -52629,18 +52632,18 @@ namespace MacStyleDock
 
 			double[] heights = new double[]
 			{
-				3 + Math.Sin(phase * 1.2) * 6 + peak * 12,
-				5 + Math.Cos(phase * 1.5) * 8 + peak * 14,
-				3 + Math.Sin(phase * 1.8) * 10 + peak * 16,
-				4 + Math.Cos(phase * 1.1) * 7 + peak * 13,
-				3 + Math.Sin(phase * 1.4) * 6 + peak * 11
+				3 + Math.Sin(phase * 1.2) * 6 + peak * 14,
+				5 + Math.Cos(phase * 1.5) * 8 + peak * 16,
+				3 + Math.Sin(phase * 1.8) * 10 + peak * 18,
+				4 + Math.Cos(phase * 1.1) * 7 + peak * 15,
+				3 + Math.Sin(phase * 1.4) * 6 + peak * 13
 			};
 
 			for (int i = 0; i < 5; i++)
 			{
 				if (isPlaying)
 				{
-					bars[i].Height = Math.Max(3, Math.Min(18, heights[i]));
+					bars[i].Height = Math.Max(4, Math.Min(18, heights[i]));
 					bars[i].Fill = brush;
 				}
 				else
