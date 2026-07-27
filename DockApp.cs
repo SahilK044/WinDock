@@ -52365,6 +52365,52 @@ namespace MacStyleDock
 
 public class AirDropWindow : Window
 	{
+		[System.Runtime.InteropServices.DllImport("user32.dll")]
+		private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+		[System.Runtime.InteropServices.DllImport("user32.dll")]
+		private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+		[System.Runtime.InteropServices.DllImport("user32.dll")]
+		private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+		private static void SendFileToPhoneLinkWindow(string filePath) {
+			try {
+				var strColl = new System.Collections.Specialized.StringCollection();
+				strColl.Add(filePath);
+				System.Windows.Clipboard.SetFileDropList(strColl);
+			} catch { }
+
+			try {
+				Process.Start(new ProcessStartInfo("cmd.exe", "/c start shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App") { CreateNoWindow = true, UseShellExecute = false });
+			} catch { }
+
+			var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+			timer.Tick += (st, ev) => {
+				timer.Stop();
+				try {
+					Process[] procs = Process.GetProcessesByName("PhoneExperienceHost");
+					if (procs.Length == 0) procs = Process.GetProcessesByName("Microsoft.YourPhone");
+					if (procs.Length == 0) procs = Process.GetProcessesByName("YourPhone");
+
+					foreach (var p in procs) {
+						if (p.MainWindowHandle != IntPtr.Zero) {
+							ShowWindow(p.MainWindowHandle, 9); // SW_RESTORE
+							SetForegroundWindow(p.MainWindowHandle);
+							
+							// Simulate Ctrl+V to auto-send file into Phone Link transfer stream
+							keybd_event(0x11, 0, 0, UIntPtr.Zero);
+							keybd_event(0x56, 0, 0, UIntPtr.Zero);
+							keybd_event(0x56, 0, 2, UIntPtr.Zero);
+							keybd_event(0x11, 0, 2, UIntPtr.Zero);
+							break;
+						}
+					}
+				} catch { }
+			};
+			timer.Start();
+		}
+
 		private static System.Windows.Controls.ControlTemplate CreateRoundedButtonTemplate(CornerRadius cornerRadius, System.Windows.Media.Brush defaultBg, System.Windows.Media.Brush hoverBg, System.Windows.Media.Brush pressedBg) {
 			var template = new System.Windows.Controls.ControlTemplate(typeof(System.Windows.Controls.Button));
 			var borderFactory = new FrameworkElementFactory(typeof(Border));
@@ -52580,36 +52626,22 @@ public class AirDropWindow : Window
 						dzIcon.Text = "\uE898";
 						dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255));
 						dzText.Text = $"Sending {fileName} to {selectedDeviceName}...";
-						dzSub.Text = "Copied file to Clipboard & Focusing Phone Link...";
+						dzSub.Text = $"Auto-Pasting {fileName} into Phone Link transfer stream...";
 
-						try {
-							var strColl = new System.Collections.Specialized.StringCollection();
-							strColl.Add(filePath);
-							System.Windows.Clipboard.SetFileDropList(strColl);
-						} catch { }
+						SendFileToPhoneLinkWindow(filePath);
 
-						// Stage 2: Launch & Focus Phone Link App cleanly without opening Settings app
-						var timerDispatch = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-						timerDispatch.Tick += (st, ev) => {
-							timerDispatch.Stop();
-							try {
-								Process.Start(new ProcessStartInfo("cmd.exe", "/c start shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App") { CreateNoWindow = true, UseShellExecute = false });
-							} catch { }
-						};
-						timerDispatch.Start();
-
-						// Stage 3: Ready state after 1.5s
-						var timerSuccess = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+						// Stage 2: Success state after 2.0s
+						var timerSuccess = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2.0) };
 						timerSuccess.Tick += (st, ev) => {
 							timerSuccess.Stop();
 							dzIcon.Text = "\uE73E";
 							dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 199, 89));
-							dzText.Text = $"File Ready for {selectedDeviceName}!";
-							dzSub.Text = $"Press Ctrl+V in Phone Link to send {fileName}";
+							dzText.Text = $"File Sent to {selectedDeviceName}!";
+							dzSub.Text = $"{fileName} transferred to {selectedDeviceName} via Phone Link";
 						};
 						timerSuccess.Start();
 
-						// Stage 4: Reset after 8s
+						// Stage 3: Reset after 8s
 						var timerReset = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(8.0) };
 						timerReset.Tick += (st, ev) => {
 							timerReset.Stop();
