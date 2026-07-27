@@ -968,8 +968,8 @@ while ($true) {
         if (latestAudioPeak > maxPeakSeen) maxPeakSeen = latestAudioPeak;
         else maxPeakSeen = Math.max(0.08, maxPeakSeen * 0.995);
 
-        const gain = Math.min(6.0, 0.9 / maxPeakSeen);
-        const normPeak = Math.min(1.0, latestAudioPeak * gain);
+        const gain = Math.min(15.0, 3.5 / Math.max(0.02, maxPeakSeen));
+        const normPeak = Math.min(1.0, latestAudioPeak * gain * 2.2);
 
         const bands = new Array(24);
         const now = Date.now() / 1000;

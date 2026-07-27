@@ -243,8 +243,8 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
 
       for (let i = 0; i < VIS_BAR_COUNT; i++) {
         let amp = 0;
-        if (real && bandsRef.current && bandsRef.current[i] > 0.02) {
-          amp = bandsRef.current[i];
+        if (real && bandsRef.current && bandsRef.current[i] > 0.01) {
+          amp = Math.min(1.0, bandsRef.current[i] * 1.8);
         }
 
         if (!real || amp < 0.01) {
@@ -364,7 +364,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
           const end = Math.floor((i + 1) * clusterSize);
           let sum = 0, count = 0;
           for (let b = start; b < end; b++) { sum += bandsRef.current[b] || 0; count++; }
-          amp = count > 0 ? sum / count : 0;
+          amp = count > 0 ? Math.min(1.0, (sum / count) * 1.8) : 0;
         }
 
         if (!real || amp < 0.01) {
@@ -778,7 +778,7 @@ export default function Island() {
         : isPlaying
           ? nowPlayingWidth
           : 170;
-  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 195 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
+  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 230 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
 
   const normalizeApps = (arr) => arr.map(a => typeof a === 'string' ? { name: a, launch: a } : a);
   const [quickApps, setQuickApps] = useState(() =>
@@ -2222,7 +2222,7 @@ export default function Island() {
                             height={32}
                           />
                         </div>
-                        <div style={{ display: 'flex', gap: 15, marginTop: 10, alignItems: 'center', marginLeft: 5 }}>
+                        <div style={{ display: 'flex', gap: 24, marginTop: 10, alignItems: 'center', justifyContent: 'center', width: '220px' }}>
                           <button
                             className="media-btn"
                             onClick={() => {

@@ -1,30 +1,36 @@
 // Runs in a Node worker_thread (spawned from main.js), never on the main
 // process, so FFT math can never cause UI jank or block audio capture.
 //
-// Receives raw mono PCM Float32 chunks (~10ms each, ~480 samples at 48kHz)
-// from the native WASAPI addon, accumulates them into a rolling analysis
-// window, runs an FFT, buckets the spectrum into log-spaced bands (roughly
-// matching how humans perceive pitch — bass bands are narrower in Hz,
-// treble bands are wider), and posts smoothed band levels back at a capped
-// rate so the render process never gets flooded.
+// Receives raw mono PCM Float32 chunks from the native WASAPI addon,
+// analyzes a short rolling FFT window, normalizes spectrum bands against an
+// adaptive floor/peak, and separately detects musical onsets for beat pulses.
 
 const { parentPort } = require("worker_threads");
 
-const FFT_SIZE = 2048; // ~43ms window at 48kHz — good balance of latency vs. frequency resolution
-const BAND_COUNT = 24; // matches the visualizer's bar count
-const POST_INTERVAL_MS = 16; // ~60fps cap; audio arrives faster than this, we just use the latest window
-const ATTACK = 0.6; // how fast a band rises (higher = snappier)
-const RELEASE = 0.15; // how fast a band falls (lower = smoother trailing decay)
+const FFT_SIZE = 1024; // ~21ms at 48kHz; lower latency matters for beat sync.
+const BAND_COUNT = 24;
+const POST_INTERVAL_MS = 16;
+const ATTACK = 0.78;
+const RELEASE = 0.20;
+const BEAT_COOLDOWN_MS = 170;
+const ONSET_HISTORY_SIZE = 48;
 
 let ringBuffer = new Float32Array(FFT_SIZE);
 let writeIndex = 0;
 let filled = false;
 let sampleRate = 48000;
 let smoothedBands = new Float32Array(BAND_COUNT);
+let adaptiveFloor = new Float32Array(BAND_COUNT).fill(0.03);
+let adaptivePeak = new Float32Array(BAND_COUNT).fill(0.25);
+let previousMagnitudes = new Float32Array(FFT_SIZE / 2);
+let bassEnvelope = 0;
+let onsetHistory = new Float32Array(ONSET_HISTORY_SIZE);
+let onsetHistoryIndex = 0;
+let onsetHistoryFilled = false;
+let beatPulse = 0;
+let lastBeatTime = 0;
 let lastPostTime = 0;
 
-// In-place iterative radix-2 Cooley-Tukey FFT. `re`/`im` length must be a
-// power of two (FFT_SIZE = 2048 satisfies this).
 function fft(re, im) {
   const n = re.length;
   for (let i = 1, j = 0; i < n; i++) {
@@ -57,14 +63,11 @@ function fft(re, im) {
   }
 }
 
-// Precomputed Hann window to reduce spectral leakage at the FFT edges.
 const hann = new Float32Array(FFT_SIZE);
 for (let i = 0; i < FFT_SIZE; i++) {
   hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (FFT_SIZE - 1)));
 }
 
-// Precomputed log-spaced band edges (20Hz - ~20kHz), recalculated only if
-// sampleRate changes (it won't, in practice, mid-stream).
 let bandEdges = null;
 let bandEdgesSampleRate = null;
 function getBandEdges(sr) {
@@ -80,10 +83,47 @@ function getBandEdges(sr) {
   return edges;
 }
 
+function averageMagnitude(magnitudes, startHz, endHz, binHz) {
+  const startBin = Math.max(1, Math.floor(startHz / binHz));
+  const endBin = Math.min(magnitudes.length - 1, Math.ceil(endHz / binHz));
+  let sum = 0, count = 0;
+  for (let bin = startBin; bin <= endBin; bin++) {
+    sum += magnitudes[bin];
+    count++;
+  }
+  return count > 0 ? sum / count : 0;
+}
+
+function positiveFlux(magnitudes, startHz, endHz, binHz) {
+  const startBin = Math.max(1, Math.floor(startHz / binHz));
+  const endBin = Math.min(magnitudes.length - 1, Math.ceil(endHz / binHz));
+  let sum = 0, count = 0;
+  for (let bin = startBin; bin <= endBin; bin++) {
+    const prev = previousMagnitudes[bin] || 0;
+    const cur = magnitudes[bin];
+    sum += Math.max(0, cur - prev) / (prev + 0.002);
+    count++;
+  }
+  return count > 0 ? sum / count : 0;
+}
+
+function getOnsetStats() {
+  const length = onsetHistoryFilled ? ONSET_HISTORY_SIZE : onsetHistoryIndex;
+  if (length < 8) return { mean: 0, std: 0.001 };
+  let sum = 0;
+  for (let i = 0; i < length; i++) sum += onsetHistory[i];
+  const mean = sum / length;
+  let variance = 0;
+  for (let i = 0; i < length; i++) {
+    const d = onsetHistory[i] - mean;
+    variance += d * d;
+  }
+  return { mean, std: Math.sqrt(variance / length) };
+}
+
 function processWindow() {
   const re = new Float32Array(FFT_SIZE);
   const im = new Float32Array(FFT_SIZE);
-  // Read the ring buffer out in correct chronological order, windowed.
   for (let i = 0; i < FFT_SIZE; i++) {
     const idx = (writeIndex + i) % FFT_SIZE;
     re[i] = ringBuffer[idx] * hann[i];
@@ -103,30 +143,75 @@ function processWindow() {
     const startBin = Math.max(1, Math.floor(edges[b] / binHz));
     const endBin = Math.min(magnitudes.length - 1, Math.ceil(edges[b + 1] / binHz));
     let sum = 0, count = 0;
-    for (let bin = startBin; bin <= endBin; bin++) { sum += magnitudes[bin]; count++; }
+    for (let bin = startBin; bin <= endBin; bin++) {
+      sum += magnitudes[bin];
+      count++;
+    }
     const avg = count > 0 ? sum / count : 0;
-    // Log-compress amplitude so quiet passages are still visible and loud
-    // transients don't just pin every bar at max.
     rawBands[b] = Math.min(1, Math.log10(1 + avg * 40) / 2.2);
   }
 
-  // Per-band attack/release smoothing so bars rise fast on transients but
-  // fall smoothly instead of flickering.
+  let bassLevel = 0;
+  for (let b = 0; b < 6; b++) bassLevel += rawBands[b];
+  bassLevel /= 6;
+
+  const kickEnergy = averageMagnitude(magnitudes, 45, 170, binHz);
+  const lowMidEnergy = averageMagnitude(magnitudes, 170, 420, binHz);
+  const musicEnergy = averageMagnitude(magnitudes, 45, 6000, binHz);
+  const kickFlux = positiveFlux(magnitudes, 45, 170, binHz);
+  const lowMidFlux = positiveFlux(magnitudes, 170, 420, binHz);
+  const fullFlux = positiveFlux(magnitudes, 45, 6000, binHz);
+
+  for (let b = 0; b < BAND_COUNT; b++) {
+    const raw = rawBands[b];
+    const floorRate = raw < adaptiveFloor[b] ? 0.08 : 0.003;
+    const peakRate = raw > adaptivePeak[b] ? 0.16 : 0.004;
+    adaptiveFloor[b] += (raw - adaptiveFloor[b]) * floorRate;
+    adaptivePeak[b] += (raw - adaptivePeak[b]) * peakRate;
+    const range = Math.max(0.09, adaptivePeak[b] - adaptiveFloor[b]);
+    rawBands[b] = Math.max(0, Math.min(1, (raw - adaptiveFloor[b] * 0.95) / range));
+  }
+
+  const bassAttack = Math.max(0, bassLevel - bassEnvelope);
+  bassEnvelope += (bassLevel - bassEnvelope) * (bassLevel > bassEnvelope ? 0.20 : 0.045);
+
+  const onset = kickFlux * 0.55 + lowMidFlux * 0.25 + fullFlux * 0.12 + bassAttack * 2.2;
+  const { mean: onsetMean, std: onsetStd } = getOnsetStats();
+  const threshold = Math.max(0.12, onsetMean + onsetStd * 1.85);
+  const energyGate = musicEnergy > 0.006 && kickEnergy + lowMidEnergy > 0.01;
+  const strength = Math.max(0, (onset - threshold) / Math.max(0.08, threshold));
+  const now = Date.now();
+
+  onsetHistory[onsetHistoryIndex] = onset;
+  onsetHistoryIndex = (onsetHistoryIndex + 1) % ONSET_HISTORY_SIZE;
+  if (onsetHistoryIndex === 0) onsetHistoryFilled = true;
+
+  if (energyGate && onset > threshold && now - lastBeatTime > BEAT_COOLDOWN_MS) {
+    lastBeatTime = now;
+    beatPulse = Math.min(1, 0.45 + strength * 0.55);
+  }
+  beatPulse *= 0.72;
+  previousMagnitudes.set(magnitudes);
+
   for (let b = 0; b < BAND_COUNT; b++) {
     const rate = rawBands[b] > smoothedBands[b] ? ATTACK : RELEASE;
     smoothedBands[b] += (rawBands[b] - smoothedBands[b]) * rate;
   }
 
-  const now = Date.now();
   if (now - lastPostTime >= POST_INTERVAL_MS) {
     lastPostTime = now;
-    parentPort.postMessage({ type: "bands", bands: Array.from(smoothedBands) });
+    parentPort.postMessage({
+      type: "analysis",
+      bands: Array.from(smoothedBands),
+      beat: beatPulse,
+      bass: Math.max(0, Math.min(1, bassLevel)),
+    });
   }
 }
 
 parentPort.on("message", (msg) => {
   if (msg?.type === "pcm") {
-    const chunk = msg.samples; // Float32Array (transferred)
+    const chunk = msg.samples;
     sampleRate = msg.sampleRate || sampleRate;
     for (let i = 0; i < chunk.length; i++) {
       ringBuffer[writeIndex] = chunk[i];
@@ -137,6 +222,15 @@ parentPort.on("message", (msg) => {
   } else if (msg?.type === "reset") {
     ringBuffer.fill(0);
     smoothedBands.fill(0);
+    adaptiveFloor.fill(0.03);
+    adaptivePeak.fill(0.25);
+    previousMagnitudes.fill(0);
+    onsetHistory.fill(0);
+    onsetHistoryIndex = 0;
+    onsetHistoryFilled = false;
+    bassEnvelope = 0;
+    beatPulse = 0;
+    lastBeatTime = 0;
     writeIndex = 0;
     filled = false;
   }
