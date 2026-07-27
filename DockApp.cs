@@ -52399,16 +52399,19 @@ public class AirDropWindow : Window
 			base.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 			base.Topmost = true;
 			base.Title = "AirDrop & Phone Link";
-			base.Width = 430.0;
-			base.Height = 340.0;
+			base.Width = 490.0;
+			base.Height = 400.0;
 
 			Border card = new Border {
 				CornerRadius = new CornerRadius (22.0),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 22, 22, 28)),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (240, 20, 20, 26)),
 				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
 				BorderThickness = new Thickness (1),
+				Margin = new Thickness (25),
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center,
 				Effect = new System.Windows.Media.Effects.DropShadowEffect {
-					BlurRadius = 32, ShadowDepth = 12, Opacity = 0.4, Color = System.Windows.Media.Colors.Black
+					BlurRadius = 24, ShadowDepth = 6, Opacity = 0.35, Color = System.Windows.Media.Colors.Black
 				}
 			};
 
@@ -52485,8 +52488,29 @@ public class AirDropWindow : Window
 				if (e.Data.GetDataPresent (System.Windows.DataFormats.FileDrop)) {
 					string[] files = (string[])e.Data.GetData (System.Windows.DataFormats.FileDrop);
 					if (files != null && files.Length > 0) {
-						dzText.Text = $"Sending {files.Length} file(s)...";
-						dzSub.Text = System.IO.Path.GetFileName (files[0]);
+						string filePath = files[0];
+						dzText.Text = $"Sharing {System.IO.Path.GetFileName(filePath)}...";
+						dzSub.Text = "Copied to clipboard! Opening Phone Link & Windows Share...";
+
+						try {
+							var strColl = new System.Collections.Specialized.StringCollection();
+							strColl.Add(filePath);
+							System.Windows.Clipboard.SetFileDropList(strColl);
+						} catch { }
+
+						try {
+							Process.Start(new ProcessStartInfo {
+								FileName = "explorer.exe",
+								Arguments = $"/select,\"{filePath}\"",
+								UseShellExecute = true
+							});
+						} catch { }
+
+						try {
+							Process.Start(new ProcessStartInfo("ms-phone-link:") { UseShellExecute = true });
+						} catch {
+							try { Process.Start(new ProcessStartInfo("ms-settings:crossdevice") { UseShellExecute = true }); } catch { }
+						}
 					}
 				}
 			};
@@ -52539,9 +52563,9 @@ public class AirDropWindow : Window
 
 			phoneLinkBtn.Click += (s, e) => {
 				try {
-					Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true });
+					Process.Start (new ProcessStartInfo ("ms-phone-link:") { UseShellExecute = true });
 				} catch {
-					try { Process.Start (new ProcessStartInfo ("https://linktopc.microsoft.com") { UseShellExecute = true }); } catch { }
+					try { Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true }); } catch { }
 				}
 			};
 
