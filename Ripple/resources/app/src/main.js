@@ -723,12 +723,12 @@ ipcMain.handle("control-system-media", async (event, command) => {
     }
     exec(`osascript -e '${script}'`);
   } else if (platform === "win32") {
-    let vk = "0xB3"; // Play/Pause (179)
-    if (command === "previous" || command === "prev") vk = "0xB1"; // Prev Track (177)
-    else if (command === "next") vk = "0xB0"; // Next Track (176)
+    let charCode = 179; // Play/Pause (VK_MEDIA_PLAY_PAUSE)
+    if (command === "previous" || command === "prev") charCode = 177; // Prev Track
+    else if (command === "next") charCode = 176; // Next Track
 
-    const psCommand = `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class MediaKeys { [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo); public static void Send(byte vk) { keybd_event(vk, 0, 0, UIntPtr.Zero); keybd_event(vk, 0, 2, UIntPtr.Zero); } }'; [MediaKeys]::Send(${vk})`;
-    exec(`powershell -NoProfile -Command "${psCommand}"`);
+    const psCommand = `(New-Object -ComObject WScript.Shell).SendKeys([char]${charCode})`;
+    exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
   } else if (platform === "linux") {
     let cmd = "playerctl play-pause";
     if (command === "next") cmd = "playerctl next";
