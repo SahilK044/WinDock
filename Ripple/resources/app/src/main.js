@@ -676,7 +676,28 @@ ipcMain.handle("get-system-media", async () => {
           }
         },
       );
-    } else if (platform === "linux") {
+    } else if (platform === "win32") {
+    let vk = 0xB3; // Play/Pause (179)
+    if (command === "previous" || command === "prev") vk = 0xB1; // Prev Track (177)
+    else if (command === "next") vk = 0xB0; // Next Track (176)
+
+    const psCommand = `$code = @'
+using System;
+using System.Runtime.InteropServices;
+public class MediaKeys {
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    public static void Send(byte vk) {
+        keybd_event(vk, 0, 0, UIntPtr.Zero);
+        keybd_event(vk, 0, 2, UIntPtr.Zero);
+    }
+}
+'@
+Add-Type -TypeDefinition $code
+[MediaKeys]::Send(${vk})`;
+
+    exec(`powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`);
+  } else if (platform === "linux") {
       exec(
         'playerctl metadata --format "{{title}}||{{artist}}||{{album}}||{{status}}"',
         (err, stdout) => {
@@ -720,7 +741,28 @@ ipcMain.handle("get-bluetooth-status", async () => {
         if (error) return resolve(false);
         resolve(stdout.trim().toLowerCase() === "true");
       });
-    } else if (platform === "linux") {
+    } else if (platform === "win32") {
+    let vk = 0xB3; // Play/Pause (179)
+    if (command === "previous" || command === "prev") vk = 0xB1; // Prev Track (177)
+    else if (command === "next") vk = 0xB0; // Next Track (176)
+
+    const psCommand = `$code = @'
+using System;
+using System.Runtime.InteropServices;
+public class MediaKeys {
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    public static void Send(byte vk) {
+        keybd_event(vk, 0, 0, UIntPtr.Zero);
+        keybd_event(vk, 0, 2, UIntPtr.Zero);
+    }
+}
+'@
+Add-Type -TypeDefinition $code
+[MediaKeys]::Send(${vk})`;
+
+    exec(`powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`);
+  } else if (platform === "linux") {
       exec("bluetoothctl devices Connected", (error, stdout) => {
         if (error) return resolve(false);
         resolve(stdout.trim().length > 0);
@@ -755,7 +797,28 @@ ipcMain.handle("get-camera-status", async () => {
         if (error) return resolve(false);
         resolve(stdout.trim().toLowerCase() === "true");
       });
-    } else if (platform === "linux") {
+    } else if (platform === "win32") {
+    let vk = 0xB3; // Play/Pause (179)
+    if (command === "previous" || command === "prev") vk = 0xB1; // Prev Track (177)
+    else if (command === "next") vk = 0xB0; // Next Track (176)
+
+    const psCommand = `$code = @'
+using System;
+using System.Runtime.InteropServices;
+public class MediaKeys {
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    public static void Send(byte vk) {
+        keybd_event(vk, 0, 0, UIntPtr.Zero);
+        keybd_event(vk, 0, 2, UIntPtr.Zero);
+    }
+}
+'@
+Add-Type -TypeDefinition $code
+[MediaKeys]::Send(${vk})`;
+
+    exec(`powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`);
+  } else if (platform === "linux") {
       exec("fuser /dev/video* 2>/dev/null", (error, stdout) => {
         resolve(stdout.trim().length > 0);
       });
@@ -778,7 +841,28 @@ ipcMain.handle("get-microphone-status", async () => {
         if (error) return resolve(false);
         resolve(stdout.trim().toLowerCase() === "true");
       });
-    } else if (platform === "linux") {
+    } else if (platform === "win32") {
+    let vk = 0xB3; // Play/Pause (179)
+    if (command === "previous" || command === "prev") vk = 0xB1; // Prev Track (177)
+    else if (command === "next") vk = 0xB0; // Next Track (176)
+
+    const psCommand = `$code = @'
+using System;
+using System.Runtime.InteropServices;
+public class MediaKeys {
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    public static void Send(byte vk) {
+        keybd_event(vk, 0, 0, UIntPtr.Zero);
+        keybd_event(vk, 0, 2, UIntPtr.Zero);
+    }
+}
+'@
+Add-Type -TypeDefinition $code
+[MediaKeys]::Send(${vk})`;
+
+    exec(`powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`);
+  } else if (platform === "linux") {
       exec("pactl list source-outputs | grep -q 'Source #'", (error) => {
         resolve(!error);
       });
@@ -810,6 +894,27 @@ ipcMain.handle("control-system-media", async (event, command) => {
         end if
         `;
     exec(`osascript -e '${script}'`);
+  } else if (platform === "win32") {
+    let vk = 0xB3; // Play/Pause (179)
+    if (command === "previous" || command === "prev") vk = 0xB1; // Prev Track (177)
+    else if (command === "next") vk = 0xB0; // Next Track (176)
+
+    const psCommand = `$code = @'
+using System;
+using System.Runtime.InteropServices;
+public class MediaKeys {
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    public static void Send(byte vk) {
+        keybd_event(vk, 0, 0, UIntPtr.Zero);
+        keybd_event(vk, 0, 2, UIntPtr.Zero);
+    }
+}
+'@
+Add-Type -TypeDefinition $code
+[MediaKeys]::Send(${vk})`;
+
+    exec(`powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`);
   } else if (platform === "linux") {
     let cmd = command;
     if (command === "playpause") cmd = "play-pause";
