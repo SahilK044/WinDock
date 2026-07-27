@@ -3973,7 +3973,8 @@ namespace MacStyleDock
 
 				_isPresentationSourceValid = true;
 				SetupFullscreenWatcher ();
-				try { new VisualizerOverlayWindow().Show(); } catch { }
+				// External visualizer window disabled - visualizer is inside Ripple pill
+// try { new VisualizerOverlayWindow().Show(); } catch { }
 
 				// Perf fix: ManageRippleState() runs a WMI process query and (on first run)
 				// launches the ~200MB Chromium-based Ripple helper process. Doing that

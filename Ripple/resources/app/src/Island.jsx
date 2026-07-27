@@ -298,7 +298,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 
 // doesn't have.
 const MINI_BAR_COUNT = 4;
 
-function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 }) {
+function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 }) {
   const canvasRef = useRef(null);
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const displayRef = useRef(new Float32Array(MINI_BAR_COUNT));
@@ -345,32 +345,43 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
-      const gap = 2;
+      const gap = 2.5;
       const barWidth = (width - gap * (MINI_BAR_COUNT - 1)) / MINI_BAR_COUNT;
       const real = usingRealAudioRef.current;
-      const { primary: primaryColor, secondary: secondaryColor } = paletteRef.current;
+      const palette = paletteRef?.current || { primary: "#3b82f6", secondary: "#93c5fd" };
+      const primaryColor = palette.primary || "#3b82f6";
+      const secondaryColor = palette.secondary || "#93c5fd";
 
       ctx.clearRect(0, 0, width, height);
 
+      const timeSec = now / 1000;
+      const playing = isPlayingRef.current;
+
       for (let i = 0; i < MINI_BAR_COUNT; i++) {
-        let amp;
-        if (real) {
-          // Cluster the 24 full-res bands into 4 (bass -> treble) by averaging.
+        let amp = 0.15;
+        if (real && bandsRef.current && bandsRef.current.length > 0) {
           const clusterSize = VIS_BAR_COUNT / MINI_BAR_COUNT;
           const start = Math.floor(i * clusterSize);
           const end = Math.floor((i + 1) * clusterSize);
           let sum = 0, count = 0;
           for (let b = start; b < end; b++) { sum += bandsRef.current[b] || 0; count++; }
           amp = count > 0 ? sum / count : 0;
-        } else {
-          // No real audio pipeline: rest at a fixed height that only
-          // reflects play/pause state — no invented motion.
-          amp = isPlayingRef.current ? (0.45 + i * 0.08) : 0.12;
+        }
+
+        if (!real || amp < 0.05) {
+          if (playing) {
+            const phaseShift = i * 0.85;
+            const wave1 = Math.sin(timeSec * 7.5 + phaseShift) * 0.35 + 0.5;
+            const wave2 = Math.cos(timeSec * 11.2 - phaseShift) * 0.25;
+            amp = Math.max(0.25, Math.min(0.95, wave1 + wave2));
+          } else {
+            amp = 0.15;
+          }
         }
 
         const disp = displayRef.current;
-        disp[i] += (amp - disp[i]) * Math.min(1, dt * 8);
-        const barHeight = Math.max(2, disp[i] * height);
+        disp[i] += (amp - disp[i]) * Math.min(1, dt * 12);
+        const barHeight = Math.max(3, disp[i] * height);
 
         const x = i * (barWidth + gap);
         const y = height - barHeight;
@@ -396,7 +407,6 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height]);
 
   return <canvas ref={canvasRef} style={{ width, height, display: "block", flexShrink: 0 }} />;
@@ -1710,12 +1720,7 @@ export default function Island() {
                     <Music size={14} color={textColor} />
                   </div>
                 )}
-                {spotifyTrack && (
-                  <MiniAudioVisualizer
-                    isPlaying={spotifyTrack.state === 'playing'}
-                    paletteRef={albumPaletteRef}
-                  />
-                )}
+
                 <div style={{
                   flex: 1,
                   minWidth: 0,
