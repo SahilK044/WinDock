@@ -7534,9 +7534,9 @@ namespace MacStyleDock
 
 				byte a2 = (byte)Math.Min (255, b2 + 40);
 
-				color2 = System.Windows.Media.Color.FromArgb (a, byte.MaxValue, byte.MaxValue, byte.MaxValue);
+				color2 = System.Windows.Media.Color.FromArgb ((byte)Math.Min(60, (int)a), 22, 22, 28);
 
-				color3 = System.Windows.Media.Color.FromArgb (a2, 250, 250, 250);
+				color3 = System.Windows.Media.Color.FromArgb ((byte)Math.Min(45, (int)a2), 30, 30, 38);
 
 				color4 = System.Windows.Media.Color.FromArgb (230, byte.MaxValue, byte.MaxValue, byte.MaxValue);
 
@@ -11478,9 +11478,9 @@ namespace MacStyleDock
 
 					dockBorder.Background = new LinearGradientBrush (
 						new GradientStopCollection {
-							new GradientStop (System.Windows.Media.Color.FromArgb (165, 255, 255, 255), 0.0),
-							new GradientStop (System.Windows.Media.Color.FromArgb (115, 242, 245, 250), 0.35),
-							new GradientStop (System.Windows.Media.Color.FromArgb (145, 255, 255, 255), 1.0)
+							new GradientStop (System.Windows.Media.Color.FromArgb (45, 22, 22, 28), 0.0),
+							new GradientStop (System.Windows.Media.Color.FromArgb (25, 255, 255, 255), 0.35),
+							new GradientStop (System.Windows.Media.Color.FromArgb (40, 20, 20, 26), 1.0)
 						},
 						new System.Windows.Point (0.0, 0.0),
 						new System.Windows.Point (0.0, 1.0)
