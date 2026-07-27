@@ -877,32 +877,140 @@ function ensureAudioWorker() {
   return audioWorker;
 }
 
+
+// --- WASAPI System Audio Meter Sampler (Windows CoreAudio COM API) ---
+let wasapiProcess = null;
+let latestAudioPeak = 0;
+
+function startWasapiSampler() {
+  if (wasapiProcess || process.platform !== "win32") return;
+
+  const psScript = `
+$code = @'
+using System;
+using System.Runtime.InteropServices;
+
+namespace AudioMeter {
+    [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IMMDeviceEnumerator {
+        int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice endpoint);
+    }
+
+    [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IMMDevice {
+        int Activate(ref Guid iid, uint dwClsCtx, IntPtr pActivationParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
+    }
+
+    [Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IAudioMeterInformation {
+        int GetPeakValue(out float pfPeak);
+    }
+
+    public class Meter {
+        [DllImport("Ole32.dll")]
+        private static extern int CoCreateInstance(ref Guid rclsid, IntPtr pUnkOuter, uint dwClsContext, ref Guid riid, out IntPtr ppv);
+
+        private static IAudioMeterInformation meter = null;
+
+        public static float GetPeak() {
+            try {
+                if (meter == null) {
+                    Guid CLSID_MMDeviceEnumerator = new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E");
+                    Guid IID_IMMDeviceEnumerator = new Guid("A95664D2-9614-4F35-A746-DE8DB63617E6");
+                    Guid IID_IAudioMeterInformation = new Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064");
+
+                    IntPtr enumeratorPtr;
+                    if (CoCreateInstance(ref CLSID_MMDeviceEnumerator, IntPtr.Zero, 1, ref IID_IMMDeviceEnumerator, out enumeratorPtr) != 0) return 0f;
+                    IMMDeviceEnumerator enumerator = (IMMDeviceEnumerator)Marshal.GetObjectForIUnknown(enumeratorPtr);
+                    IMMDevice device;
+                    if (enumerator.GetDefaultAudioEndpoint(0, 1, out device) != 0) return 0f;
+                    object meterObj;
+                    if (device.Activate(ref IID_IAudioMeterInformation, 1, IntPtr.Zero, out meterObj) != 0) return 0f;
+                    meter = (IAudioMeterInformation)meterObj;
+                }
+                float peak = 0f;
+                meter.GetPeakValue(out peak);
+                return peak;
+            } catch { return 0f; }
+        }
+    }
+}
+'@
+Add-Type -TypeDefinition $code
+while ($true) {
+    $p = [AudioMeter.Meter]::GetPeak()
+    [Console]::WriteLine($p)
+    Start-Sleep -Milliseconds 20
+}
+  `;
+
+  try {
+    const child = spawn("powershell", ["-NoProfile", "-Command", psScript], {
+      shell: false,
+      detached: false,
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+
+    child.stdout.on("data", (data) => {
+      const str = data.toString();
+      const lines = str.trim().split("\n");
+      const lastLine = lines[lines.length - 1];
+      const val = parseFloat(lastLine);
+      if (!isNaN(val)) {
+        latestAudioPeak = val;
+        const bands = new Array(24);
+        const now = Date.now() / 1000;
+        for (let i = 0; i < 24; i++) {
+          const freqMult = 0.6 + Math.sin(i * 0.45 + now * 2) * 0.3 + Math.cos(i * 0.8 - now * 3) * 0.2;
+          bands[i] = Math.max(0.05, Math.min(1.0, latestAudioPeak * 2.5 * freqMult));
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("audio-bands", bands);
+        }
+      }
+    });
+
+    child.on("error", () => {});
+    wasapiProcess = child;
+  } catch (err) {
+    console.error("[wasapi-sampler] Error starting sampler:", err);
+  }
+}
+
+function stopWasapiSampler() {
+  if (wasapiProcess) {
+    try { wasapiProcess.kill(); } catch {}
+    wasapiProcess = null;
+  }
+}
+
 ipcMain.handle("audio-viz-start", () => {
-  if (!loopback.available) return { started: false, reason: "unsupported-platform" };
-
   audioRefCount++;
-  if (audioCaptureActive) return { started: true };
-
-  const worker = ensureAudioWorker();
-  if (!worker) return { started: false, reason: "worker-unavailable" };
-
-  const started = loopback.start((pcmFloat32, sampleRate) => {
-    // Transfer the underlying buffer to avoid copying on every ~10ms chunk.
-    worker.postMessage(
-      { type: "pcm", samples: pcmFloat32, sampleRate },
-      [pcmFloat32.buffer]
-    );
-  });
-  audioCaptureActive = started;
-  return { started };
+  startWasapiSampler();
+  if (loopback.available && !audioCaptureActive) {
+    const worker = ensureAudioWorker();
+    if (worker) {
+      const started = loopback.start((pcmFloat32, sampleRate) => {
+        worker.postMessage(
+          { type: "pcm", samples: pcmFloat32, sampleRate },
+          [pcmFloat32.buffer]
+        );
+      });
+      audioCaptureActive = started;
+    }
+  }
+  return { started: true };
 });
 
 ipcMain.handle("audio-viz-stop", () => {
   audioRefCount = Math.max(0, audioRefCount - 1);
-  if (audioRefCount === 0 && audioCaptureActive) {
-    loopback.stop();
-    audioCaptureActive = false;
-    if (audioWorker) audioWorker.postMessage({ type: "reset" });
+  if (audioRefCount === 0) {
+    stopWasapiSampler();
+    if (audioCaptureActive) {
+      loopback.stop();
+      audioCaptureActive = false;
+      if (audioWorker) audioWorker.postMessage({ type: "reset" });
+    }
   }
   return { stopped: true };
 });
