@@ -275,7 +275,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
     return () => cancelAnimationFrame(raf);
   }, [width, height]);
 
-  return <canvas ref={canvasRef} style={{ width, height, display: "block" }} />;
+  return <canvas ref={canvasRef} style={{ width, height, display: "block", background: "transparent", zIndex: 20, relative: "position" }} />;
 }
 
 // ---- Mini visualizer for the compact/small pill mode -----------------------
@@ -772,7 +772,7 @@ export default function Island() {
         : isPlaying
           ? nowPlayingWidth
           : 170;
-  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 150 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
+  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 195 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
 
   const normalizeApps = (arr) => arr.map(a => typeof a === 'string' ? { name: a, launch: a } : a);
   const [quickApps, setQuickApps] = useState(() =>
@@ -2208,7 +2208,7 @@ export default function Island() {
                             )}
                           </motion.p>
                         </div>
-                        <div style={{ marginTop: 8, marginLeft: 5 }}>
+                        <div style={{ marginTop: 6, marginBottom: 4, marginLeft: 5, display: 'flex', alignItems: 'center', minHeight: 32 }}>
                           <AlbumAudioVisualizer
                             isPlaying={spotifyTrack?.state ? spotifyTrack.state === 'playing' : true}
                             paletteRef={albumPaletteRef}
