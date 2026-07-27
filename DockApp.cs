@@ -52363,6 +52363,61 @@ namespace MacStyleDock
 	
 
 
+	public class AirDropHttpServer {
+		private static System.Net.HttpListener _listener;
+		private static string _sharedFilePath;
+		private static int _port = 8999;
+
+		public static string GetLocalIPAddress() {
+			try {
+				var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+				foreach (var ip in host.AddressList) {
+					if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !System.Net.IPAddress.IsLoopback(ip)) {
+						return ip.ToString();
+					}
+				}
+			} catch { }
+			return "127.0.0.1";
+		}
+
+		public static string StartSharing(string filePath) {
+			_sharedFilePath = filePath;
+			if (_listener == null || !_listener.IsListening) {
+				try {
+					_listener = new System.Net.HttpListener();
+					_listener.Prefixes.Add($"http://*:{_port}/");
+					_listener.Start();
+					Task.Run(() => ListenLoop());
+				} catch {
+					try {
+						_listener = new System.Net.HttpListener();
+						_listener.Prefixes.Add($"http://localhost:{_port}/");
+						_listener.Start();
+						Task.Run(() => ListenLoop());
+					} catch { }
+				}
+			}
+			string localIp = GetLocalIPAddress();
+			return $"http://{localIp}:{_port}/download";
+		}
+
+		private static void ListenLoop() {
+			while (_listener != null && _listener.IsListening) {
+				try {
+					var ctx = _listener.GetContext();
+					if (ctx.Request.Url.AbsolutePath.Contains("download") && !string.IsNullOrEmpty(_sharedFilePath) && System.IO.File.Exists(_sharedFilePath)) {
+						byte[] bytes = System.IO.File.ReadAllBytes(_sharedFilePath);
+						ctx.Response.ContentType = "application/octet-stream";
+						ctx.Response.AddHeader("Content-Disposition", $"attachment; filename=\"{System.IO.Path.GetFileName(_sharedFilePath)}\"");
+						ctx.Response.ContentLength64 = bytes.Length;
+						ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
+					}
+					ctx.Response.Close();
+				} catch { }
+			}
+		}
+	}
+
 public class AirDropWindow : Window
 	{
 		[System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
@@ -52641,27 +52696,17 @@ public class AirDropWindow : Window
 						string filePath = files[0];
 						string fileName = System.IO.Path.GetFileName(filePath);
 						
-						// Stage 1: Active Sending UI
-						dzIcon.Text = "\uE898";
-						dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255));
-						dzText.Text = $"Transmitting {fileName} to {selectedDeviceName}...";
-						dzSub.Text = $"Dispatching direct share payload to {selectedDeviceName}...";
+						string downloadUrl = AirDropHttpServer.StartSharing(filePath);
+						try {
+							System.Windows.Clipboard.SetText(downloadUrl);
+						} catch { }
 
-						SendFileToPhoneLinkWindow(filePath);
+						dzIcon.Text = "\uE73E";
+						dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 199, 89));
+						dzText.Text = $"Direct AirDrop Share Ready for {selectedDeviceName}!";
+						dzSub.Text = $"Open in Phone / Mac browser: {downloadUrl} (Copied to Clipboard)";
 
-						// Stage 2: Success state after 2.0s
-						var timerSuccess = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2.0) };
-						timerSuccess.Tick += (st, ev) => {
-							timerSuccess.Stop();
-							dzIcon.Text = "\uE73E";
-							dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 199, 89));
-							dzText.Text = $"File Transmitted to {selectedDeviceName}!";
-							dzSub.Text = $"{fileName} sent directly to {selectedDeviceName}";
-						};
-						timerSuccess.Start();
-
-						// Stage 3: Reset after 8s
-						var timerReset = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(8.0) };
+						var timerReset = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(15.0) };
 						timerReset.Tick += (st, ev) => {
 							timerReset.Stop();
 							dzIcon.Text = "\uE898";
