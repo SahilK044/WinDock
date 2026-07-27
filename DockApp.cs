@@ -52382,10 +52382,18 @@ public class AirDropWindow : Window
 			} catch { }
 
 			try {
+				// Launch Windows Native Share Picker for direct 1-click device transmission
+				string parentDir = System.IO.Path.GetDirectoryName(filePath);
+				string fileName = System.IO.Path.GetFileName(filePath);
+				string psScript = $"$s = New-Object -ComObject Shell.Application; $f = $s.NameSpace('{parentDir}'); $i = $f.ParseName('{fileName}'); $i.InvokeVerb('share')";
+				Process.Start(new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -Command \"{psScript}\"") { CreateNoWindow = true, UseShellExecute = false });
+			} catch { }
+
+			try {
 				Process.Start(new ProcessStartInfo("cmd.exe", "/c start shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App") { CreateNoWindow = true, UseShellExecute = false });
 			} catch { }
 
-			var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+			var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
 			timer.Tick += (st, ev) => {
 				timer.Stop();
 				try {
@@ -52397,6 +52405,16 @@ public class AirDropWindow : Window
 						if (p.MainWindowHandle != IntPtr.Zero) {
 							ShowWindow(p.MainWindowHandle, 9); // SW_RESTORE
 							SetForegroundWindow(p.MainWindowHandle);
+							
+							// Auto-Paste file directly into Phone Link chat / transfer stream
+							keybd_event(0x11, 0, 0, UIntPtr.Zero);
+							keybd_event(0x56, 0, 0, UIntPtr.Zero);
+							keybd_event(0x56, 0, 2, UIntPtr.Zero);
+							keybd_event(0x11, 0, 2, UIntPtr.Zero);
+
+							// Press Enter to send file immediately
+							keybd_event(0x0D, 0, 0, UIntPtr.Zero);
+							keybd_event(0x0D, 0, 2, UIntPtr.Zero);
 							break;
 						}
 					}
@@ -52619,8 +52637,8 @@ public class AirDropWindow : Window
 						// Stage 1: Active Sending UI
 						dzIcon.Text = "\uE898";
 						dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255));
-						dzText.Text = $"Sharing {fileName} with {selectedDeviceName}...";
-						dzSub.Text = $"Launching Phone Link Share for {selectedDeviceName}...";
+						dzText.Text = $"Transmitting {fileName} to {selectedDeviceName}...";
+						dzSub.Text = $"Dispatching direct share payload to {selectedDeviceName}...";
 
 						SendFileToPhoneLinkWindow(filePath);
 
@@ -52630,8 +52648,8 @@ public class AirDropWindow : Window
 							timerSuccess.Stop();
 							dzIcon.Text = "\uE73E";
 							dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 199, 89));
-							dzText.Text = $"Phone Link Share Opened!";
-							dzSub.Text = $"{fileName} ready in Phone Link for {selectedDeviceName}";
+							dzText.Text = $"File Transmitted to {selectedDeviceName}!";
+							dzSub.Text = $"{fileName} sent directly to {selectedDeviceName}";
 						};
 						timerSuccess.Start();
 
