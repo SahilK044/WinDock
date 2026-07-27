@@ -52398,20 +52398,20 @@ public class AirDropWindow : Window
 			base.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 			base.Topmost = true;
 			base.Title = "AirDrop & Phone Link";
-			base.Width = 420.0;
-			base.Height = 360.0;
+			base.Width = 430.0;
+			base.Height = 340.0;
 
 			Border card = new Border {
-				CornerRadius = new CornerRadius (24.0),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (245, 20, 20, 26)),
-				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (45, 255, 255, 255)),
+				CornerRadius = new CornerRadius (22.0),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (235, 22, 22, 28)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
 				BorderThickness = new Thickness (1),
 				Effect = new System.Windows.Media.Effects.DropShadowEffect {
-					BlurRadius = 35, ShadowDepth = 10, Opacity = 0.45, Color = System.Windows.Media.Colors.Black
+					BlurRadius = 32, ShadowDepth = 12, Opacity = 0.4, Color = System.Windows.Media.Colors.Black
 				}
 			};
 
-			Grid root = new Grid { Margin = new Thickness (24) };
+			Grid root = new Grid { Margin = new Thickness (22) };
 			root.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto });
 			root.RowDefinitions.Add (new RowDefinition { Height = new GridLength (1.0, GridUnitType.Star) });
 			root.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto });
@@ -52420,12 +52420,12 @@ public class AirDropWindow : Window
 			TextBlock iconT = new TextBlock {
 				Text = "\uE709",
 				FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
-				FontSize = 20, Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
+				FontSize = 18, Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (10, 132, 255)),
 				VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness (0, 0, 10, 0)
 			};
 			TextBlock titleT = new TextBlock {
 				Text = "AirDrop & Phone Link",
-				FontSize = 18, FontWeight = FontWeights.Bold, Foreground = System.Windows.Media.Brushes.White,
+				FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = System.Windows.Media.Brushes.White,
 				VerticalAlignment = VerticalAlignment.Center
 			};
 			headSp.Children.Add (iconT);
@@ -52434,7 +52434,14 @@ public class AirDropWindow : Window
 			System.Windows.Controls.Button closeBtn = new System.Windows.Controls.Button {
 				Content = "✕", Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (160, 255, 255, 255)),
 				Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness (0),
-				FontSize = 14, Cursor = System.Windows.Input.Cursors.Hand, HorizontalAlignment = System.Windows.HorizontalAlignment.Right
+				FontSize = 13, Cursor = System.Windows.Input.Cursors.Hand, HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+				Width = 26, Height = 26,
+				Template = CreateRoundedButtonTemplate(
+					new CornerRadius(13),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (20, 255, 255, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (50, 255, 255, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (80, 255, 255, 255))
+				)
 			};
 			closeBtn.Click += (s, e) => base.Close ();
 
@@ -52446,26 +52453,26 @@ public class AirDropWindow : Window
 
 			Border dropZone = new Border {
 				CornerRadius = new CornerRadius (16),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 255, 255, 255)),
-				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (70, 0, 122, 255)),
-				BorderThickness = new Thickness (1.5),
-				Margin = new Thickness (0, 18, 0, 18),
+				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (15, 255, 255, 255)),
+				BorderBrush = new SolidColorBrush (System.Windows.Media.Color.FromArgb (45, 10, 132, 255)),
+				BorderThickness = new Thickness (1),
+				Margin = new Thickness (0, 16, 0, 16),
 				AllowDrop = true
 			};
 			StackPanel dzSp = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = System.Windows.HorizontalAlignment.Center };
 			TextBlock dzIcon = new TextBlock {
 				Text = "\uE898", FontFamily = new System.Windows.Media.FontFamily ("Segoe MDL2 Assets"),
-				FontSize = 36, Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
+				FontSize = 32, Foreground = new SolidColorBrush (System.Windows.Media.Color.FromRgb (10, 132, 255)),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center, Margin = new Thickness (0, 0, 0, 8)
 			};
 			TextBlock dzText = new TextBlock {
 				Text = "Drop files here to share with Phone / Mac",
-				FontSize = 13.5, FontWeight = FontWeights.Medium, Foreground = System.Windows.Media.Brushes.White,
+				FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = System.Windows.Media.Brushes.White,
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center
 			};
 			TextBlock dzSub = new TextBlock {
 				Text = "Nearby Devices: iPhone / Android Connected",
-				FontSize = 11, Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (140, 255, 255, 255)),
+				FontSize = 11, Foreground = new SolidColorBrush (System.Windows.Media.Color.FromArgb (130, 255, 255, 255)),
 				HorizontalAlignment = System.Windows.HorizontalAlignment.Center, Margin = new Thickness (0, 4, 0, 0)
 			};
 			dzSp.Children.Add (dzIcon);
@@ -52490,32 +52497,36 @@ public class AirDropWindow : Window
 
 			System.Windows.Controls.Button crossDevBtn = new System.Windows.Controls.Button {
 				Content = "Device Settings",
-				Padding = new Thickness (14, 8, 14, 8),
+				Height = 36,
+				Padding = new Thickness (18, 0, 18, 0),
 				Foreground = System.Windows.Media.Brushes.White,
 				BorderThickness = new Thickness (0),
+				FontSize = 12,
 				FontWeight = FontWeights.SemiBold,
 				Cursor = System.Windows.Input.Cursors.Hand,
 				Margin = new Thickness (0, 0, 10, 0),
 				Template = CreateRoundedButtonTemplate(
-					new CornerRadius(12),
-					new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
-					new SolidColorBrush (System.Windows.Media.Color.FromArgb (65, 255, 255, 255)),
-					new SolidColorBrush (System.Windows.Media.Color.FromArgb (90, 255, 255, 255))
+					new CornerRadius(18),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (30, 255, 255, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (55, 255, 255, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (80, 255, 255, 255))
 				)
 			};
 
 			System.Windows.Controls.Button phoneLinkBtn = new System.Windows.Controls.Button {
 				Content = "Open Phone Link",
-				Padding = new Thickness (16, 8, 16, 8),
+				Height = 36,
+				Padding = new Thickness (20, 0, 20, 0),
 				Foreground = System.Windows.Media.Brushes.White,
 				BorderThickness = new Thickness (0),
-				FontWeight = FontWeights.Bold,
+				FontSize = 12,
+				FontWeight = FontWeights.SemiBold,
 				Cursor = System.Windows.Input.Cursors.Hand,
 				Template = CreateRoundedButtonTemplate(
-					new CornerRadius(12),
-					new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
-					new SolidColorBrush (System.Windows.Media.Color.FromRgb (30, 144, 255)),
-					new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 90, 200))
+					new CornerRadius(18),
+					new SolidColorBrush (System.Windows.Media.Color.FromRgb (10, 132, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromRgb (35, 148, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 100, 210))
 				)
 			};
 			crossDevBtn.Click += (s, e) => {
