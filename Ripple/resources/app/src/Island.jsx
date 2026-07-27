@@ -1582,7 +1582,12 @@ export default function Island() {
           document.activeElement.blur();
         }
 
-        setMode(prev => prev === "large" ? "quick" : "large");
+        setMode(prev => {
+          if (prev !== "large" && isMusicActive) {
+            setTabState([3, 0]);
+          }
+          return prev === "large" ? "quick" : "large";
+        });
         if (window.electronAPI) {
           window.electronAPI.setIgnoreMouseEvents(false, false);
         }
