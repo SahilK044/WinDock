@@ -1,0 +1,11 @@
+{
+  "name": "wasapi-loopback",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Windows WASAPI loopback audio capture native addon for Ripple's audio visualizer",
+  "main": "index.js",
+  "gypfile": true,
+  "dependencies": {
+    "node-addon-api": "^8.3.0"
+  }
+}
