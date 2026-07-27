@@ -184,20 +184,6 @@ function parseCommand(input) {
 function launchWindows(input) {
   const trimmed = input.trim();
 
-  try {
-    const cacheFile = path.join(app.getPath("userData"), "app-cache.json");
-    if (fs.existsSync(cacheFile)) {
-      const data = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
-      const match = data.find((a) => a.name && a.name.toLowerCase() === trimmed.toLowerCase() && a.path && !a.path.startsWith("shell:"));
-      if (match && match.path) {
-        shell.openPath(match.path).then((err) => {
-          if (err) exec(`start "" "${match.path}"`);
-        });
-        return;
-      }
-    }
-  } catch {}
-
   // UWP apps and schemes
   if (trimmed.startsWith("shell:")) {
     const safe = trimmed.replace(/'/g, "''");
@@ -300,7 +286,31 @@ ipcMain.handle("launch-app", async (event, appName) => {
   if (platform === "darwin") {
     exec(`open -a "${appName}"`);
   } else if (platform === "win32") {
-    launchWindows(appName);
+    // Prefer the cached, discovery-resolved path (a real .exe found via the
+    // Start Menu, or a UWP shell:AppsFolder entry) over launching the bare
+    // name directly. Bare names get resolved by Windows via PATH, which
+    // includes %LOCALAPPDATA%\Microsoft\WindowsApps — where Microsoft Store
+    // apps register "App Execution Alias" stubs. A stale/orphaned alias
+    // (e.g. left over from a since-uninstalled Store version of an app)
+    // will try to resolve back to a dead AUMID and fail with a confusing
+    // "Windows cannot find '...'" error, even though the real desktop app
+    // is installed and already sitting in our cache with a working path.
+    let resolved = null;
+    try {
+      const cacheFile = path.join(app.getPath("userData"), "app-cache.json");
+      if (fs.existsSync(cacheFile)) {
+        const entries = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+        const q = appName.trim().toLowerCase();
+        // Exact name match first, then prefer a win32 (real .exe) entry
+        // over a uwp (shell:AppsFolder) entry if both exist for the name.
+        const matches = entries.filter((e) => e.name && e.name.toLowerCase() === q);
+        const win32Match = matches.find((e) => !e.launch.startsWith("shell:"));
+        resolved = (win32Match || matches[0])?.launch || null;
+      }
+    } catch {
+      // Cache missing/corrupt — fall through to raw-name resolution below.
+    }
+    launchWindows(resolved || appName);
   } else {
     exec(appName);
   }
@@ -557,6 +567,176 @@ app.whenReady().then(() => {
   }
 });
 
+const mediaArtworkCache = new Map();
+
+function getMediaScriptPath() {
+  const fs = require('fs');
+  const path = require('path');
+  const userDataScript = path.join(app.getPath('userData'), 'get_media.ps1');
+  const scriptContent = `
+[System.Reflection.Assembly]::LoadWithPartialName('System.Runtime.WindowsRuntime') | Out-Null
+$asTaskGeneric = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' }[0]
+
+function AwaitOperation($asyncOp, $type) {
+    $asTask = $asTaskGeneric.MakeGenericMethod($type)
+    $task = $asTask.Invoke($null, @($asyncOp))
+    $task.Wait()
+    return $task.Result
+}
+
+try {
+    $asyncOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]::RequestAsync()
+    $manager = AwaitOperation $asyncOp ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+    if ($manager) {
+        $sessions = @($manager.GetSessions())
+        $session = $sessions | Where-Object {
+            $_.SourceAppUserModelId -like '*Spotify*' -and
+            $_.GetPlaybackInfo().PlaybackStatus.ToString() -eq 'Playing'
+        } | Select-Object -First 1
+        if (-not $session) {
+            $session = $sessions | Where-Object { $_.SourceAppUserModelId -like '*Spotify*' } | Select-Object -First 1
+        }
+        if (-not $session) {
+            $session = $manager.GetCurrentSession()
+        }
+        if (-not $session) {
+            $session = $sessions | Where-Object {
+                $_.GetPlaybackInfo().PlaybackStatus.ToString() -eq 'Playing'
+            } | Select-Object -First 1
+        }
+        if (-not $session) { $session = $sessions | Select-Object -First 1 }
+        if ($session) {
+            $propsOp = $session.TryGetMediaPropertiesAsync()
+            $props = AwaitOperation $propsOp ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
+            $playback = $session.GetPlaybackInfo()
+            
+            $artwork = ""
+            if ($props.Thumbnail) {
+                try {
+                    $streamOp = $props.Thumbnail.OpenReadAsync()
+                    $stream = AwaitOperation $streamOp ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
+                    if ($stream) {
+                        $buffer = New-Object byte[] $stream.Size
+                        $reader = New-Object Windows.Storage.Streams.DataReader $stream
+                        $reader.LoadAsync($stream.Size).GetAwaiter().GetResult() | Out-Null
+                        $reader.ReadBytes($buffer)
+                        $artwork = 'data:image/png;base64,' + [Convert]::ToBase64String($buffer)
+                        $reader.Close()
+                        $stream.Close()
+                    }
+                } catch {}
+            }
+
+            $info = @{
+                Title = $props.Title
+                Artist = $props.Artist
+                Album = $props.AlbumTitle
+                Status = $playback.PlaybackStatus.ToString().ToLower()
+                Source = $session.SourceAppUserModelId
+                Artwork = $artwork
+            }
+            return $info | ConvertTo-Json -Compress
+        }
+    }
+} catch {}
+
+try {
+    $proc = Get-Process | Where-Object { $_.ProcessName -eq 'Spotify' -and $_.MainWindowTitle -ne '' } | Select-Object -First 1
+    if ($proc -and $proc.MainWindowTitle -like '*-*') {
+        $parts = $proc.MainWindowTitle -split ' - '
+        $artist = $parts[0]
+        $title = ($parts[1..($parts.Length-1)]) -join ' - '
+        $info = @{
+            Title = $title
+            Artist = $artist
+            Album = ''
+            Status = 'playing'
+            Source = 'Spotify'
+            Artwork = ''
+        }
+        return $info | ConvertTo-Json -Compress
+    }
+} catch {}
+
+return 'null'
+`;
+
+  try {
+    if (!fs.existsSync(userDataScript) || fs.readFileSync(userDataScript, 'utf8') !== scriptContent) {
+      fs.writeFileSync(userDataScript, scriptContent, 'utf8');
+    }
+  } catch (e) {}
+  return userDataScript;
+}
+
+async function fetchArtworkFallback(artist, title) {
+  if (!artist || !title || artist === "Unknown Artist" || title === "Unknown Title") return null;
+  const cacheKey = `${artist}-${title}`.toLowerCase();
+  if (mediaArtworkCache.has(cacheKey)) {
+    return mediaArtworkCache.get(cacheKey);
+  }
+
+  return new Promise((resolve) => {
+    const query = encodeURIComponent(`${artist} ${title}`);
+    const url = `https://itunes.apple.com/search?term=${query}&entity=song&limit=1`;
+    const https = require("https");
+    const req = https.get(url, { timeout: 2500 }, (res) => {
+      let body = "";
+      res.on("data", (chunk) => body += chunk);
+      res.on("end", () => {
+        try {
+          const data = JSON.parse(body);
+          if (data.results && data.results.length > 0) {
+            const art100 = data.results[0].artworkUrl100;
+            const highRes = art100 ? art100.replace("100x100bb", "600x600bb") : null;
+            mediaArtworkCache.set(cacheKey, highRes);
+            return resolve(highRes);
+          }
+        } catch (e) {}
+        mediaArtworkCache.set(cacheKey, null);
+        resolve(null);
+      });
+    });
+    req.on("error", () => {
+      mediaArtworkCache.set(cacheKey, null);
+      resolve(null);
+    });
+    req.on("timeout", () => {
+      req.destroy();
+      mediaArtworkCache.set(cacheKey, null);
+      resolve(null);
+    });
+  });
+}
+
+
+ipcMain.handle("control-system-media", async (event, command) => {
+  const platform = process.platform;
+  if (platform === "darwin") {
+    let script = "";
+    if (command === "playpause") {
+      script = 'tell application "System Events"\nif (name of every process) contains "Spotify" then\ntell application "Spotify" to playpause\nelse if (name of every process) contains "Music" then\ntell application "Music" to playpause\nend if\nend tell';
+    } else if (command === "next") {
+      script = 'tell application "System Events"\nif (name of every process) contains "Spotify" then\ntell application "Spotify" to next track\nelse if (name of every process) contains "Music" then\ntell application "Music" to next track\nend if\nend tell';
+    } else if (command === "previous") {
+      script = 'tell application "System Events"\nif (name of every process) contains "Spotify" then\ntell application "Spotify" to previous track\nelse if (name of every process) contains "Music" then\ntell application "Music" to previous track\nend if\nend tell';
+    }
+    exec(`osascript -e '${script}'`);
+  } else if (platform === "win32") {
+    let vk = "0xB3"; // Play/Pause (179)
+    if (command === "previous" || command === "prev") vk = "0xB1"; // Prev Track (177)
+    else if (command === "next") vk = "0xB0"; // Next Track (176)
+
+    const psCommand = `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class MediaKeys { [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo); public static void Send(byte vk) { keybd_event(vk, 0, 0, UIntPtr.Zero); keybd_event(vk, 0, 2, UIntPtr.Zero); } }'; [MediaKeys]::Send(${vk})`;
+    exec(`powershell -NoProfile -Command "${psCommand}"`);
+  } else if (platform === "linux") {
+    let cmd = "playerctl play-pause";
+    if (command === "next") cmd = "playerctl next";
+    else if (command === "previous") cmd = "playerctl previous";
+    exec(cmd);
+  }
+});
+
 ipcMain.handle("get-system-media", async () => {
   return new Promise((resolve) => {
     const platform = process.platform;
@@ -624,79 +804,43 @@ ipcMain.handle("get-system-media", async () => {
         }
       });
     } else if (platform === "win32") {
-      const psScript = `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Add-Type -AssemblyName System.Runtime.WindowsRuntime; $manager = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]::RequestAsync().GetAwaiter().GetResult(); $session = $manager.GetCurrentSession(); if ($session) { $props = $session.TryGetMediaPropertiesAsync().GetAwaiter().GetResult(); $playback = $session.GetPlaybackInfo(); $status = $playback.PlaybackStatus; $thumbnail = $props.Thumbnail; $artwork = ''; if ($thumbnail) { try { $stream = $thumbnail.OpenReadAsync().GetAwaiter().GetResult(); $buffer = New-Object byte[] $stream.Size; $reader = New-Object Windows.Storage.Streams.DataReader $stream; $reader.LoadAsync($stream.Size).GetAwaiter().GetResult() | Out-Null; $reader.ReadBytes($buffer); $artwork = 'data:image/png;base64,' + [Convert]::ToBase64String($buffer); $reader.Close(); $stream.Close(); } catch { } } $info = @{ Title = $props.Title; Artist = $props.Artist; Album = $props.AlbumTitle; Status = $status.ToString().ToLower(); Source = $session.SourceAppUserModelId; Artwork = $artwork }; return $info | ConvertTo-Json -Compress; } return 'null';`;
+      const scriptPath = getMediaScriptPath();
       exec(
-        `powershell -NoProfile -Command "${psScript}"`,
-        { maxBuffer: 5 * 1024 * 1024, encoding: "utf8" },
-        (error, stdout) => {
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`,
+        { maxBuffer: 10 * 1024 * 1024, encoding: "utf8" },
+        async (error, stdout) => {
           if (
             error ||
             !stdout ||
             stdout.trim() === "null" ||
             stdout.trim() === "'null'"
           ) {
-            exec(
-              `powershell -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Process | Where-Object {$_.ProcessName -eq 'Spotify'} | Select-Object MainWindowTitle"`,
-              { encoding: "utf8" },
-              (err, out) => {
-                if (err || !out) return resolve(null);
-                const title = out
-                  .split("\n")
-                  .find((l) => l.includes("-"))
-                  ?.trim();
-                if (title) {
-                  const [artist, ...songParts] = title.split(" - ");
-                  const song = songParts.join(" - ");
-                  resolve({
-                    name: song || title,
-                    artist: artist || "Unknown",
-                    state: "playing",
-                    source: "Spotify",
-                  });
-                } else {
-                  resolve(null);
-                }
-              },
-            );
-            return;
+            return resolve(null);
           }
 
           try {
-            const data = JSON.parse(stdout);
+            const data = JSON.parse(stdout.trim());
+            const songName = data.Title || "Unknown Title";
+            const artistName = data.Artist || "Unknown Artist";
+            let artworkUrl = data.Artwork || null;
+
+            if (!artworkUrl && songName !== "Unknown Title") {
+              artworkUrl = await fetchArtworkFallback(artistName, songName);
+            }
+
             resolve({
-              name: data.Title || "Unknown Title",
-              artist: data.Artist || "Unknown Artist",
+              name: songName,
+              artist: artistName,
               album: data.Album || "",
-              artwork_url: data.Artwork || null,
-              state: data.Status === "playing" ? "playing" : "paused",
-              source: data.Source || "System",
+              artwork_url: artworkUrl,
+              state: (data.Status === "playing" || data.Status === "opened") ? "playing" : "paused",
+              source: data.Source || "Spotify",
             });
           } catch (e) {
             resolve(null);
           }
-        },
+        }
       );
-    } else if (platform === "win32") {
-    let vk = 0xB3; // Play/Pause (179)
-    if (command === "previous" || command === "prev") vk = 0xB1; // Prev Track (177)
-    else if (command === "next") vk = 0xB0; // Next Track (176)
-
-    const psCommand = `$code = @'
-using System;
-using System.Runtime.InteropServices;
-public class MediaKeys {
-    [DllImport("user32.dll")]
-    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-    public static void Send(byte vk) {
-        keybd_event(vk, 0, 0, UIntPtr.Zero);
-        keybd_event(vk, 0, 2, UIntPtr.Zero);
-    }
-}
-'@
-Add-Type -TypeDefinition $code
-[MediaKeys]::Send(${vk})`;
-
-    exec(`powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`);
   } else if (platform === "linux") {
       exec(
         'playerctl metadata --format "{{title}}||{{artist}}||{{album}}||{{status}}"',
@@ -741,27 +885,6 @@ ipcMain.handle("get-bluetooth-status", async () => {
         if (error) return resolve(false);
         resolve(stdout.trim().toLowerCase() === "true");
       });
-    } else if (platform === "win32") {
-    let vk = 0xB3; // Play/Pause (179)
-    if (command === "previous" || command === "prev") vk = 0xB1; // Prev Track (177)
-    else if (command === "next") vk = 0xB0; // Next Track (176)
-
-    const psCommand = `$code = @'
-using System;
-using System.Runtime.InteropServices;
-public class MediaKeys {
-    [DllImport("user32.dll")]
-    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-    public static void Send(byte vk) {
-        keybd_event(vk, 0, 0, UIntPtr.Zero);
-        keybd_event(vk, 0, 2, UIntPtr.Zero);
-    }
-}
-'@
-Add-Type -TypeDefinition $code
-[MediaKeys]::Send(${vk})`;
-
-    exec(`powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`);
   } else if (platform === "linux") {
       exec("bluetoothctl devices Connected", (error, stdout) => {
         if (error) return resolve(false);
@@ -797,27 +920,6 @@ ipcMain.handle("get-camera-status", async () => {
         if (error) return resolve(false);
         resolve(stdout.trim().toLowerCase() === "true");
       });
-    } else if (platform === "win32") {
-    let vk = 0xB3; // Play/Pause (179)
-    if (command === "previous" || command === "prev") vk = 0xB1; // Prev Track (177)
-    else if (command === "next") vk = 0xB0; // Next Track (176)
-
-    const psCommand = `$code = @'
-using System;
-using System.Runtime.InteropServices;
-public class MediaKeys {
-    [DllImport("user32.dll")]
-    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-    public static void Send(byte vk) {
-        keybd_event(vk, 0, 0, UIntPtr.Zero);
-        keybd_event(vk, 0, 2, UIntPtr.Zero);
-    }
-}
-'@
-Add-Type -TypeDefinition $code
-[MediaKeys]::Send(${vk})`;
-
-    exec(`powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`);
   } else if (platform === "linux") {
       exec("fuser /dev/video* 2>/dev/null", (error, stdout) => {
         resolve(stdout.trim().length > 0);
@@ -841,27 +943,6 @@ ipcMain.handle("get-microphone-status", async () => {
         if (error) return resolve(false);
         resolve(stdout.trim().toLowerCase() === "true");
       });
-    } else if (platform === "win32") {
-    let vk = 0xB3; // Play/Pause (179)
-    if (command === "previous" || command === "prev") vk = 0xB1; // Prev Track (177)
-    else if (command === "next") vk = 0xB0; // Next Track (176)
-
-    const psCommand = `$code = @'
-using System;
-using System.Runtime.InteropServices;
-public class MediaKeys {
-    [DllImport("user32.dll")]
-    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-    public static void Send(byte vk) {
-        keybd_event(vk, 0, 0, UIntPtr.Zero);
-        keybd_event(vk, 0, 2, UIntPtr.Zero);
-    }
-}
-'@
-Add-Type -TypeDefinition $code
-[MediaKeys]::Send(${vk})`;
-
-    exec(`powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`);
   } else if (platform === "linux") {
       exec("pactl list source-outputs | grep -q 'Source #'", (error) => {
         resolve(!error);
@@ -940,7 +1021,7 @@ try {
   // by @electron-forge/plugin-auto-unpack-natives when packaged.
   loopback = require("wasapi-loopback");
 } catch (err) {
-  console.error('[wasapi-loopback] Failed to load native WASAPI addon:', err);
+  console.error("[wasapi-loopback] module failed to resolve — has it been built? Reason:", err.message);
   loopback = { available: false, start: () => false, stop: () => false };
 }
 
@@ -972,8 +1053,12 @@ function ensureAudioWorker() {
   }
   audioWorker = new Worker(workerPath);
   audioWorker.on("message", (msg) => {
-    if (msg?.type === "bands" && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("audio-bands", msg.bands);
+    if ((msg?.type === "analysis" || msg?.type === "bands") && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("audio-analysis", {
+        bands: msg.bands,
+        beat: msg.beat || 0,
+        bass: msg.bass || 0,
+      });
     }
   });
   audioWorker.on("error", (err) => {
@@ -982,156 +1067,32 @@ function ensureAudioWorker() {
   return audioWorker;
 }
 
-
-// --- WASAPI System Audio Meter Sampler (Windows CoreAudio COM API) ---
-let wasapiProcess = null;
-let maxPeakSeen = 0.1;
-let latestAudioPeak = 0;
-
-global.startWasapiSampler = function() {};
-function startWasapiSampler() {
-  if (wasapiProcess || process.platform !== "win32") return;
-
-  const meterExePath = app.isPackaged
-    ? path.join(process.resourcesPath, "wasapi_meter.exe")
-    : path.join(app.getAppPath(), "src", "audio", "wasapi_meter.exe");
-
-  try {
-    let child = null;
-    if (fs.existsSync(meterExePath)) {
-      child = spawn(meterExePath, [], { shell: false, detached: false, stdio: ["ignore", "pipe", "ignore"] });
-    } else {
-      const psScript = `
-$code = @'
-using System;
-using System.Runtime.InteropServices;
-
-namespace AudioMeter {
-    [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    public interface IMMDeviceEnumerator {
-        int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice endpoint);
-    }
-
-    [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    public interface IMMDevice {
-        int Activate(ref Guid iid, uint dwClsCtx, IntPtr pActivationParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
-    }
-
-    [Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    public interface IAudioMeterInformation {
-        int GetPeakValue(out float pfPeak);
-    }
-
-    public class Meter {
-        [DllImport("Ole32.dll")]
-        private static extern int CoCreateInstance(ref Guid rclsid, IntPtr pUnkOuter, uint dwClsContext, ref Guid riid, out IntPtr ppv);
-
-        private static IAudioMeterInformation meter = null;
-
-        public static float GetPeak() {
-            try {
-                if (meter == null) {
-                    Guid CLSID_MMDeviceEnumerator = new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E");
-                    Guid IID_IMMDeviceEnumerator = new Guid("A95664D2-9614-4F35-A746-DE8DB63617E6");
-                    Guid IID_IAudioMeterInformation = new Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064");
-
-                    IntPtr enumeratorPtr;
-                    if (CoCreateInstance(ref CLSID_MMDeviceEnumerator, IntPtr.Zero, 1, ref IID_IMMDeviceEnumerator, out enumeratorPtr) != 0) return 0f;
-                    IMMDeviceEnumerator enumerator = (IMMDeviceEnumerator)Marshal.GetObjectForIUnknown(enumeratorPtr);
-                    IMMDevice device;
-                    if (enumerator.GetDefaultAudioEndpoint(0, 1, out device) != 0) return 0f;
-                    object meterObj;
-                    if (device.Activate(ref IID_IAudioMeterInformation, 1, IntPtr.Zero, out meterObj) != 0) return 0f;
-                    meter = (IAudioMeterInformation)meterObj;
-                }
-                float peak = 0f;
-                meter.GetPeakValue(out peak);
-                return peak;
-            } catch { return 0f; }
-        }
-    }
-}
-'@
-Add-Type -TypeDefinition $code
-while ($true) {
-    $p = [AudioMeter.Meter]::GetPeak()
-    [Console]::WriteLine($p)
-    [Console]::Out.Flush()
-    Start-Sleep -Milliseconds 20
-}
-      `;
-      child = spawn("powershell", ["-NoProfile", "-Command", psScript], { shell: false, detached: false, stdio: ["ignore", "pipe", "ignore"] });
-    }
-
-    child.stdout.on("data", (data) => {
-      const str = data.toString();
-      const lines = str.trim().split("\n");
-      const lastLine = lines[lines.length - 1];
-      const val = parseFloat(lastLine);
-      if (!isNaN(val)) {
-        latestAudioPeak = val;
-        if (latestAudioPeak > maxPeakSeen) maxPeakSeen = latestAudioPeak;
-        else maxPeakSeen = Math.max(0.08, maxPeakSeen * 0.995);
-
-        const gain = Math.min(15.0, 3.5 / Math.max(0.02, maxPeakSeen));
-        const normPeak = Math.min(1.0, latestAudioPeak * gain * 2.2);
-
-        const bands = new Array(24);
-        const now = Date.now() / 1000;
-        for (let i = 0; i < 24; i++) {
-          const freqMult = 0.55 + Math.sin(i * 0.42 + now * 2.2) * 0.35 + Math.cos(i * 0.75 - now * 3.1) * 0.25;
-          bands[i] = Math.max(0.08, Math.min(1.0, normPeak * freqMult));
-        }
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("audio-bands", bands);
-        }
-      }
-    });
-
-    child.on("error", (err) => {
-      console.error("[wasapi-sampler] Error starting sampler:", err);
-    });
-    wasapiProcess = child;
-  } catch (err) {
-    console.error("[wasapi-sampler] Exception in startWasapiSampler:", err);
-  }
-}
-
-function stopWasapiSampler() {
-  if (wasapiProcess) {
-    try { wasapiProcess.kill(); } catch {}
-    wasapiProcess = null;
-  }
-}
-
 ipcMain.handle("audio-viz-start", () => {
-  if (typeof startWasapiSampler === "function") startWasapiSampler();
+  if (!loopback.available) return { started: false, reason: "unsupported-platform" };
+
   audioRefCount++;
-  startWasapiSampler();
-  if (loopback.available && !audioCaptureActive) {
-    const worker = ensureAudioWorker();
-    if (worker) {
-      const started = loopback.start((pcmFloat32, sampleRate) => {
-        worker.postMessage(
-          { type: "pcm", samples: pcmFloat32, sampleRate },
-          [pcmFloat32.buffer]
-        );
-      });
-      audioCaptureActive = started;
-    }
-  }
-  return { started: true };
+  if (audioCaptureActive) return { started: true };
+
+  const worker = ensureAudioWorker();
+  if (!worker) return { started: false, reason: "worker-unavailable" };
+
+  const started = loopback.start((pcmFloat32, sampleRate) => {
+    // Transfer the underlying buffer to avoid copying on every ~10ms chunk.
+    worker.postMessage(
+      { type: "pcm", samples: pcmFloat32, sampleRate },
+      [pcmFloat32.buffer]
+    );
+  });
+  audioCaptureActive = started;
+  return { started };
 });
 
 ipcMain.handle("audio-viz-stop", () => {
   audioRefCount = Math.max(0, audioRefCount - 1);
-  if (audioRefCount === 0) {
-    stopWasapiSampler();
-    if (audioCaptureActive) {
-      loopback.stop();
-      audioCaptureActive = false;
-      if (audioWorker) audioWorker.postMessage({ type: "reset" });
-    }
+  if (audioRefCount === 0 && audioCaptureActive) {
+    loopback.stop();
+    audioCaptureActive = false;
+    if (audioWorker) audioWorker.postMessage({ type: "reset" });
   }
   return { stopped: true };
 });
@@ -1153,9 +1114,16 @@ function loadSpotifyConfig() {
   try {
     const fs = require('fs');
     const path = require('path');
-    const configPath = path.join(app.getAppPath(), "spotify-config.json");
-    if (fs.existsSync(configPath)) {
-      const data = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    const userPath = path.join(app.getPath('userData'), "spotify-config.json");
+    const appPath = path.join(app.getAppPath(), "spotify-config.json");
+    let targetPath = null;
+    if (fs.existsSync(userPath)) {
+      targetPath = userPath;
+    } else if (fs.existsSync(appPath)) {
+      targetPath = appPath;
+    }
+    if (targetPath) {
+      const data = JSON.parse(fs.readFileSync(targetPath, "utf-8"));
       spotifyConfig.clientId = data.SPOTIFY_CLIENT_ID || spotifyConfig.clientId;
       spotifyConfig.clientSecret = data.SPOTIFY_CLIENT_SECRET || spotifyConfig.clientSecret;
       spotifyConfig.apiKey = data.SPOTIFY_API_KEY || spotifyConfig.apiKey;
@@ -1174,8 +1142,8 @@ ipcMain.handle("save-spotify-config", (event, newConfig) => {
     try {
       const fs = require('fs');
       const path = require('path');
-      const configPath = path.join(app.getAppPath(), "spotify-config.json");
-      fs.writeFileSync(configPath, JSON.stringify({
+      const userPath = path.join(app.getPath('userData'), "spotify-config.json");
+      fs.writeFileSync(userPath, JSON.stringify({
         SPOTIFY_CLIENT_ID: spotifyConfig.clientId,
         SPOTIFY_CLIENT_SECRET: spotifyConfig.clientSecret,
         SPOTIFY_API_KEY: spotifyConfig.apiKey,

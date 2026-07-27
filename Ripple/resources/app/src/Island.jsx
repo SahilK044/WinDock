@@ -778,7 +778,7 @@ export default function Island() {
         : isPlaying
           ? nowPlayingWidth
           : 170;
-  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 195 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
+  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 215 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
 
   const normalizeApps = (arr) => arr.map(a => typeof a === 'string' ? { name: a, launch: a } : a);
   const [quickApps, setQuickApps] = useState(() =>
