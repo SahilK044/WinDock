@@ -247,7 +247,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
           amp = bandsRef.current[i];
         }
 
-        if (!real || amp < 0.05) {
+        if (!real || amp < 0.01) {
           const p = phasesRef.current[i];
           const wave =
             0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.6 +
@@ -367,7 +367,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
           amp = count > 0 ? sum / count : 0;
         }
 
-        if (!real || amp < 0.05) {
+        if (!real || amp < 0.01) {
           if (playing) {
             const phaseShift = i * 0.85;
             const wave1 = Math.sin(timeSec * 7.5 + phaseShift) * 0.35 + 0.5;
@@ -380,7 +380,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
 
         const disp = displayRef.current;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * 12);
-        const barHeight = Math.max(3, disp[i] * height);
+        const barHeight = Math.max(isPlayingRef.current ? 5 : 2, disp[i] * height);
 
         const x = i * (barWidth + gap);
         const y = height - barHeight;
@@ -762,7 +762,7 @@ export default function Island() {
     }, 800);
   };
 
-  let isPlaying = spotifyTrack?.state === 'playing';
+  let isPlaying = !!spotifyTrack?.state && String(spotifyTrack.state).toLowerCase() === 'playing' || (!!spotifyTrack?.name && String(spotifyTrack?.state).toLowerCase() !== 'paused');
   const nowPlayingText = spotifyTrack?.name ? `${spotifyTrack.name}${spotifyTrack.artist ? ` • ${spotifyTrack.artist}` : ''}` : '';
   const textWidth = measureTextWidth(nowPlayingText) || (nowPlayingText.length * 7);
   const hoverExtraWidth = 36;
@@ -1760,7 +1760,7 @@ export default function Island() {
                 {spotifyTrack && (
                   <div style={{ marginLeft: 6, marginRight: 4, display: 'flex', alignItems: 'center', flexShrink: 0, zIndex: 10 }}>
                     <MiniAudioVisualizer
-                      isPlaying={spotifyTrack.state === 'playing'}
+                      isPlaying={isPlaying}
                       paletteRef={albumPaletteRef}
                       width={22}
                       height={16}
@@ -2084,7 +2084,7 @@ export default function Island() {
               }}>
                 {/* Album-art color wash — fades smoothly track-to-track, updates via its own rAF loop instead of React state so it doesn't re-render the rest of the Island */}
                 {spotifyTrack?.artwork_url && (
-                  <AlbumGlow paletteRef={albumPaletteRef} isPlaying={spotifyTrack.state === 'playing'} />
+                  <AlbumGlow paletteRef={albumPaletteRef} isPlaying={isPlaying} />
                 )}
                 <AnimatePresence mode="wait">
                   {spotifyTrack ? (
@@ -2220,7 +2220,7 @@ export default function Island() {
                         </div>
                         <div style={{ marginTop: 6, marginBottom: 4, marginLeft: 5, display: 'flex', alignItems: 'center', minHeight: 32 }}>
                           <AlbumAudioVisualizer
-                            isPlaying={spotifyTrack?.state ? spotifyTrack.state === 'playing' : true}
+                            isPlaying={isPlaying}
                             paletteRef={albumPaletteRef}
                             width={220}
                             height={32}

@@ -880,6 +880,7 @@ function ensureAudioWorker() {
 
 // --- WASAPI System Audio Meter Sampler (Windows CoreAudio COM API) ---
 let wasapiProcess = null;
+let maxPeakSeen = 0.1;
 let latestAudioPeak = 0;
 
 global.startWasapiSampler = function() {};
@@ -959,11 +960,18 @@ while ($true) {
       const val = parseFloat(lastLine);
       if (!isNaN(val)) {
         latestAudioPeak = val;
+        // Automatic Gain Control (AGC) for dynamic volume scaling
+        if (latestAudioPeak > maxPeakSeen) maxPeakSeen = latestAudioPeak;
+        else maxPeakSeen = Math.max(0.08, maxPeakSeen * 0.995); // decay slowly
+
+        const gain = Math.min(5.0, 0.85 / maxPeakSeen);
+        const normPeak = Math.min(1.0, latestAudioPeak * gain);
+
         const bands = new Array(24);
         const now = Date.now() / 1000;
         for (let i = 0; i < 24; i++) {
-          const freqMult = 0.6 + Math.sin(i * 0.45 + now * 2) * 0.3 + Math.cos(i * 0.8 - now * 3) * 0.2;
-          bands[i] = Math.max(0.05, Math.min(1.0, latestAudioPeak * 2.5 * freqMult));
+          const freqMult = 0.55 + Math.sin(i * 0.42 + now * 2.2) * 0.35 + Math.cos(i * 0.75 - now * 3.1) * 0.25;
+          bands[i] = Math.max(0.08, Math.min(1.0, normPeak * freqMult));
         }
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send("audio-bands", bands);
