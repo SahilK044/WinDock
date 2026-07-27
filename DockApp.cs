@@ -52365,28 +52365,33 @@ namespace MacStyleDock
 
 public class AirDropWindow : Window
 	{
+		[System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+		private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
 		[System.Runtime.InteropServices.DllImport("user32.dll")]
 		private static extern bool SetForegroundWindow(IntPtr hWnd);
 
 		[System.Runtime.InteropServices.DllImport("user32.dll")]
 		private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
-		[System.Runtime.InteropServices.DllImport("user32.dll")]
-		private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+		[System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto, SetLastError = true)]
+		private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+
+		[System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto, SetLastError = true)]
+		private static extern IntPtr GlobalLock(IntPtr hMem);
+
+		[System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto, SetLastError = true)]
+		private static extern bool GlobalUnlock(IntPtr hMem);
+
+		private const uint WM_DROPFILES = 0x0233;
+		private const uint GMEM_MOVEABLE = 0x0002;
+		private const uint GMEM_ZEROINIT = 0x0040;
 
 		private static void SendFileToPhoneLinkWindow(string filePath) {
 			try {
 				var strColl = new System.Collections.Specialized.StringCollection();
 				strColl.Add(filePath);
 				System.Windows.Clipboard.SetFileDropList(strColl);
-			} catch { }
-
-			try {
-				// Launch Windows Native Share Picker for direct 1-click device transmission
-				string parentDir = System.IO.Path.GetDirectoryName(filePath);
-				string fileName = System.IO.Path.GetFileName(filePath);
-				string psScript = $"$s = New-Object -ComObject Shell.Application; $f = $s.NameSpace('{parentDir}'); $i = $f.ParseName('{fileName}'); $i.InvokeVerb('share')";
-				Process.Start(new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -Command \"{psScript}\"") { CreateNoWindow = true, UseShellExecute = false });
 			} catch { }
 
 			try {
@@ -52403,18 +52408,20 @@ public class AirDropWindow : Window
 
 					foreach (var p in procs) {
 						if (p.MainWindowHandle != IntPtr.Zero) {
-							ShowWindow(p.MainWindowHandle, 9); // SW_RESTORE
-							SetForegroundWindow(p.MainWindowHandle);
-							
-							// Auto-Paste file directly into Phone Link chat / transfer stream
-							keybd_event(0x11, 0, 0, UIntPtr.Zero);
-							keybd_event(0x56, 0, 0, UIntPtr.Zero);
-							keybd_event(0x56, 0, 2, UIntPtr.Zero);
-							keybd_event(0x11, 0, 2, UIntPtr.Zero);
+							IntPtr hwnd = p.MainWindowHandle;
+							ShowWindow(hwnd, 9); // SW_RESTORE
+							SetForegroundWindow(hwnd);
 
-							// Press Enter to send file immediately
-							keybd_event(0x0D, 0, 0, UIntPtr.Zero);
-							keybd_event(0x0D, 0, 2, UIntPtr.Zero);
+							byte[] fileBytes = System.Text.Encoding.Unicode.GetBytes(filePath + "\0\0");
+							uint size = (uint)(20 + fileBytes.Length);
+							IntPtr hGlobal = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, (UIntPtr)size);
+							IntPtr pGlobal = GlobalLock(hGlobal);
+							System.Runtime.InteropServices.Marshal.WriteInt32(pGlobal, 0, 20); // pFiles
+							System.Runtime.InteropServices.Marshal.WriteInt32(pGlobal, 16, 1);  // fWide = true
+							System.Runtime.InteropServices.Marshal.Copy(fileBytes, 0, pGlobal + 20, fileBytes.Length);
+							GlobalUnlock(hGlobal);
+
+							PostMessage(hwnd, WM_DROPFILES, hGlobal, IntPtr.Zero);
 							break;
 						}
 					}
