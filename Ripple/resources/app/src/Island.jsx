@@ -235,9 +235,9 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
       const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
       const t = now / 1000;
       const real = usingRealAudioRef.current;
-      const palette = paletteRef?.current || { primary: "rgba(225,29,72,1)", secondary: "rgba(244,63,94,1)" };
-      const primaryColor = ensureMinBrightness(palette.primary || "rgba(225,29,72,1)", 150);
-      const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(244,63,94,1)", 110);
+      const palette = paletteRef?.current || { primary: "#10b981", secondary: "#34d399" };
+      const primaryColor = ensureMinBrightness(palette.primary || "#10b981", 180);
+      const secondaryColor = ensureMinBrightness(palette.secondary || "#34d399", 140);
 
       ctx.clearRect(0, 0, width, height);
 
@@ -285,7 +285,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
     return () => cancelAnimationFrame(raf);
   }, [width, height]);
 
-  return <canvas ref={canvasRef} style={{ width, height, display: "block", position: "relative", zIndex: 20 }} />;
+  return <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, minWidth: `${width}px`, minHeight: `${height}px`, display: "block", position: "relative", zIndex: 50 }} />;
 }
 
 // ---- Mini visualizer for the compact/small pill mode -----------------------
@@ -347,9 +347,9 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
       const gap = 2.5;
       const barWidth = (width - gap * (MINI_BAR_COUNT - 1)) / MINI_BAR_COUNT;
       const real = usingRealAudioRef.current;
-      const palette = paletteRef?.current || { primary: "rgba(225,29,72,1)", secondary: "rgba(244,63,94,1)" };
-      const primaryColor = ensureMinBrightness(palette.primary || "rgba(225,29,72,1)", 150);
-      const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(244,63,94,1)", 110);
+      const palette = paletteRef?.current || { primary: "#10b981", secondary: "#34d399" };
+      const primaryColor = ensureMinBrightness(palette.primary || "#10b981", 180);
+      const secondaryColor = ensureMinBrightness(palette.secondary || "#34d399", 140);
 
       ctx.clearRect(0, 0, width, height);
 
@@ -368,14 +368,10 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
         }
 
         if (!real || amp < 0.01) {
-          if (playing) {
-            const phaseShift = i * 0.85;
-            const wave1 = Math.sin(timeSec * 7.5 + phaseShift) * 0.35 + 0.5;
-            const wave2 = Math.cos(timeSec * 11.2 - phaseShift) * 0.25;
-            amp = Math.max(0.25, Math.min(0.95, wave1 + wave2));
-          } else {
-            amp = 0.15;
-          }
+          const phaseShift = i * 0.85;
+          const wave1 = Math.sin(timeSec * 7.5 + phaseShift) * 0.35 + 0.5;
+          const wave2 = Math.cos(timeSec * 11.2 - phaseShift) * 0.25;
+          amp = Math.max(0.35, Math.min(0.95, wave1 + wave2));
         }
 
         const disp = displayRef.current;
@@ -408,7 +404,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
     return () => cancelAnimationFrame(raf);
   }, [width, height]);
 
-  return <canvas ref={canvasRef} style={{ width, height, display: "block", flexShrink: 0 }} />;
+  return <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, minWidth: `${width}px`, minHeight: `${height}px`, display: "block", flexShrink: 0, zIndex: 50 }} />;
 }
 
 const WeatherIcon = ({ status, size = 16, color = "currentColor" }) => {
