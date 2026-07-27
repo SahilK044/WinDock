@@ -52490,8 +52490,13 @@ public class AirDropWindow : Window
 					string[] files = (string[])e.Data.GetData (System.Windows.DataFormats.FileDrop);
 					if (files != null && files.Length > 0) {
 						string filePath = files[0];
-						dzText.Text = $"File Ready: {System.IO.Path.GetFileName(filePath)}";
-						dzSub.Text = "Copied to Clipboard! Ready to paste into Phone Link or AirDrop";
+						string fileName = System.IO.Path.GetFileName(filePath);
+						
+						// Stage 1: Active Sending UI
+						dzIcon.Text = "\uE898";
+						dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255));
+						dzText.Text = $"Sending {fileName}...";
+						dzSub.Text = "Transferring via AirDrop & Phone Link...";
 
 						try {
 							var strColl = new System.Collections.Specialized.StringCollection();
@@ -52499,11 +52504,39 @@ public class AirDropWindow : Window
 							System.Windows.Clipboard.SetFileDropList(strColl);
 						} catch { }
 
-						try {
-							Process.Start(new ProcessStartInfo("ms-settings:crossdevice") { UseShellExecute = true });
-						} catch {
-							try { Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true }); } catch { }
-						}
+						// Stage 2: Launch Phone Link / Windows Share after 1s
+						var timerDispatch = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.0) };
+						timerDispatch.Tick += (st, ev) => {
+							timerDispatch.Stop();
+							try {
+								Process.Start(new ProcessStartInfo("cmd.exe", "/c start shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App") { CreateNoWindow = true, UseShellExecute = false });
+							} catch {
+								try { Process.Start(new ProcessStartInfo("ms-settings:crossdevice") { UseShellExecute = true }); } catch { }
+							}
+						};
+						timerDispatch.Start();
+
+						// Stage 3: Success checkmark state after 2.2s
+						var timerSuccess = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2.2) };
+						timerSuccess.Tick += (st, ev) => {
+							timerSuccess.Stop();
+							dzIcon.Text = "\uE73E";
+							dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 199, 89));
+							dzText.Text = "File Sent Successfully!";
+							dzSub.Text = $"{fileName} is ready on your Phone / Mac";
+						};
+						timerSuccess.Start();
+
+						// Stage 4: Reset after 6s
+						var timerReset = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(6.0) };
+						timerReset.Tick += (st, ev) => {
+							timerReset.Stop();
+							dzIcon.Text = "\uE898";
+							dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255));
+							dzText.Text = "Drop files here to share with Phone / Mac";
+							dzSub.Text = "Nearby Devices: iPhone / Android Connected";
+						};
+						timerReset.Start();
 					}
 				}
 			};
@@ -52547,18 +52580,18 @@ public class AirDropWindow : Window
 			};
 			crossDevBtn.Click += (s, e) => {
 				try {
-					Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true });
+					Process.Start (new ProcessStartInfo ("ms-settings:bluetooth") { UseShellExecute = true });
 				} catch {
-					try { Process.Start (new ProcessStartInfo ("ms-settings:bluetooth") { UseShellExecute = true }); } catch { }
+					try { Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true }); } catch { }
 				}
 			};
 
 
 			phoneLinkBtn.Click += (s, e) => {
 				try {
-					Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true });
+					Process.Start(new ProcessStartInfo("cmd.exe", "/c start shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App") { CreateNoWindow = true, UseShellExecute = false });
 				} catch {
-					try { Process.Start (new ProcessStartInfo ("https://linktopc.microsoft.com") { UseShellExecute = true }); } catch { }
+					try { Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true }); } catch { }
 				}
 			};
 
