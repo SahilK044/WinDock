@@ -574,8 +574,8 @@
                                         </Grid>
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
-                                            <TextBlock Text="Enable Voice Assistant (Chonk)" Style="{StaticResource CardText}"/>
-                                            <CheckBox x:Name="EnableAIAssistant" Template="{StaticResource MacToggle}"/>
+                                            <TextBlock Text="Enable Voice Commands" Style="{StaticResource CardText}"/>
+                                            <CheckBox x:Name="EnableCommandCenter" Template="{StaticResource MacToggle}"/>
                                         </Grid>
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
