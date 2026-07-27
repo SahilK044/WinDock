@@ -2102,7 +2102,7 @@ export default function Island() {
                         width: '100%',
                         height: '100%',
                         gap: '14px',
-                        padding: '14px 16px',
+                        padding: '10px 16px',
                         boxSizing: 'border-box',
                         opacity: spotifyTrack.state === 'playing' ? 1 : 0.5,
                         filter: spotifyTrack.state === 'playing' ? 'none' : 'grayscale(1)',
@@ -2220,22 +2220,22 @@ export default function Island() {
                             )}
                           </motion.p>
                         </div>
-                        <div style={{ marginTop: 4, marginBottom: 4, marginLeft: 0, display: 'flex', alignItems: 'center', minHeight: 26, width: '185px' }}>
+                        <div style={{ marginTop: 2, marginBottom: 2, marginLeft: 0, display: 'flex', alignItems: 'center', minHeight: 20, width: '185px' }}>
                           <AlbumAudioVisualizer
                             isPlaying={isPlaying}
                             paletteRef={albumPaletteRef}
                             width={185}
-                            height={26}
+                            height={20}
                           />
                         </div>
-                        <div style={{ display: 'flex', gap: 20, marginTop: 6, alignItems: 'center', justifyContent: 'center', width: '185px' }}>
+                        <div style={{ display: 'flex', gap: 16, marginTop: 2, alignItems: 'center', justifyContent: 'center', width: '185px' }}>
                           <button
                             className="media-btn"
                             onClick={() => {
                               window.electronAPI.controlSystemMedia('previous');
                             }}
-                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 8, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
-                          ><SkipBackIcon size={20} color={textColor} fill={textColor} /></button>
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 6, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+                          ><SkipBackIcon size={18} color={textColor} fill={textColor} /></button>
                           <button
                             className="media-btn"
                             onClick={() => {
@@ -2247,7 +2247,7 @@ export default function Island() {
                               borderRadius: '50%',
                               color: textColor,
                               cursor: 'pointer',
-                              padding: 10,
+                              padding: 7,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -2255,15 +2255,15 @@ export default function Island() {
                               boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                             }}
                           >
-                            {spotifyTrack.state === 'playing' ? <Pause size={24} color={textColor} fill={textColor} /> : <Play size={24} color={textColor} fill={textColor} />}
+                            {spotifyTrack.state === 'playing' ? <Pause size={20} color={textColor} fill={textColor} /> : <Play size={20} color={textColor} fill={textColor} />}
                           </button>
                           <button
                             className="media-btn"
                             onClick={() => {
                               window.electronAPI.controlSystemMedia('next');
                             }}
-                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 8, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
-                          ><SkipForwardIcon size={20} color={textColor} fill={textColor} /></button>
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 6, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+                          ><SkipForwardIcon size={18} color={textColor} fill={textColor} /></button>
                         </div>
                       </div>
                     </motion.div>
