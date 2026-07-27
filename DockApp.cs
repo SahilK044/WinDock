@@ -52579,8 +52579,8 @@ public class AirDropWindow : Window
 						// Stage 1: Active Sending UI
 						dzIcon.Text = "\uE898";
 						dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255));
-						dzText.Text = $"Dispatching {fileName} to {selectedDeviceName}...";
-						dzSub.Text = "Copied to Clipboard! Launching Phone Link & Nearby Share...";
+						dzText.Text = $"Sending {fileName} to {selectedDeviceName}...";
+						dzSub.Text = "Copied file to Clipboard & Focusing Phone Link...";
 
 						try {
 							var strColl = new System.Collections.Specialized.StringCollection();
@@ -52588,30 +52588,24 @@ public class AirDropWindow : Window
 							System.Windows.Clipboard.SetFileDropList(strColl);
 						} catch { }
 
-						try {
-							Process.Start(new ProcessStartInfo("ms-settings:nearbysharing") { UseShellExecute = true });
-						} catch { }
-
-						// Stage 2: Launch Phone Link / Windows Share after 0.8s
-						var timerDispatch = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(0.8) };
+						// Stage 2: Launch & Focus Phone Link App cleanly without opening Settings app
+						var timerDispatch = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
 						timerDispatch.Tick += (st, ev) => {
 							timerDispatch.Stop();
 							try {
 								Process.Start(new ProcessStartInfo("cmd.exe", "/c start shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App") { CreateNoWindow = true, UseShellExecute = false });
-							} catch {
-								try { Process.Start(new ProcessStartInfo("ms-settings:crossdevice") { UseShellExecute = true }); } catch { }
-							}
+							} catch { }
 						};
 						timerDispatch.Start();
 
-						// Stage 3: Clear instruction state after 1.8s
-						var timerSuccess = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.8) };
+						// Stage 3: Ready state after 1.5s
+						var timerSuccess = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
 						timerSuccess.Tick += (st, ev) => {
 							timerSuccess.Stop();
 							dzIcon.Text = "\uE73E";
 							dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 199, 89));
-							dzText.Text = $"File Dispatched to {selectedDeviceName}!";
-							dzSub.Text = $"Paste (Ctrl+V) in Phone Link or accept Nearby Share on {selectedDeviceName}";
+							dzText.Text = $"File Ready for {selectedDeviceName}!";
+							dzSub.Text = $"Press Ctrl+V in Phone Link to send {fileName}";
 						};
 						timerSuccess.Start();
 
