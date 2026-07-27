@@ -707,11 +707,23 @@ label {
 
 .media-btn {
   transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.4s ease, opacity 0.4s ease;
+  border-radius: 50% !important;
+  outline: none !important;
 }
 
 .media-btn:hover {
-  filter: brightness(0.95);
-  transform: scale(1.2);
+  filter: brightness(1.2);
+  transform: scale(1.15);
+  border-radius: 50% !important;
+  outline: none !important;
+}
+
+button {
+  outline: none !important;
+}
+
+button:focus-visible {
+  outline: none !important;
 }
 
 .radio-group {

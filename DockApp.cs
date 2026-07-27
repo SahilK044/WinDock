@@ -52360,8 +52360,36 @@ namespace MacStyleDock
 		}
 	}
 
-	public class AirDropWindow : Window
+	
+
+
+public class AirDropWindow : Window
 	{
+		private static System.Windows.Controls.ControlTemplate CreateRoundedButtonTemplate(CornerRadius cornerRadius, System.Windows.Media.Brush defaultBg, System.Windows.Media.Brush hoverBg, System.Windows.Media.Brush pressedBg) {
+			var template = new System.Windows.Controls.ControlTemplate(typeof(System.Windows.Controls.Button));
+			var borderFactory = new FrameworkElementFactory(typeof(Border));
+			borderFactory.Name = "border";
+			borderFactory.SetValue(Border.CornerRadiusProperty, cornerRadius);
+			borderFactory.SetValue(Border.BackgroundProperty, defaultBg);
+
+			var presenterFactory = new FrameworkElementFactory(typeof(System.Windows.Controls.ContentPresenter));
+			presenterFactory.SetValue(System.Windows.Controls.ContentPresenter.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Center);
+			presenterFactory.SetValue(System.Windows.Controls.ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+			borderFactory.AppendChild(presenterFactory);
+
+			template.VisualTree = borderFactory;
+
+			var hoverTrigger = new Trigger { Property = System.Windows.Controls.Button.IsMouseOverProperty, Value = true };
+			hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, hoverBg, "border"));
+			template.Triggers.Add(hoverTrigger);
+
+			var pressedTrigger = new Trigger { Property = System.Windows.Controls.Button.IsPressedProperty, Value = true };
+			pressedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, pressedBg, "border"));
+			template.Triggers.Add(pressedTrigger);
+
+			return template;
+		}
+
 		public AirDropWindow ()
 		{
 			base.WindowStyle = WindowStyle.None;
@@ -52460,39 +52488,36 @@ namespace MacStyleDock
 
 			StackPanel btnSp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
 
-			Border crossDevBorder = new Border {
-				CornerRadius = new CornerRadius(10),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
-				Margin = new Thickness (0, 0, 10, 0)
-			};
 			System.Windows.Controls.Button crossDevBtn = new System.Windows.Controls.Button {
 				Content = "Device Settings",
 				Padding = new Thickness (14, 8, 14, 8),
-				Background = System.Windows.Media.Brushes.Transparent,
 				Foreground = System.Windows.Media.Brushes.White,
 				BorderThickness = new Thickness (0),
 				FontWeight = FontWeights.SemiBold,
-				Cursor = System.Windows.Input.Cursors.Hand
+				Cursor = System.Windows.Input.Cursors.Hand,
+				Margin = new Thickness (0, 0, 10, 0),
+				Template = CreateRoundedButtonTemplate(
+					new CornerRadius(12),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (35, 255, 255, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (65, 255, 255, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromArgb (90, 255, 255, 255))
+				)
 			};
-			crossDevBorder.Child = crossDevBtn;
 
-			Border phoneLinkBorder = new Border {
-				CornerRadius = new CornerRadius(10),
-				Background = new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
-				Effect = new System.Windows.Media.Effects.DropShadowEffect {
-					BlurRadius = 12, ShadowDepth = 2, Opacity = 0.35, Color = System.Windows.Media.Color.FromRgb (0, 122, 255)
-				}
-			};
 			System.Windows.Controls.Button phoneLinkBtn = new System.Windows.Controls.Button {
 				Content = "Open Phone Link",
 				Padding = new Thickness (16, 8, 16, 8),
-				Background = System.Windows.Media.Brushes.Transparent,
 				Foreground = System.Windows.Media.Brushes.White,
 				BorderThickness = new Thickness (0),
 				FontWeight = FontWeights.Bold,
-				Cursor = System.Windows.Input.Cursors.Hand
+				Cursor = System.Windows.Input.Cursors.Hand,
+				Template = CreateRoundedButtonTemplate(
+					new CornerRadius(12),
+					new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 122, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromRgb (30, 144, 255)),
+					new SolidColorBrush (System.Windows.Media.Color.FromRgb (0, 90, 200))
+				)
 			};
-			phoneLinkBorder.Child = phoneLinkBtn;
 			crossDevBtn.Click += (s, e) => {
 				try {
 					Process.Start (new ProcessStartInfo ("ms-settings:crossdevice") { UseShellExecute = true });
@@ -52510,8 +52535,8 @@ namespace MacStyleDock
 				}
 			};
 
-			btnSp.Children.Add (crossDevBorder);
-			btnSp.Children.Add (phoneLinkBorder);
+			btnSp.Children.Add (crossDevBtn);
+			btnSp.Children.Add (phoneLinkBtn);
 			Grid.SetRow (btnSp, 2);
 			root.Children.Add (btnSp);
 
