@@ -165,10 +165,10 @@ function AlbumGlow({ paletteRef, isPlaying }) {
 // it doesn't have access to.
 const VIS_BAR_COUNT = 24;
 
-function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 }) {
+function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 }) {
   const canvasRef = useRef(null);
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
-  const displayRef = useRef(new Float32Array(VIS_BAR_COUNT)); // eased for smooth rendering
+  const displayRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const usingRealAudioRef = useRef(false);
   const isPlayingRef = useRef(isPlaying);
   const phasesRef = useRef(
@@ -178,15 +178,10 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 
       speed: 1.6 + Math.random() * 1.2,
     }))
   );
-  const fallbackLevelRef = useRef(0);
+  const fallbackLevelRef = useRef(1.0);
 
-  // Keep isPlaying available to the draw loop without forcing the loop
-  // itself to tear down and restart on every play/pause toggle.
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
-  // Start/stop real audio capture whenever this visualizer is mounted
-  // (i.e. the Now Playing tab is open) and unsubscribe on unmount so we
-  // don't burn CPU capturing audio nobody is looking at.
   useEffect(() => {
     let unsubscribe = null;
     let cancelled = false;
@@ -229,32 +224,30 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 
       const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
       const t = now / 1000;
       const real = usingRealAudioRef.current;
-      const { primary: primaryColor, secondary: secondaryColor } = paletteRef.current;
+      const palette = paletteRef?.current || { primary: "#3b82f6", secondary: "#93c5fd" };
+      const primaryColor = palette.primary || "#3b82f6";
+      const secondaryColor = palette.secondary || "#93c5fd";
 
-      // Fallback amplitude ramps toward play/pause state when we have no
-      // real audio pipeline (non-Windows, or addon failed to load/build).
-      const target = isPlayingRef.current ? 1 : 0;
+      const target = isPlayingRef.current ? 1.0 : 0.45;
       fallbackLevelRef.current += (target - fallbackLevelRef.current) * Math.min(1, dt * 6);
 
       ctx.clearRect(0, 0, width, height);
 
       for (let i = 0; i < VIS_BAR_COUNT; i++) {
         let amp;
-        if (real) {
-          amp = bandsRef.current[i] || 0;
+        if (real && bandsRef.current && bandsRef.current[i] > 0.02) {
+          amp = bandsRef.current[i];
         } else {
           const p = phasesRef.current[i];
           const wave =
             0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.6 +
             0.25 * Math.sin(t * p.speed * 1.7 + p.phase * 1.3);
-          amp = Math.max(0.04, Math.min(1, wave)) * fallbackLevelRef.current;
+          amp = Math.max(0.12, Math.min(1, wave)) * fallbackLevelRef.current;
         }
 
-        // Light easing on top of the real data too, purely for visual
-        // smoothness between the ~60fps redraw and the audio-driven updates.
         const disp = displayRef.current;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * 10);
-        const barHeight = Math.max(2, disp[i] * height);
+        const barHeight = Math.max(4, disp[i] * height);
 
         const x = i * (barWidth + gap);
         const y = height - barHeight;
@@ -280,10 +273,6 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-    // Deliberately NOT depending on paletteRef.current / isPlaying here —
-    // both are read live from refs each frame so the loop only needs to
-    // restart when the canvas itself is resized.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height]);
 
   return <canvas ref={canvasRef} style={{ width, height, display: "block" }} />;
@@ -2221,10 +2210,10 @@ export default function Island() {
                         </div>
                         <div style={{ marginTop: 8, marginLeft: 5 }}>
                           <AlbumAudioVisualizer
-                            isPlaying={spotifyTrack.state === 'playing'}
+                            isPlaying={spotifyTrack?.state ? spotifyTrack.state === 'playing' : true}
                             paletteRef={albumPaletteRef}
-                            width={175}
-                            height={26}
+                            width={220}
+                            height={32}
                           />
                         </div>
                         <div style={{ display: 'flex', gap: 15, marginTop: 10, alignItems: 'center', marginLeft: 5 }}>
