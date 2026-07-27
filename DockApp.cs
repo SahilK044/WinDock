@@ -52417,9 +52417,10 @@ public class AirDropWindow : Window
 			};
 
 			Grid root = new Grid { Margin = new Thickness (22) };
-			root.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto });
-			root.RowDefinitions.Add (new RowDefinition { Height = new GridLength (1.0, GridUnitType.Star) });
-			root.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto });
+			root.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto }); // 0: Header
+			root.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto }); // 1: Devices
+			root.RowDefinitions.Add (new RowDefinition { Height = new GridLength (1.0, GridUnitType.Star) }); // 2: DropZone
+			root.RowDefinitions.Add (new RowDefinition { Height = GridLength.Auto }); // 3: Buttons
 
 			StackPanel headSp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
 			TextBlock iconT = new TextBlock {
@@ -52455,6 +52456,89 @@ public class AirDropWindow : Window
 			headGrid.Children.Add (closeBtn);
 			Grid.SetRow (headGrid, 0);
 			root.Children.Add (headGrid);
+
+			// Active Selected Device state
+			string selectedDeviceName = "Sahil's S24 Ultra";
+
+			// Device Selector Row
+			StackPanel devRow = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0), HorizontalAlignment = System.Windows.HorizontalAlignment.Center };
+
+			// Device 1: Sahil's S24 Ultra
+			Border dev1Card = new Border {
+				Width = 220, Height = 54, CornerRadius = new CornerRadius(14),
+				Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 10, 132, 255)),
+				BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255)),
+				BorderThickness = new Thickness(1.5),
+				Margin = new Thickness(0, 0, 12, 0),
+				Cursor = System.Windows.Input.Cursors.Hand,
+				Padding = new Thickness(12, 8, 12, 8)
+			};
+			Grid dev1Grid = new Grid();
+			dev1Grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+			dev1Grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.0, GridUnitType.Star) });
+			TextBlock dev1Icon = new TextBlock { Text = "\uE8EA", FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"), FontSize = 22, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+			StackPanel dev1TextSp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+			TextBlock dev1Name = new TextBlock { Text = "Sahil's S24 Ultra", FontSize = 12.5, FontWeight = FontWeights.Bold, Foreground = System.Windows.Media.Brushes.White };
+			TextBlock dev1Status = new TextBlock { Text = "● Connected (Phone Link)", FontSize = 10, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 199, 89)) };
+			dev1TextSp.Children.Add(dev1Name);
+			dev1TextSp.Children.Add(dev1Status);
+			Grid.SetColumn(dev1Icon, 0);
+			Grid.SetColumn(dev1TextSp, 1);
+			dev1Grid.Children.Add(dev1Icon);
+			dev1Grid.Children.Add(dev1TextSp);
+			dev1Card.Child = dev1Grid;
+
+			// Device 2: MacBook / AirDrop
+			Border dev2Card = new Border {
+				Width = 220, Height = 54, CornerRadius = new CornerRadius(14),
+				Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(15, 255, 255, 255)),
+				BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 255, 255, 255)),
+				BorderThickness = new Thickness(1),
+				Cursor = System.Windows.Input.Cursors.Hand,
+				Padding = new Thickness(12, 8, 12, 8)
+			};
+			Grid dev2Grid = new Grid();
+			dev2Grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+			dev2Grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.0, GridUnitType.Star) });
+			TextBlock dev2Icon = new TextBlock { Text = "\uE7F4", FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"), FontSize = 22, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+			StackPanel dev2TextSp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+			TextBlock dev2Name = new TextBlock { Text = "MacBook Air (AirDrop)", FontSize = 12.5, FontWeight = FontWeights.Bold, Foreground = System.Windows.Media.Brushes.White };
+			TextBlock dev2Status = new TextBlock { Text = "● Nearby Share Ready", FontSize = 10, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255)) };
+			dev2TextSp.Children.Add(dev2Name);
+			dev2TextSp.Children.Add(dev2Status);
+			Grid.SetColumn(dev2Icon, 0);
+			Grid.SetColumn(dev2TextSp, 1);
+			dev2Grid.Children.Add(dev2Icon);
+			dev2Grid.Children.Add(dev2TextSp);
+			dev2Card.Child = dev2Grid;
+
+			// Selection click handlers
+			dev1Card.MouseLeftButtonDown += (s, e) => {
+				selectedDeviceName = "Sahil's S24 Ultra";
+				dev1Card.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 10, 132, 255));
+				dev1Card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255));
+				dev1Card.BorderThickness = new Thickness(1.5);
+
+				dev2Card.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(15, 255, 255, 255));
+				dev2Card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 255, 255, 255));
+				dev2Card.BorderThickness = new Thickness(1);
+			};
+
+			dev2Card.MouseLeftButtonDown += (s, e) => {
+				selectedDeviceName = "MacBook Air";
+				dev2Card.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 10, 132, 255));
+				dev2Card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255));
+				dev2Card.BorderThickness = new Thickness(1.5);
+
+				dev1Card.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(15, 255, 255, 255));
+				dev1Card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 255, 255, 255));
+				dev1Card.BorderThickness = new Thickness(1);
+			};
+
+			devRow.Children.Add(dev1Card);
+			devRow.Children.Add(dev2Card);
+			Grid.SetRow(devRow, 1);
+			root.Children.Add(devRow);
 
 			Border dropZone = new Border {
 				CornerRadius = new CornerRadius (16),
@@ -52495,8 +52579,8 @@ public class AirDropWindow : Window
 						// Stage 1: Active Sending UI
 						dzIcon.Text = "\uE898";
 						dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 132, 255));
-						dzText.Text = $"Sending {fileName}...";
-						dzSub.Text = "Transferring via AirDrop & Phone Link...";
+						dzText.Text = $"Sending {fileName} to {selectedDeviceName}...";
+						dzSub.Text = $"Transferring via AirDrop to {selectedDeviceName}...";
 
 						try {
 							var strColl = new System.Collections.Specialized.StringCollection();
@@ -52522,8 +52606,8 @@ public class AirDropWindow : Window
 							timerSuccess.Stop();
 							dzIcon.Text = "\uE73E";
 							dzIcon.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 199, 89));
-							dzText.Text = "File Sent Successfully!";
-							dzSub.Text = $"{fileName} is ready on your Phone / Mac";
+							dzText.Text = $"Sent to {selectedDeviceName}!";
+							dzSub.Text = $"{fileName} is ready on {selectedDeviceName}";
 						};
 						timerSuccess.Start();
 
@@ -52541,7 +52625,7 @@ public class AirDropWindow : Window
 				}
 			};
 
-			Grid.SetRow (dropZone, 1);
+			Grid.SetRow (dropZone, 2);
 			root.Children.Add (dropZone);
 
 			StackPanel btnSp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
@@ -52597,7 +52681,7 @@ public class AirDropWindow : Window
 
 			btnSp.Children.Add (crossDevBtn);
 			btnSp.Children.Add (phoneLinkBtn);
-			Grid.SetRow (btnSp, 2);
+			Grid.SetRow (btnSp, 3);
 			root.Children.Add (btnSp);
 
 			card.Child = root;
