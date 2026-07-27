@@ -887,7 +887,16 @@ global.startWasapiSampler = function() {};
 function startWasapiSampler() {
   if (wasapiProcess || process.platform !== "win32") return;
 
-  const psScript = `
+  const meterExePath = app.isPackaged
+    ? path.join(process.resourcesPath, "wasapi_meter.exe")
+    : path.join(app.getAppPath(), "src", "audio", "wasapi_meter.exe");
+
+  try {
+    let child = null;
+    if (fs.existsSync(meterExePath)) {
+      child = spawn(meterExePath, [], { shell: false, detached: false, stdio: ["ignore", "pipe", "ignore"] });
+    } else {
+      const psScript = `
 $code = @'
 using System;
 using System.Runtime.InteropServices;
@@ -942,16 +951,12 @@ Add-Type -TypeDefinition $code
 while ($true) {
     $p = [AudioMeter.Meter]::GetPeak()
     [Console]::WriteLine($p)
+    [Console]::Out.Flush()
     Start-Sleep -Milliseconds 20
 }
-  `;
-
-  try {
-    const child = spawn("powershell", ["-NoProfile", "-Command", psScript], {
-      shell: false,
-      detached: false,
-      stdio: ["ignore", "pipe", "ignore"]
-    });
+      `;
+      child = spawn("powershell", ["-NoProfile", "-Command", psScript], { shell: false, detached: false, stdio: ["ignore", "pipe", "ignore"] });
+    }
 
     child.stdout.on("data", (data) => {
       const str = data.toString();
@@ -960,11 +965,10 @@ while ($true) {
       const val = parseFloat(lastLine);
       if (!isNaN(val)) {
         latestAudioPeak = val;
-        // Automatic Gain Control (AGC) for dynamic volume scaling
         if (latestAudioPeak > maxPeakSeen) maxPeakSeen = latestAudioPeak;
-        else maxPeakSeen = Math.max(0.08, maxPeakSeen * 0.995); // decay slowly
+        else maxPeakSeen = Math.max(0.08, maxPeakSeen * 0.995);
 
-        const gain = Math.min(5.0, 0.85 / maxPeakSeen);
+        const gain = Math.min(6.0, 0.9 / maxPeakSeen);
         const normPeak = Math.min(1.0, latestAudioPeak * gain);
 
         const bands = new Array(24);
@@ -979,10 +983,12 @@ while ($true) {
       }
     });
 
-    child.on("error", () => {});
+    child.on("error", (err) => {
+      console.error("[wasapi-sampler] Error starting sampler:", err);
+    });
     wasapiProcess = child;
   } catch (err) {
-    console.error("[wasapi-sampler] Error starting sampler:", err);
+    console.error("[wasapi-sampler] Exception in startWasapiSampler:", err);
   }
 }
 
