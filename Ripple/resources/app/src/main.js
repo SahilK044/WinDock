@@ -882,6 +882,7 @@ function ensureAudioWorker() {
 let wasapiProcess = null;
 let latestAudioPeak = 0;
 
+global.startWasapiSampler = function() {};
 function startWasapiSampler() {
   if (wasapiProcess || process.platform !== "win32") return;
 
@@ -985,6 +986,7 @@ function stopWasapiSampler() {
 }
 
 ipcMain.handle("audio-viz-start", () => {
+  if (typeof startWasapiSampler === "function") startWasapiSampler();
   audioRefCount++;
   startWasapiSampler();
   if (loopback.available && !audioCaptureActive) {

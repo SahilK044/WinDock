@@ -1,34 +1,4 @@
-"use strict";
-const {
-  app,
-  BrowserWindow,
-  screen,
-  ipcMain,
-  shell,
-  Tray,
-  Menu,
-  nativeImage,
-} = require("electron");
-const path = require("node:path");
-const fs = require("fs");
-
-if (process.platform === "linux") {
-  app.commandLine.appendSwitch("enable-transparent-visuals");
-  app.commandLine.appendSwitch("disable-gpu-compositing");
-  app.disableHardwareAcceleration();
-}
-let tray = null;
-let mainWindow = null;
-
-const { exec, spawn } = require('child_process');
-
-// --- App discovery providers ---
-
-// Scans Start Menu .lnk files and resolves them to Win32 exe paths.
-// Skips shortcuts targeting explorer.exe (UWP launchers) or WindowsApps.
-function discoverStartMenu() {
-  return new Promise((resolve) => {
-    const script = `
+"use strict";const{app:c,BrowserWindow:_,screen:E,ipcMain:p,shell:A,Tray:j,Menu:G,nativeImage:L}=require("electron"),h=require("node:path"),f=require("fs");process.platform==="linux"&&(c.commandLine.appendSwitch("enable-transparent-visuals"),c.commandLine.appendSwitch("disable-gpu-compositing"),c.disableHardwareAcceleration());let k=null,i=null;const{exec:l,spawn:T}=require("child_process");function R(){return new Promise(n=>{const e=Buffer.from(`
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $shell   = New-Object -ComObject WScript.Shell
 $dirs    = @("$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs","$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs")
@@ -48,29 +18,7 @@ foreach ($dir in $dirs) {
   }
 }
 @($results) | ConvertTo-Json -Compress -Depth 2
-`;
-    const enc = Buffer.from(script, "utf16le").toString("base64");
-    exec(
-      `powershell -NoProfile -EncodedCommand ${enc}`,
-      { maxBuffer: 5 * 1024 * 1024 },
-      (err, out) => {
-        if (err || !out) return resolve([]);
-        try {
-          const d = JSON.parse(out.trim());
-          resolve(Array.isArray(d) ? d : d ? [d] : []);
-        } catch {
-          resolve([]);
-        }
-      },
-    );
-  });
-}
-
-// Gets UWP / Store apps via Get-StartApps.
-// UWP entries have AppID in the form PackageFamilyName!AppId (contains '!').
-function discoverUWP() {
-  return new Promise((resolve) => {
-    const script = `
+`,"utf16le").toString("base64");l(`powershell -NoProfile -EncodedCommand ${e}`,{maxBuffer:5*1024*1024},(r,s)=>{if(r||!s)return n([]);try{const o=JSON.parse(s.trim());n(Array.isArray(o)?o:o?[o]:[])}catch{n([])}})})}function U(){return new Promise(n=>{const e=Buffer.from(`
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $results = [System.Collections.Generic.List[object]]::new()
 Get-StartApps -EA SilentlyContinue | ForEach-Object {
@@ -79,476 +27,90 @@ Get-StartApps -EA SilentlyContinue | ForEach-Object {
   }
 }
 @($results) | ConvertTo-Json -Compress -Depth 2
-`;
-    const enc = Buffer.from(script, "utf16le").toString("base64");
-    exec(
-      `powershell -NoProfile -EncodedCommand ${enc}`,
-      { maxBuffer: 2 * 1024 * 1024 },
-      (err, out) => {
-        if (err || !out) return resolve([]);
-        try {
-          const d = JSON.parse(out.trim());
-          resolve(Array.isArray(d) ? d : d ? [d] : []);
-        } catch {
-          resolve([]);
-        }
-      },
-    );
-  });
-}
-
-// Converts provider-specific shapes to { name, launch } and deduplicates.
-// win32: launch = exe path   |   uwp: launch = shell:AppsFolder\\appId
-async function buildCache() {
-  const [startMenu, uwp] = await Promise.all([
-    discoverStartMenu(),
-    discoverUWP(),
-  ]);
-  const seen = new Set();
-  const entries = [];
-  for (const item of [...startMenu, ...uwp]) {
-    if (!item.name || !(item.path || item.appId)) continue;
-    const launch =
-      item.type === "uwp" ? `shell:AppsFolder\\${item.appId}` : item.path;
-    const key = launch.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      entries.push({ name: item.name, launch });
-    }
-  }
-  return entries.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-// Tokenizes an argument string, correctly handling mid-token quotes.
-// --flag="hello world"  ->  ['--flag=hello world']
-// "quoted arg" --bare   ->  ['quoted arg', '--bare']
-function tokenizeArgs(str) {
-  const args = [];
-  let i = 0;
-  while (i < str.length) {
-    while (i < str.length && /\s/.test(str[i])) i++;
-    if (i >= str.length) break;
-    let token = "";
-    while (i < str.length && !/\s/.test(str[i])) {
-      if (str[i] === '"') {
-        i++;
-        while (i < str.length && str[i] !== '"') token += str[i++];
-        if (i < str.length) i++; // consume closing quote
-      } else {
-        token += str[i++];
-      }
-    }
-    if (token) args.push(token);
-  }
-  return args;
-}
-
-// Parses a Windows command string into { exe, args }.
-// Normalizes forward slashes and expands %ENV_VAR% before splitting.
-function parseCommand(input) {
-  const prepared = input
-    .replace(/\//g, "\\")
-    .replace(/%([^%]+)%/g, (_, v) => process.env[v] || `%${v}%`);
-
-  // Quoted exe path: "C:\path with spaces\app.exe" [args...]
-  const quotedMatch = prepared.match(/^"([^"]+)"(.*)/);
-  if (quotedMatch) {
-    return {
-      exe: quotedMatch[1],
-      args: quotedMatch[2].trim() ? tokenizeArgs(quotedMatch[2].trim()) : [],
-    };
-  }
-
-  // Unquoted path: find exe boundary by known extension so that spaces inside
-  // the path (C:\Program Files\...) don't cause premature splitting.
-  const extMatch = prepared.match(
-    /^(.+?\.(?:exe|cmd|bat|com|ps1))(?:\s+(.*))?$/i,
-  );
-  if (extMatch) {
-    return {
-      exe: extMatch[1],
-      args: extMatch[2] ? tokenizeArgs(extMatch[2]) : [],
-    };
-  }
-
-  // No recognised extension (e.g. cmd, wt) — split on first whitespace.
-  const spaceIdx = prepared.search(/\s/);
-  if (spaceIdx === -1) return { exe: prepared, args: [] };
-  return {
-    exe: prepared.slice(0, spaceIdx),
-    args: tokenizeArgs(prepared.slice(spaceIdx + 1).trim()),
-  };
-}
-
-// --- Launch abstraction ---
-function launchWindows(input) {
-  const trimmed = input.trim();
-
-  // UWP apps and schemes
-  if (trimmed.startsWith("shell:")) {
-    const safe = trimmed.replace(/'/g, "''");
-    exec(
-      `powershell -NoProfile -WindowStyle Hidden -Command "Start-Process '${safe}'"`,
-    );
-    return;
-  }
-
-  // Paths with slashes (ex: C:\Program Files\App.exe)
-  if (/[\\\/]/.test(trimmed)) {
-    const { exe, args } = parseCommand(trimmed);
-
-    // If no arguments, use native OS approach for best compatibility
-    if (args.length === 0) {
-      if (exe.toLowerCase().endsWith(".url")) {
-        try {
-          const content = fs.readFileSync(exe, "utf8");
-          const m = content.match(/^URL=(.+)$/im);
-          if (m) shell.openExternal(m[1].trim());
-        } catch {}
-        return;
-      }
-      shell.openPath(exe).then((err) => {
-        if (err) exec(`start "" "${exe}"`);
-      });
-      return;
-    }
-
-    // Arguments provided - spawn exactly to prevent execution escaping vulnerabilities
-    const finalExe = /[\\/]/.test(exe) && !/\.[^\\.]+$/.test(exe) ? exe + ".exe" : exe;
-
-    // cmd / bat scripts must run via cmd.exe
-    if (/\.(cmd|bat)$/i.test(finalExe)) {
-      const child = spawn("cmd.exe", ["/c", finalExe, ...args], {
-        shell: false,
-        detached: true,
-        stdio: "ignore",
-      });
-      child.on("error", () => {});
-      child.unref();
-      return;
-    }
-
-    // powershell scripts
-    if (/\.ps1$/i.test(finalExe)) {
-      const child = spawn(
-        "powershell.exe",
-        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", finalExe, ...args],
-        { shell: false, detached: true, stdio: "ignore" },
-      );
-      child.on("error", () => {});
-      child.unref();
-      return;
-    }
-
-    const child = spawn(finalExe, args, {
-      shell: false,
-      detached: true,
-      stdio: "ignore",
-    });
-    child.on("error", () => {}); 
-    child.unref();
-    return;
-  }
-
-  // App Paths or raw executables
-  if (trimmed.includes(" ")) {
-    const safe = trimmed.replace(/'/g, "''");
-    exec(
-      `powershell -NoProfile -WindowStyle Hidden -Command "Start-Process '${safe}'"`,
-    );
-  } else {
-    exec(`start "" ${trimmed}`);
-  }
-}
-
-ipcMain.handle("set-ignore-mouse-events", (event, ignore, forward) => {
-  if (mainWindow) {
-    if (process.platform !== "linux") {
-      mainWindow.setIgnoreMouseEvents(ignore, { forward: forward || false });
-    } else {
-      mainWindow.setIgnoreMouseEvents(ignore);
-    }
-  }
-});
-
-ipcMain.handle("focus-window", () => {
-  if (mainWindow) {
-    mainWindow.focus();
-  }
-});
-
-ipcMain.handle("open-external", async (event, url) => {
-  await shell.openExternal(url);
-});
-
-ipcMain.handle("launch-app", async (event, appName) => {
-  const platform = process.platform;
-  if (platform === "darwin") {
-    exec(`open -a "${appName}"`);
-  } else if (platform === "win32") {
-    launchWindows(appName);
-  } else {
-    exec(appName);
-  }
-});
-
-ipcMain.handle("build-app-cache", async () => {
-  if (process.platform !== "win32") return;
-  const cacheFile = path.join(app.getPath("userData"), "app-cache.json");
-  try {
-    const entries = await buildCache();
-    fs.writeFileSync(cacheFile, JSON.stringify(entries));
-  } catch {
-    // Silently ignore cache build failures
-  }
-});
-
-ipcMain.handle("search-apps", async (event, query) => {
-  if (process.platform !== "win32" || !query) return [];
-  const cacheFile = path.join(app.getPath("userData"), "app-cache.json");
-  try {
-    if (!fs.existsSync(cacheFile)) return [];
-    const data = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
-    const q = query.toLowerCase();
-    return data
-      .filter((a) => a.name && a.name.toLowerCase().includes(q))
-      .slice(0, 8);
-  } catch {
-    return [];
-  }
-});
-
-ipcMain.handle("get-displays", () => {
-  const displays = screen.getAllDisplays();
-  return displays.map((d) => ({
-    id: d.id,
-    label: d.label || `Display ${d.id}`,
-    bounds: d.bounds,
-  }));
-});
-
-ipcMain.handle("set-display", (event, displayId) => {
-  if (mainWindow) {
-    const displays = screen.getAllDisplays();
-    const targetDisplay =
-      displays.find((d) => d.id.toString() === displayId.toString()) ||
-      screen.getPrimaryDisplay();
-
-    const { x, y, width, height } = targetDisplay.bounds;
-    const isLinux = process.platform === "linux";
-
-    mainWindow.setBounds({ x, y, width, height });
-    if (!isLinux) {
-      // Avoid setFullScreen to prevent covering taskbars and causing focus issues
-      // mainWindow.setFullScreen(true);
-    }
-
-    mainWindow.show();
-  }
-});
-
-ipcMain.handle("update-window-position", (event, xPerc, yPx) => {});
-
-ipcMain.handle("set-auto-launch", (event, enable) => {
-  if (process.platform === "linux") {
-    const autostartPath = path.join(
-      app.getPath("home"),
-      ".config",
-      "autostart",
-    );
-    const desktopFilePath = path.join(autostartPath, "ripple.desktop");
-
-    try {
-      if (enable) {
-        if (!fs.existsSync(autostartPath)) {
-          fs.mkdirSync(autostartPath, { recursive: true });
-        }
-        const desktopFileContent = `[Desktop Entry]
+`,"utf16le").toString("base64");l(`powershell -NoProfile -EncodedCommand ${e}`,{maxBuffer:2*1024*1024},(r,s)=>{if(r||!s)return n([]);try{const o=JSON.parse(s.trim());n(Array.isArray(o)?o:o?[o]:[])}catch{n([])}})})}async function q(){const[n,t]=await Promise.all([R(),U()]),e=new Set,r=[];for(const s of[...n,...t]){if(!s.name||!(s.path||s.appId))continue;const o=s.type==="uwp"?`shell:AppsFolder\\${s.appId}`:s.path,a=o.toLowerCase();e.has(a)||(e.add(a),r.push({name:s.name,launch:o}))}return r.sort((s,o)=>s.name.localeCompare(o.name))}function O(n){const t=[];let e=0;for(;e<n.length;){for(;e<n.length&&/\s/.test(n[e]);)e++;if(e>=n.length)break;let r="";for(;e<n.length&&!/\s/.test(n[e]);)if(n[e]==='"'){for(e++;e<n.length&&n[e]!=='"';)r+=n[e++];e<n.length&&e++}else r+=n[e++];r&&t.push(r)}return t}function B(n){const t=n.replace(/\//g,"\\").replace(/%([^%]+)%/g,(o,a)=>process.env[a]||`%${a}%`),e=t.match(/^"([^"]+)"(.*)/);if(e)return{exe:e[1],args:e[2].trim()?O(e[2].trim()):[]};const r=t.match(/^(.+?\.(?:exe|cmd|bat|com|ps1))(?:\s+(.*))?$/i);if(r)return{exe:r[1],args:r[2]?O(r[2]):[]};const s=t.search(/\s/);return s===-1?{exe:t,args:[]}:{exe:t.slice(0,s),args:O(t.slice(s+1).trim())}}function J(n){const t=n.trim();try{const e=h.join(c.getPath("userData"),"app-cache.json");if(f.existsSync(e)){const s=JSON.parse(f.readFileSync(e,"utf8")).find(o=>o.name&&o.name.toLowerCase()===t.toLowerCase()&&o.path&&!o.path.startsWith("shell:"));if(s&&s.path){A.openPath(s.path).then(o=>{o&&l(`start "" "${s.path}"`)});return}}}catch{}if(t.startsWith("shell:")||t.includes("!")||t.endsWith(":")||t.toLowerCase().includes("spotify")){let e=t;t.toLowerCase().includes("spotify")&&!t.includes("!")?e="spotify:":t.includes("!")&&!t.startsWith("shell:")&&(e=`shell:AppsFolder\\${t}`);const r=e.replace(/'/g,"''");l(`powershell -NoProfile -WindowStyle Hidden -Command "Start-Process '${r}'"`);return}if(/[\\\/]/.test(t)){const{exe:e,args:r}=B(t);if(r.length===0){if(e.toLowerCase().endsWith(".url")){try{const u=f.readFileSync(e,"utf8").match(/^URL=(.+)$/im);u&&A.openExternal(u[1].trim())}catch{}return}A.openPath(e).then(a=>{a&&l(`start "" "${e}"`)});return}const s=/[\\/]/.test(e)&&!/\.[^\\.]+$/.test(e)?e+".exe":e;if(/\.(cmd|bat)$/i.test(s)){const a=T("cmd.exe",["/c",s,...r],{shell:!1,detached:!0,stdio:"ignore"});a.on("error",()=>{}),a.unref();return}if(/\.ps1$/i.test(s)){const a=T("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File",s,...r],{shell:!1,detached:!0,stdio:"ignore"});a.on("error",()=>{}),a.unref();return}const o=T(s,r,{shell:!1,detached:!0,stdio:"ignore"});o.on("error",()=>{}),o.unref();return}if(t.includes(" ")){const e=t.replace(/'/g,"''");l(`powershell -NoProfile -WindowStyle Hidden -Command "Start-Process '${e}'"`)}else l(`start "" ${t}`)}p.handle("set-ignore-mouse-events",(n,t,e)=>{i&&(process.platform!=="linux"?i.setIgnoreMouseEvents(t,{forward:e||!1}):i.setIgnoreMouseEvents(t))});p.handle("focus-window",()=>{i&&i.focus()});p.handle("open-external",async(n,t)=>{await A.openExternal(t)});p.handle("launch-app",async(n,t)=>{var r;const e=process.platform;if(e==="darwin")l(`open -a "${t}"`);else if(e==="win32"){let s=null;try{const o=h.join(c.getPath("userData"),"app-cache.json");if(f.existsSync(o)){const a=JSON.parse(f.readFileSync(o,"utf8")),u=t.trim().toLowerCase(),d=a.filter(m=>m.name&&m.name.toLowerCase()===u);s=((r=d.find(m=>!m.launch.startsWith("shell:"))||d[0])==null?void 0:r.launch)||null}}catch{}J(s||t)}else l(t)});p.handle("build-app-cache",async()=>{if(process.platform!=="win32")return;const n=h.join(c.getPath("userData"),"app-cache.json");try{const t=await q();f.writeFileSync(n,JSON.stringify(t))}catch{}});p.handle("search-apps",async(n,t)=>{if(process.platform!=="win32"||!t)return[];const e=h.join(c.getPath("userData"),"app-cache.json");try{if(!f.existsSync(e))return[];const r=JSON.parse(f.readFileSync(e,"utf8")),s=t.toLowerCase();return r.filter(o=>o.name&&o.name.toLowerCase().includes(s)).slice(0,8)}catch{return[]}});p.handle("get-displays",()=>E.getAllDisplays().map(t=>({id:t.id,label:t.label||`Display ${t.id}`,bounds:t.bounds})));p.handle("set-display",(n,t)=>{if(i){const r=E.getAllDisplays().find(d=>d.id.toString()===t.toString())||E.getPrimaryDisplay(),{x:s,y:o,width:a,height:u}=r.bounds;process.platform,i.setBounds({x:s,y:o,width:a,height:u}),i.show()}});p.handle("update-window-position",(n,t,e)=>{});p.handle("set-auto-launch",(n,t)=>{if(process.platform==="linux"){const e=h.join(c.getPath("home"),".config","autostart"),r=h.join(e,"ripple.desktop");try{if(t){f.existsSync(e)||f.mkdirSync(e,{recursive:!0});const s=`[Desktop Entry]
 Type=Application
 Version=1.0
 Name=Ripple
 Comment=Ripple Desktop Assistant
-Exec="${app.getPath("exe")}"\nIcon=${getIconPath()}
+Exec="${c.getPath("exe")}"
+Icon=${x()}
 Terminal=false
-`;
-        fs.writeFileSync(desktopFilePath, desktopFileContent);
-      } else {
-        if (fs.existsSync(desktopFilePath)) {
-          fs.unlinkSync(desktopFilePath);
+`;f.writeFileSync(r,s)}else f.existsSync(r)&&f.unlinkSync(r)}catch(s){console.error("Failed to set auto-launch on Linux:",s)}}else if(process.platform==="win32")try{c.setLoginItemSettings({openAtLogin:t,path:c.getPath("exe")})}catch(e){console.error("Failed to set login item settings on Windows:",e)}});const x=()=>{const n="png";if(c.isPackaged){const t=h.join(process.resourcesPath,`icon.${n}`),e=h.join(process.resourcesPath,`assets/icons/icon.${n}`);return f.existsSync(t)?t:f.existsSync(e)?e:t}return h.join(__dirname,`../../src/assets/icons/icon.${n}`)},N=()=>{const n=E.getPrimaryDisplay(),{x:t,y:e,width:r,height:s}=n.bounds,o=process.platform==="linux",a=process.platform==="win32",u=process.platform==="darwin",d=r,w=s,m=t,I=e,b=a?"toolbar":"panel";i=new _({width:d,height:w,x:m,y:I,backgroundColor:"#00000000",transparent:!0,alwaysOnTop:!0,resizable:!1,frame:!1,...a?{}:{thickFrame:!1},hasShadow:!1,skipTaskbar:!0,icon:x(),...u?{hiddenInMissionControl:!0}:{},type:b,fullscreen:!1,visibleOnFullScreen:!0,acceptFirstMouse:!0,webPreferences:{preload:h.join(__dirname,"preload.js"),devTools:!1},show:!0}),o?i.setIgnoreMouseEvents(!0):i.setIgnoreMouseEvents(!0,{forward:!0});const v=o?500:0;i.once("ready-to-show",()=>{setTimeout(()=>{i&&(i.show(),o?i.setAlwaysOnTop(!0,"screen-saver"):i.setAlwaysOnTop(!0,"pop-up-menu"),i.focus())},v)}),setTimeout(()=>{i&&!i.isVisible()&&(i.show(),i.focus())},5e3),i.on("closed",()=>{i=null});try{i.setVisibleOnAllWorkspaces(!0,{visibleOnFullScreen:!0})}catch{}if(!c.isPackaged||process.env.NODE_ENV==="development")i.loadURL("http://localhost:5173");else{const F=h.join(__dirname,"../renderer/main_window/index.html");i.loadFile(F)}};c.whenReady().then(()=>{process.platform==="darwin"&&c.dock.hide(),N(),c.on("activate",()=>{_.getAllWindows().length===0&&N()});try{const n=x(),e=L.createFromPath(n).resize({width:16,height:16});k=new j(e);const r=G.buildFromTemplate([{label:"Show/Hide Ripple",click:()=>{i&&(i.isVisible()?i.hide():i.show())}},{type:"separator"},{label:"Quit",click:()=>{c.quit()}}]);k.setToolTip("Ripple"),k.setContextMenu(r)}catch(n){console.error("Failed to create tray:",n)}});const $=new Map;function Y(){const n=require("fs"),e=require("path").join(c.getPath("userData"),"get_media.ps1"),r=`
+[System.Reflection.Assembly]::LoadWithPartialName('System.Runtime.WindowsRuntime') | Out-Null
+$asTaskGeneric = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' }[0]
+
+function AwaitOperation($asyncOp, $type) {
+    $asTask = $asTaskGeneric.MakeGenericMethod($type)
+    $task = $asTask.Invoke($null, @($asyncOp))
+    $task.Wait()
+    return $task.Result
+}
+
+try {
+    $asyncOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]::RequestAsync()
+    $manager = AwaitOperation $asyncOp ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+    if ($manager) {
+        $session = $manager.GetCurrentSession()
+        if (-not $session) {
+            $sessions = $manager.GetSessions()
+            $session = $sessions | Where-Object { $_.SourceAppUserModelId -like '*Spotify*' } | Select-Object -First 1
+            if (-not $session) { $session = $sessions | Select-Object -First 1 }
         }
-      }
-    } catch (e) {
-      console.error("Failed to set auto-launch on Linux:", e);
-    }
-  } else if (process.platform === "win32") {
-    try {
-      app.setLoginItemSettings({
-        openAtLogin: enable,
-        path: app.getPath("exe"),
-      });
-    } catch (e) {
-      console.error("Failed to set login item settings on Windows:", e);
-    }
-  }
-});
-
-const getIconPath = () => {
-  const ext = "png";
-  if (app.isPackaged) {
-    const resPath = path.join(process.resourcesPath, `icon.${ext}`);
-    const assetsPath = path.join(
-      process.resourcesPath,
-      `assets/icons/icon.${ext}`,
-    );
-
-    if (fs.existsSync(resPath)) return resPath;
-    if (fs.existsSync(assetsPath)) return assetsPath;
-
-    return resPath;
-  }
-  return path.join(__dirname, `../../src/assets/icons/icon.${ext}`);
-};
-
-const createWindow = () => {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { x, y, width, height } = primaryDisplay.bounds;
-  const isLinux = process.platform === "linux";
-  const isWindows = process.platform === "win32";
-  const isMac = process.platform === "darwin";
-
-  const winWidth = width;
-  const winHeight = height;
-  const winX = x;
-  const winY = y;
-
-  const windowType = isWindows ? "toolbar" : "panel";
-
-  mainWindow = new BrowserWindow({
-    width: winWidth,
-    height: winHeight,
-    x: winX,
-    y: winY,
-    backgroundColor: "#00000000",
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: false,
-    frame: false,
-    ...(isWindows ? {} : { thickFrame: false }),
-    hasShadow: false,
-    skipTaskbar: true,
-    icon: getIconPath(),
-    ...(isMac ? { hiddenInMissionControl: true } : {}),
-    ...(windowType ? { type: windowType } : {}),
-    fullscreen: false,
-    visibleOnFullScreen: true,
-    acceptFirstMouse: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      devTools: false,
-    },
-    show: true,
-  });
-
-  if (!isLinux) {
-    mainWindow.setIgnoreMouseEvents(true, { forward: true });
-  } else {
-    mainWindow.setIgnoreMouseEvents(true);
-  }
-
-  const showDelay = isLinux ? 500 : 0;
-
-  mainWindow.once("ready-to-show", () => {
-    setTimeout(() => {
-      if (mainWindow) {
-        mainWindow.show();
-        if (isLinux) {
-          mainWindow.setAlwaysOnTop(true, "screen-saver");
-        } else if (isMac) {
-          mainWindow.setAlwaysOnTop(true, "pop-up-menu");
-        } else {
-          mainWindow.setAlwaysOnTop(true, "pop-up-menu");
-        }
-        mainWindow.focus();
-      }
-    }, showDelay);
-  });
-
-  setTimeout(() => {
-    if (mainWindow && !mainWindow.isVisible()) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  }, 5000);
-
-  mainWindow.on("closed", () => {
-    mainWindow = null;
-  });
-
-  try {
-    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  } catch (_) {}
-
-  if (!app.isPackaged || process.env.NODE_ENV === "development") {
-    mainWindow.loadURL("http://localhost:5173");
-  } else {
-    const rendererPath = path.join(
-      __dirname,
-      "../renderer/main_window/index.html",
-    );
-    mainWindow.loadFile(rendererPath);
-  }
-};
-
-app.whenReady().then(() => {
-  if (process.platform === "darwin") {
-    app.dock.hide();
-  }
-  createWindow();
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-
-  try {
-    const iconPath = getIconPath();
-    const icon = nativeImage.createFromPath(iconPath);
-    const trayIcon = icon.resize({ width: 16, height: 16 });
-    tray = new Tray(trayIcon);
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: "Show/Hide Ripple",
-        click: () => {
-          if (mainWindow) {
-            if (mainWindow.isVisible()) {
-              mainWindow.hide();
-            } else {
-              mainWindow.show();
+        if ($session) {
+            $propsOp = $session.TryGetMediaPropertiesAsync()
+            $props = AwaitOperation $propsOp ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
+            $playback = $session.GetPlaybackInfo()
+            
+            $artwork = ""
+            if ($props.Thumbnail) {
+                try {
+                    $streamOp = $props.Thumbnail.OpenReadAsync()
+                    $stream = AwaitOperation $streamOp ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
+                    if ($stream) {
+                        $buffer = New-Object byte[] $stream.Size
+                        $reader = New-Object Windows.Storage.Streams.DataReader $stream
+                        $reader.LoadAsync($stream.Size).GetAwaiter().GetResult() | Out-Null
+                        $reader.ReadBytes($buffer)
+                        $artwork = 'data:image/png;base64,' + [Convert]::ToBase64String($buffer)
+                        $reader.Close()
+                        $stream.Close()
+                    }
+                } catch {}
             }
-          }
-        },
-      },
-      { type: "separator" },
-      {
-        label: "Quit",
-        click: () => {
-          app.quit();
-        },
-      },
-    ]);
-    tray.setToolTip("Ripple");
-    tray.setContextMenu(contextMenu);
-  } catch (e) {
-    console.error("Failed to create tray:", e);
-  }
-});
 
-ipcMain.handle("get-system-media", async () => {
-  return new Promise((resolve) => {
-    const platform = process.platform;
+            $info = @{
+                Title = $props.Title
+                Artist = $props.Artist
+                Album = $props.AlbumTitle
+                Status = $playback.PlaybackStatus.ToString().ToLower()
+                Source = $session.SourceAppUserModelId
+                Artwork = $artwork
+            }
+            return $info | ConvertTo-Json -Compress
+        }
+    }
+} catch {}
 
-    if (platform === "darwin") {
-      const script = `
+try {
+    $proc = Get-Process | Where-Object { $_.ProcessName -eq 'Spotify' -and $_.MainWindowTitle -ne '' } | Select-Object -First 1
+    if ($proc -and $proc.MainWindowTitle -like '*-*') {
+        $parts = $proc.MainWindowTitle -split ' - '
+        $artist = $parts[0]
+        $title = ($parts[1..($parts.Length-1)]) -join ' - '
+        $info = @{
+            Title = $title
+            Artist = $artist
+            Album = ''
+            Status = 'playing'
+            Source = 'Spotify'
+            Artwork = ''
+        }
+        return $info | ConvertTo-Json -Compress
+    }
+} catch {}
+
+return 'null'
+`;try{(!n.existsSync(e)||n.readFileSync(e,"utf8")!==r)&&n.writeFileSync(e,r,"utf8")}catch{}return e}async function K(n,t){if(n==="Unknown Artist"||t==="Unknown Title")return null;const e=`${n}-${t}`.toLowerCase();return $.has(e)?$.get(e):new Promise(r=>{const o=`https://itunes.apple.com/search?term=${encodeURIComponent(`${n} ${t}`)}&entity=song&limit=1`,u=require("https").get(o,{timeout:2500},d=>{let w="";d.on("data",m=>w+=m),d.on("end",()=>{try{const m=JSON.parse(w);if(m.results&&m.results.length>0){const I=m.results[0].artworkUrl100,b=I?I.replace("100x100bb","600x600bb"):null;return $.set(e,b),r(b)}}catch{}$.set(e,null),r(null)})});u.on("error",()=>{$.set(e,null),r(null)}),u.on("timeout",()=>{u.destroy(),$.set(e,null),r(null)})})}p.handle("get-system-media",async()=>new Promise(n=>{const t=process.platform;if(t==="darwin")l(`osascript -e '
             tell application "System Events"
                 set spotifyRunning to (name of every process) contains "Spotify"
                 set musicRunning to (name of every process) contains "Music"
@@ -585,147 +147,7 @@ ipcMain.handle("get-system-media", async () => {
             else
                 return "None"
             end if
-            `;
-      exec(`osascript -e '${script}'`, (error, stdout) => {
-        if (error) {
-          return resolve(null);
-        }
-        const output = stdout.trim();
-
-        if (!output || output === "None" || output === "Error")
-          return resolve(null);
-
-        const parts = output.split("||");
-        if (parts.length >= 4) {
-          resolve({
-            name: parts[2],
-            artist: parts[3],
-            album: parts[4],
-            artwork_url: parts[5] || null,
-            state: parts[1] === "playing" ? "playing" : "paused",
-            source: parts[0],
-          });
-        } else {
-          resolve(null);
-        }
-      });
-    } else if (platform === "win32") {
-      const psScript = `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Add-Type -AssemblyName System.Runtime.WindowsRuntime; $manager = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]::RequestAsync().GetAwaiter().GetResult(); $session = $manager.GetCurrentSession(); if ($session) { $props = $session.TryGetMediaPropertiesAsync().GetAwaiter().GetResult(); $playback = $session.GetPlaybackInfo(); $status = $playback.PlaybackStatus; $thumbnail = $props.Thumbnail; $artwork = ''; if ($thumbnail) { try { $stream = $thumbnail.OpenReadAsync().GetAwaiter().GetResult(); $buffer = New-Object byte[] $stream.Size; $reader = New-Object Windows.Storage.Streams.DataReader $stream; $reader.LoadAsync($stream.Size).GetAwaiter().GetResult() | Out-Null; $reader.ReadBytes($buffer); $artwork = 'data:image/png;base64,' + [Convert]::ToBase64String($buffer); $reader.Close(); $stream.Close(); } catch { } } $info = @{ Title = $props.Title; Artist = $props.Artist; Album = $props.AlbumTitle; Status = $status.ToString().ToLower(); Source = $session.SourceAppUserModelId; Artwork = $artwork }; return $info | ConvertTo-Json -Compress; } return 'null';`;
-      exec(
-        `powershell -NoProfile -Command "${psScript}"`,
-        { maxBuffer: 5 * 1024 * 1024, encoding: "utf8" },
-        (error, stdout) => {
-          if (
-            error ||
-            !stdout ||
-            stdout.trim() === "null" ||
-            stdout.trim() === "'null'"
-          ) {
-            exec(
-              `powershell -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Process | Where-Object {$_.ProcessName -eq 'Spotify'} | Select-Object MainWindowTitle"`,
-              { encoding: "utf8" },
-              (err, out) => {
-                if (err || !out) return resolve(null);
-                const title = out
-                  .split("\n")
-                  .find((l) => l.includes("-"))
-                  ?.trim();
-                if (title) {
-                  const [artist, ...songParts] = title.split(" - ");
-                  const song = songParts.join(" - ");
-                  resolve({
-                    name: song || title,
-                    artist: artist || "Unknown",
-                    state: "playing",
-                    source: "Spotify",
-                  });
-                } else {
-                  resolve(null);
-                }
-              },
-            );
-            return;
-          }
-
-          try {
-            const data = JSON.parse(stdout);
-            resolve({
-              name: data.Title || "Unknown Title",
-              artist: data.Artist || "Unknown Artist",
-              album: data.Album || "",
-              artwork_url: data.Artwork || null,
-              state: data.Status === "playing" ? "playing" : "paused",
-              source: data.Source || "System",
-            });
-          } catch (e) {
-            resolve(null);
-          }
-        },
-      );
-    } else if (platform === "linux") {
-      exec(
-        'playerctl metadata --format "{{title}}||{{artist}}||{{album}}||{{status}}"',
-        (err, stdout) => {
-          if (err || !stdout) return resolve(null);
-          const parts = stdout.trim().split("||");
-          resolve({
-            name: parts[0],
-            artist: parts[1],
-            album: parts[2],
-            state: parts[3].toLowerCase(),
-            source: "System",
-          });
-        },
-      );
-    } else {
-      resolve(null);
-    }
-  });
-});
-
-ipcMain.handle("get-bluetooth-status", async () => {
-  return new Promise((resolve) => {
-    const platform = process.platform;
-    if (platform === "darwin") {
-      exec("system_profiler SPBluetoothDataType -json", (error, stdout) => {
-        if (error) return resolve(false);
-        try {
-          const data = JSON.parse(stdout);
-          const bluetoothData = data.SPBluetoothDataType[0];
-          const hasConnectedDevices =
-            bluetoothData.device_connected &&
-            bluetoothData.device_connected.length > 0;
-          resolve(hasConnectedDevices);
-        } catch (e) {
-          resolve(false);
-        }
-      });
-    } else if (platform === "win32") {
-      const psScript = `@(Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'OK' -and $_.Present -eq $true -and $_.InstanceId -match 'BTHENUM' }).Count -gt 0`;
-      exec(`powershell -NoProfile -Command "${psScript}"`, (error, stdout) => {
-        if (error) return resolve(false);
-        resolve(stdout.trim().toLowerCase() === "true");
-      });
-    } else if (platform === "linux") {
-      exec("bluetoothctl devices Connected", (error, stdout) => {
-        if (error) return resolve(false);
-        resolve(stdout.trim().length > 0);
-      });
-    } else {
-      resolve(false);
-    }
-  });
-});
-
-ipcMain.handle("get-camera-status", async () => {
-  return new Promise((resolve) => {
-    const platform = process.platform;
-    if (platform === "darwin") {
-      exec('ioreg -l | grep -E "FrontCameraActive|FrontCameraStreaming"', (error, stdout) => {
-        resolve(stdout ? stdout.includes('= Yes') : false);
-      });
-    } else if (platform === "win32") {
-      const psScript = `
+            '`,(r,s)=>{if(r)return n(null);const o=s.trim();if(!o||o==="None"||o==="Error")return n(null);const a=o.split("||");a.length>=4?n({name:a[2],artist:a[3],album:a[4],artwork_url:a[5]||null,state:a[1]==="playing"?"playing":"paused",source:a[0]}):n(null)});else if(t==="win32"){const e=Y();l(`powershell -NoProfile -ExecutionPolicy Bypass -File "${e}"`,{maxBuffer:10*1024*1024,encoding:"utf8"},async(r,s)=>{if(r||!s||s.trim()==="null"||s.trim()==="'null'")return n(null);try{const o=JSON.parse(s.trim()),a=o.Title||"Unknown Title",u=o.Artist||"Unknown Artist";let d=o.Artwork||null;!d&&a!=="Unknown Title"&&(d=await K(u,a)),n({name:a,artist:u,album:o.Album||"",artwork_url:d,state:o.Status==="playing"||o.Status==="opened"?"playing":"paused",source:o.Source||"Spotify"})}catch{n(null)}})}else t==="linux"?l('playerctl metadata --format "{{title}}||{{artist}}||{{album}}||{{status}}"',(e,r)=>{if(e||!r)return n(null);const s=r.trim().split("||");n({name:s[0],artist:s[1],album:s[2],state:s[3].toLowerCase(),source:"System"})}):n(null)}));p.handle("get-bluetooth-status",async()=>new Promise(n=>{const t=process.platform;t==="darwin"?l("system_profiler SPBluetoothDataType -json",(e,r)=>{if(e)return n(!1);try{const o=JSON.parse(r).SPBluetoothDataType[0],a=o.device_connected&&o.device_connected.length>0;n(a)}catch{n(!1)}}):t==="win32"?l(`powershell -NoProfile -Command "@(Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'OK' -and $_.Present -eq $true -and $_.InstanceId -match 'BTHENUM' }).Count -gt 0"`,(r,s)=>{if(r)return n(!1);n(s.trim().toLowerCase()==="true")}):t==="linux"?l("bluetoothctl devices Connected",(e,r)=>{if(e)return n(!1);n(r.trim().length>0)}):n(!1)}));p.handle("get-camera-status",async()=>new Promise(n=>{const t=process.platform;t==="darwin"?l('ioreg -l | grep -E "FrontCameraActive|FrontCameraStreaming"',(e,r)=>{n(r?r.includes("= Yes"):!1)}):t==="win32"?l(`powershell -NoProfile -Command "
         $inUse = $false
         $keys = Get-ChildItem -Path "HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam" -Recurse -ErrorAction SilentlyContinue
         foreach ($key in $keys) {
@@ -736,208 +158,72 @@ ipcMain.handle("get-camera-status", async () => {
             }
         }
         $inUse
-      `;
-      exec(`powershell -NoProfile -Command "${psScript}"`, (error, stdout) => {
-        if (error) return resolve(false);
-        resolve(stdout.trim().toLowerCase() === "true");
-      });
-    } else if (platform === "linux") {
-      exec("fuser /dev/video* 2>/dev/null", (error, stdout) => {
-        resolve(stdout.trim().length > 0);
-      });
-    } else {
-      resolve(false);
-    }
-  });
-});
-
-ipcMain.handle("get-microphone-status", async () => {
-  return new Promise((resolve) => {
-    const platform = process.platform;
-    if (platform === "darwin") {
-      exec('ioreg -l | grep -E "IOAudioStreamActive|IOAudioEngine|IOAudioStream" | grep -i "Yes"', (error, stdout) => {
-        resolve(stdout ? stdout.trim().length > 0 : false);
-      });
-    } else if (platform === "win32") {
-      const psScript = `@(Get-ChildItem -Path "HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone" -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty -Path $_.PSPath -Name "LastUsedTimeStop" -ErrorAction SilentlyContinue } | Where-Object { $_ -and $_.LastUsedTimeStop -eq 0 }).Count -gt 0`;
-      exec(`powershell -NoProfile -Command "${psScript}"`, (error, stdout) => {
-        if (error) return resolve(false);
-        resolve(stdout.trim().toLowerCase() === "true");
-      });
-    } else if (platform === "linux") {
-      exec("pactl list source-outputs | grep -q 'Source #'", (error) => {
-        resolve(!error);
-      });
-    } else {
-      resolve(false);
-    }
-  });
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform === "linux" && !tray) {
-    app.quit();
-  }
-});
-
-// System Media Controls Handler
-ipcMain.handle("control-system-media", async (event, command) => {
-  const platform = process.platform;
-  if (platform === "darwin") {
-    const script = `
+      "`,(r,s)=>{if(r)return n(!1);n(s.trim().toLowerCase()==="true")}):t==="linux"?l("fuser /dev/video* 2>/dev/null",(e,r)=>{n(r.trim().length>0)}):n(!1)}));p.handle("get-microphone-status",async()=>new Promise(n=>{const t=process.platform;t==="darwin"?l('ioreg -l | grep -E "IOAudioStreamActive|IOAudioEngine|IOAudioStream" | grep -i "Yes"',(e,r)=>{n(r?r.trim().length>0:!1)}):t==="win32"?l('powershell -NoProfile -Command "@(Get-ChildItem -Path "HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone" -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty -Path $_.PSPath -Name "LastUsedTimeStop" -ErrorAction SilentlyContinue } | Where-Object { $_ -and $_.LastUsedTimeStop -eq 0 }).Count -gt 0"',(r,s)=>{if(r)return n(!1);n(s.trim().toLowerCase()==="true")}):t==="linux"?l("pactl list source-outputs | grep -q 'Source #'",e=>{n(!e)}):n(!1)}));c.on("window-all-closed",()=>{process.platform==="linux"&&!k&&c.quit()});p.handle("control-system-media",async(n,t)=>{const e=process.platform;if(e==="darwin"){const r=`
         tell application "System Events"
             set spotifyRunning to (name of every process) contains "Spotify"
             set musicRunning to (name of every process) contains "Music"
         end tell
         if spotifyRunning then
-            tell application "Spotify" to ${command} track
+            tell application "Spotify" to ${t} track
         else if musicRunning then
-            tell application "Music" to ${command} track
+            tell application "Music" to ${t} track
         end if
-        `;
-    exec(`osascript -e '${script}'`);
-  } else if (platform === "linux") {
-    let cmd = command;
-    if (command === "playpause") cmd = "play-pause";
-    exec(`playerctl ${cmd}`);
-  }
-});
+        `;l(`osascript -e '${r}'`)}else if(e==="linux"){let r=t;t==="playpause"&&(r="play-pause"),l(`playerctl ${r}`)}});const{Worker:V}=require("worker_threads");let g=null;try{g=require("wasapi-loopback")}catch(n){console.error("[wasapi-loopback] module failed to resolve — has it been built? Reason:",n.message),g={available:!1,start:()=>!1,stop:()=>!1}}let S=null,P=!1,M=0;function H(){return c.isPackaged?h.join(process.resourcesPath,"audioWorker.js"):h.join(c.getAppPath(),"src","audio","audioWorker.js")}function z(){if(S)return S;const n=H();return f.existsSync(n)?(S=new V(n),S.on("message",t=>{(t==null?void 0:t.type)==="bands"&&i&&!i.isDestroyed()&&i.webContents.send("audio-bands",t.bands)}),S.on("error",t=>{console.error("[audio-worker] error:",t)}),S):(console.error(`[audio-worker] script not found at ${n}`),null)}let C=null,W=0;global.startWasapiSampler=function(){};function D(){if(C||process.platform!=="win32")return;const n=`
+$code = @'
+using System;
+using System.Runtime.InteropServices;
 
-// --- Audio visualizer: WASAPI loopback capture + FFT worker ---------------
-//
-// Windows-only for now (see native/wasapi-loopback). The native addon reads
-// raw PCM off the default audio render device and hands it to a worker
-// thread here for FFT + banding, which then streams smoothed band levels to
-// the renderer. On non-Windows platforms `loopback.available` is false and
-// the renderer falls back to its metadata-driven visualizer automatically.
-const { Worker } = require("worker_threads");
-let loopback = null;
-try {
-  // Resolved as a normal node_modules dependency (see package.json ->
-  // "wasapi-loopback": "file:native/wasapi-loopback") rather than a relative
-  // path, since a relative require here breaks once Vite bundles main.js
-  // into .vite/build/ (the ".." would resolve from the wrong directory).
-  // As a real node_modules dependency it also gets picked up automatically
-  // by @electron-forge/plugin-auto-unpack-natives when packaged.
-  loopback = require("wasapi-loopback");
-} catch (err) {
-  loopback = { available: false, start: () => false, stop: () => false };
-}
-
-let audioWorker = null;
-let audioCaptureActive = false;
-let audioRefCount = 0; // multiple visualizer instances (mini pill + expanded view) can be mounted at once
-
-// __dirname inside the compiled main.js does NOT point at src/ (Vite bundles
-// main.js into .vite/build/), so a __dirname-relative path to audioWorker.js
-// resolves to the wrong folder. In dev, app.getAppPath() reliably returns the
-// project root (where package.json lives) regardless of where the bundled
-// output sits. In a packaged build we instead read it from extraResource
-// (see forge.config.js), which places a copy outside the asar archive —
-// worker_threads loading a script from inside an asar is unreliable, so we
-// deliberately keep this file unpacked rather than relying on that.
-function resolveAudioWorkerPath() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, "audioWorker.js");
-  }
-  return path.join(app.getAppPath(), "src", "audio", "audioWorker.js");
-}
-
-function ensureAudioWorker() {
-  if (audioWorker) return audioWorker;
-  const workerPath = resolveAudioWorkerPath();
-  if (!fs.existsSync(workerPath)) {
-    console.error(`[audio-worker] script not found at ${workerPath}`);
-    return null;
-  }
-  audioWorker = new Worker(workerPath);
-  audioWorker.on("message", (msg) => {
-    if (msg?.type === "bands" && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("audio-bands", msg.bands);
+namespace AudioMeter {
+    [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IMMDeviceEnumerator {
+        int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice endpoint);
     }
-  });
-  audioWorker.on("error", (err) => {
-    console.error("[audio-worker] error:", err);
-  });
-  return audioWorker;
-}
 
-ipcMain.handle("audio-viz-start", () => {
-  if (!loopback.available) return { started: false, reason: "unsupported-platform" };
-
-  audioRefCount++;
-  if (audioCaptureActive) return { started: true };
-
-  const worker = ensureAudioWorker();
-  if (!worker) return { started: false, reason: "worker-unavailable" };
-
-  const started = loopback.start((pcmFloat32, sampleRate) => {
-    // Transfer the underlying buffer to avoid copying on every ~10ms chunk.
-    worker.postMessage(
-      { type: "pcm", samples: pcmFloat32, sampleRate },
-      [pcmFloat32.buffer]
-    );
-  });
-  audioCaptureActive = started;
-  return { started };
-});
-
-ipcMain.handle("audio-viz-stop", () => {
-  audioRefCount = Math.max(0, audioRefCount - 1);
-  if (audioRefCount === 0 && audioCaptureActive) {
-    loopback.stop();
-    audioCaptureActive = false;
-    if (audioWorker) audioWorker.postMessage({ type: "reset" });
-  }
-  return { stopped: true };
-});
-
-app.on("before-quit", () => {
-  if (audioCaptureActive) loopback.stop();
-  if (audioWorker) audioWorker.terminate();
-});
-
-
-// --- Spotify Web API & API Key Integration ---
-let spotifyConfig = {
-  clientId: process.env.SPOTIFY_CLIENT_ID || "",
-  clientSecret: process.env.SPOTIFY_CLIENT_SECRET || "",
-  apiKey: process.env.SPOTIFY_API_KEY || ""
-};
-
-function loadSpotifyConfig() {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const configPath = path.join(app.getAppPath(), "spotify-config.json");
-    if (fs.existsSync(configPath)) {
-      const data = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      spotifyConfig.clientId = data.SPOTIFY_CLIENT_ID || spotifyConfig.clientId;
-      spotifyConfig.clientSecret = data.SPOTIFY_CLIENT_SECRET || spotifyConfig.clientSecret;
-      spotifyConfig.apiKey = data.SPOTIFY_API_KEY || spotifyConfig.apiKey;
+    [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IMMDevice {
+        int Activate(ref Guid iid, uint dwClsCtx, IntPtr pActivationParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
     }
-  } catch (e) {}
+
+    [Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IAudioMeterInformation {
+        int GetPeakValue(out float pfPeak);
+    }
+
+    public class Meter {
+        [DllImport("Ole32.dll")]
+        private static extern int CoCreateInstance(ref Guid rclsid, IntPtr pUnkOuter, uint dwClsContext, ref Guid riid, out IntPtr ppv);
+
+        private static IAudioMeterInformation meter = null;
+
+        public static float GetPeak() {
+            try {
+                if (meter == null) {
+                    Guid CLSID_MMDeviceEnumerator = new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E");
+                    Guid IID_IMMDeviceEnumerator = new Guid("A95664D2-9614-4F35-A746-DE8DB63617E6");
+                    Guid IID_IAudioMeterInformation = new Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064");
+
+                    IntPtr enumeratorPtr;
+                    if (CoCreateInstance(ref CLSID_MMDeviceEnumerator, IntPtr.Zero, 1, ref IID_IMMDeviceEnumerator, out enumeratorPtr) != 0) return 0f;
+                    IMMDeviceEnumerator enumerator = (IMMDeviceEnumerator)Marshal.GetObjectForIUnknown(enumeratorPtr);
+                    IMMDevice device;
+                    if (enumerator.GetDefaultAudioEndpoint(0, 1, out device) != 0) return 0f;
+                    object meterObj;
+                    if (device.Activate(ref IID_IAudioMeterInformation, 1, IntPtr.Zero, out meterObj) != 0) return 0f;
+                    meter = (IAudioMeterInformation)meterObj;
+                }
+                float peak = 0f;
+                meter.GetPeakValue(out peak);
+                return peak;
+            } catch { return 0f; }
+        }
+    }
 }
-
-ipcMain.handle("get-spotify-config", () => {
-  loadSpotifyConfig();
-  return spotifyConfig;
-});
-
-ipcMain.handle("save-spotify-config", (event, newConfig) => {
-  if (newConfig) {
-    spotifyConfig = { ...spotifyConfig, ...newConfig };
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const configPath = path.join(app.getAppPath(), "spotify-config.json");
-      fs.writeFileSync(configPath, JSON.stringify({
-        SPOTIFY_CLIENT_ID: spotifyConfig.clientId,
-        SPOTIFY_CLIENT_SECRET: spotifyConfig.clientSecret,
-        SPOTIFY_API_KEY: spotifyConfig.apiKey,
-        INSTRUCTIONS: "Spotify Web API Client ID & Client Secret"
-      }, null, 2));
-    } catch (e) {}
-  }
-  return { success: true };
-});
+'@
+Add-Type -TypeDefinition $code
+while ($true) {
+    $p = [AudioMeter.Meter]::GetPeak()
+    [Console]::WriteLine($p)
+    Start-Sleep -Milliseconds 20
+}
+  `;try{const t=T("powershell",["-NoProfile","-Command",n],{shell:!1,detached:!1,stdio:["ignore","pipe","ignore"]});t.stdout.on("data",e=>{const s=e.toString().trim().split(`
+`),o=s[s.length-1],a=parseFloat(o);if(!isNaN(a)){W=a;const u=new Array(24),d=Date.now()/1e3;for(let w=0;w<24;w++){const m=.6+Math.sin(w*.45+d*2)*.3+Math.cos(w*.8-d*3)*.2;u[w]=Math.max(.05,Math.min(1,W*2.5*m))}i&&!i.isDestroyed()&&i.webContents.send("audio-bands",u)}}),t.on("error",()=>{}),C=t}catch(t){console.error("[wasapi-sampler] Error starting sampler:",t)}}function Z(){if(C){try{C.kill()}catch{}C=null}}p.handle("audio-viz-start",()=>{if(typeof D=="function"&&D(),M++,D(),g.available&&!P){const n=z();n&&(P=g.start((e,r)=>{n.postMessage({type:"pcm",samples:e,sampleRate:r},[e.buffer])}))}return{started:!0}});p.handle("audio-viz-stop",()=>(M=Math.max(0,M-1),M===0&&(Z(),P&&(g.stop(),P=!1,S&&S.postMessage({type:"reset"}))),{stopped:!0}));c.on("before-quit",()=>{P&&g.stop(),S&&S.terminate()});let y={clientId:process.env.SPOTIFY_CLIENT_ID||"",clientSecret:process.env.SPOTIFY_CLIENT_SECRET||"",apiKey:process.env.SPOTIFY_API_KEY||""};function Q(){try{const n=require("fs"),t=require("path"),e=t.join(c.getPath("userData"),"spotify-config.json"),r=t.join(c.getAppPath(),"spotify-config.json");let s=null;if(n.existsSync(e)?s=e:n.existsSync(r)&&(s=r),s){const o=JSON.parse(n.readFileSync(s,"utf-8"));y.clientId=o.SPOTIFY_CLIENT_ID||y.clientId,y.clientSecret=o.SPOTIFY_CLIENT_SECRET||y.clientSecret,y.apiKey=o.SPOTIFY_API_KEY||y.apiKey}}catch{}}p.handle("get-spotify-config",()=>(Q(),y));p.handle("save-spotify-config",(n,t)=>{if(t){y={...y,...t};try{const e=require("fs"),s=require("path").join(c.getPath("userData"),"spotify-config.json");e.writeFileSync(s,JSON.stringify({SPOTIFY_CLIENT_ID:y.clientId,SPOTIFY_CLIENT_SECRET:y.clientSecret,SPOTIFY_API_KEY:y.apiKey,INSTRUCTIONS:"Spotify Web API Client ID & Client Secret"},null,2))}catch{}}return{success:!0}});
