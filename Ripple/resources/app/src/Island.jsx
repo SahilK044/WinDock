@@ -170,7 +170,6 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const displayRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const usingRealAudioRef = useRef(false);
-  const isPlayingRef = useRef(isPlaying);
   const phasesRef = useRef(
     Array.from({ length: VIS_BAR_COUNT }, (_, i) => ({
       freq: 1.4 + (i % 5) * 0.35 + Math.random() * 0.2,
@@ -178,9 +177,6 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
       speed: 1.6 + Math.random() * 1.2,
     }))
   );
-  const fallbackLevelRef = useRef(1.0);
-
-  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
   useEffect(() => {
     let unsubscribe = null;
@@ -224,30 +220,29 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
       const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
       const t = now / 1000;
       const real = usingRealAudioRef.current;
-      const palette = paletteRef?.current || { primary: "#3b82f6", secondary: "#93c5fd" };
-      const primaryColor = palette.primary || "#3b82f6";
-      const secondaryColor = palette.secondary || "#93c5fd";
-
-      const target = isPlayingRef.current ? 1.0 : 0.45;
-      fallbackLevelRef.current += (target - fallbackLevelRef.current) * Math.min(1, dt * 6);
+      const palette = paletteRef?.current || { primary: "rgba(225,29,72,1)", secondary: "rgba(244,63,94,1)" };
+      const primaryColor = palette.primary || "rgba(225,29,72,1)";
+      const secondaryColor = palette.secondary || "rgba(244,63,94,1)";
 
       ctx.clearRect(0, 0, width, height);
 
       for (let i = 0; i < VIS_BAR_COUNT; i++) {
-        let amp;
+        let amp = 0;
         if (real && bandsRef.current && bandsRef.current[i] > 0.02) {
           amp = bandsRef.current[i];
-        } else {
+        }
+
+        if (!real || amp < 0.05) {
           const p = phasesRef.current[i];
           const wave =
             0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.6 +
             0.25 * Math.sin(t * p.speed * 1.7 + p.phase * 1.3);
-          amp = Math.max(0.12, Math.min(1, wave)) * fallbackLevelRef.current;
+          amp = Math.max(0.25, Math.min(0.95, wave));
         }
 
         const disp = displayRef.current;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * 10);
-        const barHeight = Math.max(4, disp[i] * height);
+        const barHeight = Math.max(6, disp[i] * height);
 
         const x = i * (barWidth + gap);
         const y = height - barHeight;
@@ -275,7 +270,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
     return () => cancelAnimationFrame(raf);
   }, [width, height]);
 
-  return <canvas ref={canvasRef} style={{ width, height, display: "block", background: "transparent", zIndex: 20, relative: "position" }} />;
+  return <canvas ref={canvasRef} style={{ width, height, display: "block", position: "relative", zIndex: 20 }} />;
 }
 
 // ---- Mini visualizer for the compact/small pill mode -----------------------
