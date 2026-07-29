@@ -1,168 +1,100 @@
 # Ripple
 
-**Dynamic Island, but for everyone**
+**Dynamic Island, for Everyone.**
 
-Ripple is a cross-platform desktop application that recreates Apple's Dynamic Island experience on Windows, Linux, and macOS. It's a notification hub, widget system, and smart assistant that stays out of your way until you need it.
-
-<div align="center">
-
-[![Discord](https://img.shields.io/badge/Discord-Join%20Us-5865F2)](https://discord.gg/a2xzVkxFVg)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.3.0-blue)](package.json)
-
-https://github.com/user-attachments/assets/a7b9ed8a-97b5-4603-bad7-6f4c4bef1f5d
-
-</div>
+Ripple is a fast, lightweight, dynamic desktop overlay for Windows, macOS, and Linux. Inspired by mobile island design systems, Ripple brings smooth media controls, a real-time audio spectrum visualizer, system metrics, weather alerts, quick app launchers, and smart productivity tools straight to your desktop.
 
 ---
 
-## Features
+## Highlights & Key Features
 
-### Core Functionality
-- **Multi-Monitor & Desktop Support** — Island syncs seamlessly across all desktops and monitors
-- **Media Controls** — Now playing preview with playback controls for your music
-- **Customizable Themes** — Multiple themes including Win95, SleekBlack, and more
-- **Quick Apps** — One-click access to 4 apps of your choice
-- **Keyboard Shortcuts** — Quick navigation with Ctrl + number shortcuts
+### 🎵 1:1 Real-Time Audio Visualizer & Media Hub
+- **Native WASAPI Audio Capture** — Captures system audio loopback with low latency and zero attack lag.
+- **24-Band Logarithmic Spectrum** — Frequency analysis from 35Hz to 16kHz covering sub-bass, midrange, and treble.
+- **Zero-Latency Win32 Media Controls** — Instant native media keystroke dispatch for Play, Pause, Next, and Previous.
+- **Smart Artwork Resolution** — Retrieves high-resolution album covers from iTunes and fetches video thumbnails for YouTube and web browser media streams.
+- **UTF-8 Multi-Language Metadata** — Full support for international track titles, artist names, and special characters.
 
-### Information & Alerts
-- **Weather Display** — Real-time weather information
-- **Battery Alerts** — Charging status and low battery notifications
-- **Bluetooth Alerts** — Get notified when devices connect/disconnect
+### ⚡ Performance & Efficiency
+- **Instant Lag-Free Launch** — Smart background app index caching eliminates startup CPU spikes and system stuttering.
+- **In-Flight Media Protection** — Guarded system polling prevents process stacking.
+- **Low Memory Footprint** — Offloads FFT audio processing to worker threads to maintain 60 FPS / 120 FPS rendering.
 
-### Smart Features
-- **AI Ask Feature** — Integrated AI assistant powered by Groq
-- **Browser Search** — Quick search integration
-- **Clipboard Manager** — Access your clipboard history
-- **Tasks List** — Built-in task management
+### 🖥️ Desktop Experience
+- **Three Dynamic Modes**:
+  - **Still Mode** — Minimal, unobtrusive idle pill.
+  - **Quick Mode** — Hover to inspect playing track, time, weather, and instant media controls.
+  - **Large Mode** — Expanded widget hub with tabs, search, tasks, and settings.
+- **Multi-Monitor & Workspace Sync** — Pins seamlessly above full-screen windows and stays visible across workspaces.
+- **Custom Themes & Personalization** — Dark glassmorphism, OLED black, vintage Win95, and accent color customizers.
 
 ---
 
 ## Quick Start
 
 ### Installation
-
-Download the latest release for your platform:
-- **Windows**: `.exe` installer
-- **macOS**: `.dmg` package (Intel & Apple Silicon supported)
+Download the latest pre-built release for your platform:
+- **Windows**: `WinDock_Setup.exe` installer or portable package
+- **macOS**: `.dmg` installer (Apple Silicon & Intel)
 - **Linux**: `.deb` or `.rpm` packages
 
-[Download Latest Release](https://github.com/TopMyster/Ripple/releases)
-
-### First Run
-1. Install and launch Ripple
-2. The Island will appear on your screen
-3. **Click** the Island to open Large Mode
-4. **Hover** over it to see Quick Mode
-5. Visit **Settings** (last tab) to customize everything
+### Keyboard Shortcuts
+- **Hover** — View Quick Mode media preview and controls.
+- **Click Island** — Expand to Large Mode.
+- **Ctrl + 1..9** — Switch tabs instantly.
+- **Arrow Keys / Mouse Wheel** — Cycle through tabs.
 
 ---
 
-## How to Use
-
-### The Three Modes
-
-**Still Mode** — The default idle state
-- Compact display
-- Minimal visual footprint
-- Ready to expand on interaction
-
-**Quick Mode** — Hover over the Island
-- See current time, weather, and battery status
-- If music is playing, view now-playing info
-- Hover playback controls for music
-
-**Large Mode** — Click the Island
-- Full interface with all tabs
-- Switch tabs with arrow keys or mouse scroll
-- Access all features and settings
-- Default view for focused work
-
-### Using Tabs
-- **Arrow Keys** — Navigate between tabs
-- **Mouse Wheel** — Scroll horizontally between tabs
-- **Ctrl + Number** — Jump to a specific tab
-
-
----
-
-## Build & Development
+## Development Setup
 
 ### Prerequisites
-- **Node.js** 16+ and npm
-- Platform-specific build tools:
-  - **Windows**: Visual Studio Build Tools
+- **Node.js** 18+ and `npm`
+- **C++ Build Tools** (for native WASAPI module build):
+  - **Windows**: Visual Studio Build Tools (C++ Workload)
   - **macOS**: Xcode Command Line Tools
-  - **Linux**: Build essentials (`build-essential` on Ubuntu/Debian)
+  - **Linux**: `build-essential`
 
-### Development Setup
-
+### Setup & Run
 ```bash
 # Clone the repository
-git clone https://github.com/TopMyster/Ripple.git
+git clone https://github.com/SahilK044/WinDock.git
 cd Ripple
 
 # Install dependencies
 npm install
 
-# Start development server
+# Run development server
 npm start
 ```
 
-The development server will launch Ripple with hot reload enabled. Press `Ctrl+R` (or `Cmd+R` on macOS) to refresh the app.
-
-#### Build for Current OS
+### Packaging Production Release
 ```bash
+# Package for host platform
+npm run package
+
+# Build setup installer
 npm run make
 ```
 
-#### Build for Specific Platforms
-
-**Windows (x64)**
-```bash
-npm run make -- --platform=win32 --arch=x64
-```
-
-**Linux (x64)**
-```bash
-npm run make -- --platform=linux --arch=x64
-```
-
-**macOS (Apple Silicon)**
-```bash
-npm run make -- --platform=darwin --arch=arm64
-```
-
-**macOS (Intel)**
-```bash
-npm run make -- --platform=darwin --arch=x64
-```
-
-> **Linux Note**: Building Linux packages requires `dpkg`, `fakeroot`, and `rpm`:
-> ```bash
-> sudo apt-get install dpkg fakeroot rpm
-> ```
-
-**Output**: Compiled binaries are found in `out/make/`
-
 ---
 
-## Contributing
+## Architecture Overview
 
-We welcome contributions!:
-- Bug reports and fixes
-- New features and improvements
-- Documentation updates
-- Theme designs
-- Ideas and suggestions
-
-Please check [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+```
+Ripple/
+├── native/wasapi-loopback/   # C++ WASAPI system audio loopback capture & Win32 media keys
+├── resources/audioWorker.js  # Worker thread running 1024-point FFT & onset beat detection
+├── src/
+│   ├── main.js              # Electron main process, IPC handlers, app discovery & media manager
+│   ├── preload.js           # Secure context bridge API
+│   ├── Island.jsx           # Canvas audio visualizer & Dynamic Island UI
+│   └── App.css              # Glassmorphism design system & micro-animations
+```
 
 ---
 
 ## License
 
-Ripple is open source and available under the [MIT License](LICENSE).
-
----
+Ripple is open-source software released under the [MIT License](LICENSE).
 
