@@ -959,8 +959,78 @@ app.on("window-all-closed", () => {
   }
 });
 
-// System Media Controls Handler
+// ─── Audio pipeline ────────────────────────────────────────────────────────
+// Loads the native WASAPI loopback addon (Windows-only).  On every other
+// platform we stub it out so the rest of the code never has to null-check.
+const { Worker } = require("worker_threads");
+
+let loopback = { available: false, start: () => false, stop: () => {} };
+try {
+  if (process.platform === "win32") {
+    // The native addon is shipped next to the packaged resources.
+    const addonCandidates = [
+      path.join(process.resourcesPath || "", "wasapi-loopback.node"),
+      path.join(app.getAppPath(), "resources", "wasapi-loopback.node"),
+      path.join(__dirname, "../../resources/wasapi-loopback.node"),
+    ];
+    for (const candidate of addonCandidates) {
+      try {
+        if (fs.existsSync(candidate)) {
+          loopback = require(candidate);
+          break;
+        }
+      } catch { /* try next candidate */ }
+    }
+  }
+} catch { /* no native addon – fall through to silent fallback */ }
+
+let audioWorker = null;
+let audioCaptureActive = false;
+let audioRefCount = 0;
+
+function ensureAudioWorker() {
+  if (audioWorker) return audioWorker;
+  try {
+    // Worker script lives in resources/ (outside the asar bundle so it can
+    // be required by Node without asar-patching).
+    const workerCandidates = [
+      path.join(process.resourcesPath || "", "audioWorker.js"),
+      path.join(app.getAppPath(), "resources", "audioWorker.js"),
+      path.join(__dirname, "../../resources/audioWorker.js"),
+    ];
+    let workerPath = null;
+    for (const candidate of workerCandidates) {
+      if (fs.existsSync(candidate)) { workerPath = candidate; break; }
+    }
+    if (!workerPath) return null;
+
+    audioWorker = new Worker(workerPath);
+
+    // Forward FFT band analysis results to the renderer at ~60fps.
+    audioWorker.on("message", (msg) => {
+      if (msg?.type === "analysis" && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("audio-bands", msg.bands);
+      }
+    });
+
+    audioWorker.on("error", (err) => {
+      console.error("[AudioWorker] error:", err);
+    });
+
+    audioWorker.on("exit", () => {
+      audioWorker = null;
+      audioCaptureActive = false;
+    });
+    return audioWorker;
+  } catch (err) {
+    console.error("[AudioWorker] failed to start:", err);
+    return null;
+  }
+}
+
+// Audio visualizer IPC handlers
 ipcMain.handle("audio-viz-start", () => {
+
   if (!loopback.available) return { started: false, reason: "unsupported-platform" };
 
   audioRefCount++;
