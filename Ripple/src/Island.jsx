@@ -259,7 +259,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
         let amp = 0;
         if (hasRealAudio) {
           const rawVal = bandsRef.current[i] || 0;
-          amp = Math.min(1.0, Math.pow(rawVal, 0.75) * 1.8) * fallbackLevel;
+          amp = Math.min(1.0, Math.pow(rawVal, 0.65) * 1.8) * fallbackLevel;
         } else {
           const p = phasesRef.current[i];
           const wave = 0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.6 + 0.25 * Math.sin(t * p.speed * 1.7 + p.phase * 1.3);
@@ -267,7 +267,8 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
         }
 
         const disp = displayRef.current;
-        disp[i] += (amp - disp[i]) * Math.min(1, dt * 12);
+        const speed = amp > disp[i] ? 32 : 18;
+        disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
         const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);
         const y = height - barHeight;
@@ -370,7 +371,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
           let sum = 0, count = 0;
           for (let b = start; b < end; b++) { sum += bandsRef.current[b] || 0; count++; }
           const avg = count > 0 ? sum / count : 0;
-          amp = Math.min(1.0, Math.pow(avg, 0.75) * 1.8) * fallbackLevel;
+          amp = Math.min(1.0, Math.pow(avg, 0.65) * 1.8) * fallbackLevel;
         } else {
           const timeSec = now / 1000;
           const phaseShift = i * 0.95;
@@ -380,7 +381,8 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
         }
 
         const disp = displayRef.current;
-        disp[i] += (amp - disp[i]) * 0.5;
+        const speed = amp > disp[i] ? 32 : 18;
+        disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
         const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);
         const y = height - barHeight;
