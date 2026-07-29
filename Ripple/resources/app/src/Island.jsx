@@ -187,7 +187,7 @@ function AlbumGlow({ paletteRef, isPlaying }) {
 // it doesn't have access to.
 const VIS_BAR_COUNT = 24;
 
-function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 }) {
+function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 }) {
   const canvasRef = useRef(null);
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const displayRef = useRef(new Float32Array(VIS_BAR_COUNT));
@@ -195,9 +195,9 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
   const fallbackLevelRef = useRef(isPlaying ? 1.0 : 0.0);
   const phasesRef = useRef(
     Array.from({ length: VIS_BAR_COUNT }, (_, i) => ({
-      freq: 1.2 + (i % 6) * 0.28 + Math.random() * 0.15,
+      freq: 1.4 + (i % 5) * 0.35 + Math.random() * 0.2,
       phase: Math.random() * Math.PI * 2,
-      speed: 1.3 + Math.random() * 0.9,
+      speed: 1.6 + Math.random() * 1.2,
     }))
   );
   const isPlayingRef = useRef(isPlaying);
@@ -240,78 +240,52 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
     const draw = (now) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-
-      // Smooth play/pause amplitude fade
-      const targetLevel = isPlayingRef.current ? 1.0 : 0.0;
-      fallbackLevelRef.current += (targetLevel - fallbackLevelRef.current) * Math.min(1, dt * 6);
-      const level = fallbackLevelRef.current;
-
-      const gap = 2.5;
-      const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
       const t = now / 1000;
-      const hasRealAudio = (Date.now() - lastRealAudioTimeRef.current) < 1500;
+
+      const target = isPlayingRef.current ? 1 : 0;
+      fallbackLevelRef.current += (target - fallbackLevelRef.current) * Math.min(1, dt * 6);
+      const fallbackLevel = fallbackLevelRef.current;
+
       const palette = paletteRef?.current || { primary: "rgba(16,185,129,1)", secondary: "rgba(52,211,153,1)" };
       const primaryColor = ensureMinBrightness(palette.primary || "rgba(16,185,129,1)", 180);
       const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(52,211,153,1)", 140);
 
       ctx.clearRect(0, 0, width, height);
-
-      // Draw mirrored bars (from center)
-      const halfHeight = height / 2;
+      const gap = 3;
+      const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
+      const hasRealAudio = (Date.now() - lastRealAudioTimeRef.current) < 1500;
 
       for (let i = 0; i < VIS_BAR_COUNT; i++) {
         let amp = 0;
-
         if (hasRealAudio) {
-          // Accurate 1:1 real FFT audio spectrum amplitude
           const rawVal = bandsRef.current[i] || 0;
-          amp = Math.min(1.0, Math.pow(rawVal, 0.75) * 1.6);
+          amp = Math.min(1.0, Math.pow(rawVal, 0.75) * 1.8) * fallbackLevel;
         } else {
-          // Synthetic ambient fallback when no real audio feed present
           const p = phasesRef.current[i];
-          const wave =
-            0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.55 +
-            0.2 * Math.sin(t * p.speed * 1.8 + p.phase * 1.5) +
-            0.1 * Math.cos(t * p.speed * 0.7 + p.phase * 0.6);
-          amp = Math.max(0.08, Math.min(0.92, wave));
+          const wave = 0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.6 + 0.25 * Math.sin(t * p.speed * 1.7 + p.phase * 1.3);
+          amp = Math.max(0.04, Math.min(1, wave)) * fallbackLevel;
         }
 
-        // Apply play/pause multiplier
-        amp = amp * level;
-
         const disp = displayRef.current;
-        // Fast attack for crisp beats, smooth release
-        const speed = amp > disp[i] ? 24 : 14;
-        disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
-        const barHalf = Math.max(1.2, disp[i] * halfHeight * 0.90);
-
+        disp[i] += (amp - disp[i]) * Math.min(1, dt * 12);
+        const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);
-        const yTop = halfHeight - barHalf;
-        const yBot = halfHeight + barHalf;
+        const y = height - barHeight;
 
-        // Dynamic reactive glow
-        ctx.save();
-        ctx.shadowColor = primaryColor;
-        ctx.shadowBlur = 8 * disp[i];
-
-        // Gradient fill
-        const grad = ctx.createLinearGradient(0, yTop, 0, yBot);
-        grad.addColorStop(0, secondaryColor);
-        grad.addColorStop(0.5, primaryColor);
+        const grad = ctx.createLinearGradient(0, y, 0, height);
+        grad.addColorStop(0, primaryColor);
         grad.addColorStop(1, secondaryColor);
         ctx.fillStyle = grad;
 
-        // Rounded bar
-        const r = Math.min(barWidth / 2, 2);
+        const r = Math.min(barWidth / 2, 2.5);
         ctx.beginPath();
-        ctx.moveTo(x + r, yTop);
-        ctx.arcTo(x + barWidth, yTop, x + barWidth, yTop + r, r);
-        ctx.arcTo(x + barWidth, yBot, x + barWidth - r, yBot, r);
-        ctx.arcTo(x, yBot, x, yBot - r, r);
-        ctx.arcTo(x, yTop, x + r, yTop, r);
+        ctx.moveTo(x, y + r);
+        ctx.arcTo(x, y, x + r, y, r);
+        ctx.arcTo(x + barWidth, y, x + barWidth, y + r, r);
+        ctx.lineTo(x + barWidth, height);
+        ctx.lineTo(x, height);
         ctx.closePath();
         ctx.fill();
-        ctx.restore();
       }
 
       raf = requestAnimationFrame(draw);
@@ -321,13 +295,13 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
     return () => cancelAnimationFrame(raf);
   }, [width, height]);
 
-  return <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, minWidth: `${width}px`, minHeight: `${height}px`, display: "block", position: "relative", zIndex: 50 }} />;
+  return <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, display: "block", position: "relative", zIndex: 50 }} />;
 }
 
 // ---- Mini visualizer for the compact/small pill mode -----------------------
 const MINI_BAR_COUNT = 4;
 
-function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 }) {
+function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 }) {
   const canvasRef = useRef(null);
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const displayRef = useRef(new Float32Array(MINI_BAR_COUNT));
@@ -377,7 +351,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
 
       const targetLevel = isPlayingRef.current ? 1.0 : 0.0;
       fallbackLevelRef.current += (targetLevel - fallbackLevelRef.current) * Math.min(1, dt * 6);
-      const level = fallbackLevelRef.current;
+      const fallbackLevel = fallbackLevelRef.current;
 
       const gap = 2;
       const barWidth = (width - gap * (MINI_BAR_COUNT - 1)) / MINI_BAR_COUNT;
@@ -387,58 +361,44 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
       const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(52,211,153,1)", 140);
 
       ctx.clearRect(0, 0, width, height);
-
-      const timeSec = now / 1000;
-      const halfH = height / 2;
+      const cluster = VIS_BAR_COUNT / MINI_BAR_COUNT;
 
       for (let i = 0; i < MINI_BAR_COUNT; i++) {
         let amp = 0;
         if (hasRealAudio && bandsRef.current.length > 0) {
-          const clusterSize = VIS_BAR_COUNT / MINI_BAR_COUNT;
-          const start = Math.floor(i * clusterSize);
-          const end = Math.floor((i + 1) * clusterSize);
+          const start = Math.floor(i * cluster), end = Math.floor((i + 1) * cluster);
           let sum = 0, count = 0;
           for (let b = start; b < end; b++) { sum += bandsRef.current[b] || 0; count++; }
           const avg = count > 0 ? sum / count : 0;
-          amp = Math.min(1.0, Math.pow(avg, 0.75) * 1.7);
+          amp = Math.min(1.0, Math.pow(avg, 0.75) * 1.8) * fallbackLevel;
         } else {
+          const timeSec = now / 1000;
           const phaseShift = i * 0.95;
           const wave1 = Math.sin(timeSec * 6.5 + phaseShift) * 0.3 + 0.5;
           const wave2 = Math.cos(timeSec * 10.0 - phaseShift * 1.2) * 0.2;
-          amp = Math.max(0.12, Math.min(0.9, wave1 + wave2));
+          amp = Math.max(0.04, Math.min(1, wave1 + wave2)) * fallbackLevel;
         }
 
-        amp = amp * level;
-
         const disp = displayRef.current;
-        const speed = amp > disp[i] ? 24 : 14;
-        disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
-        const barHalf = Math.max(1.2, disp[i] * halfH * 0.88);
-
+        disp[i] += (amp - disp[i]) * 0.5;
+        const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);
-        const yTop = halfH - barHalf;
-        const yBot = halfH + barHalf;
+        const y = height - barHeight;
 
-        ctx.save();
-        ctx.shadowColor = primaryColor;
-        ctx.shadowBlur = 4 * disp[i];
-
-        const grad = ctx.createLinearGradient(0, yTop, 0, yBot);
-        grad.addColorStop(0, secondaryColor);
-        grad.addColorStop(0.5, primaryColor);
+        const grad = ctx.createLinearGradient(0, y, 0, height);
+        grad.addColorStop(0, primaryColor);
         grad.addColorStop(1, secondaryColor);
         ctx.fillStyle = grad;
 
         const r = Math.min(barWidth / 2, 1.5);
         ctx.beginPath();
-        ctx.moveTo(x + r, yTop);
-        ctx.arcTo(x + barWidth, yTop, x + barWidth, yTop + r, r);
-        ctx.arcTo(x + barWidth, yBot, x + barWidth - r, yBot, r);
-        ctx.arcTo(x, yBot, x, yBot - r, r);
-        ctx.arcTo(x, yTop, x + r, yTop, r);
+        ctx.moveTo(x, y + r);
+        ctx.arcTo(x, y, x + r, y, r);
+        ctx.arcTo(x + barWidth, y, x + barWidth, y + r, r);
+        ctx.lineTo(x + barWidth, height);
+        ctx.lineTo(x, height);
         ctx.closePath();
         ctx.fill();
-        ctx.restore();
       }
 
       raf = requestAnimationFrame(draw);
@@ -448,7 +408,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
     return () => cancelAnimationFrame(raf);
   }, [width, height]);
 
-  return <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, minWidth: `${width}px`, minHeight: `${height}px`, display: "block", flexShrink: 0, zIndex: 50 }} />;
+  return <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, display: "block", flexShrink: 0, zIndex: 50 }} />;
 }
 
 const WeatherIcon = ({ status, size = 16, color = "currentColor" }) => {
