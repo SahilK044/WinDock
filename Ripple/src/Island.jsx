@@ -193,6 +193,11 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
   const displayRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const lastRealAudioTimeRef = useRef(0);
   const fallbackLevelRef = useRef(isPlaying ? 1.0 : 0.0);
+  // Beat pulse (0..1) from the worker's onset detector. onBands (legacy
+  // shim) strips this field out entirely, which is why beats weren't
+  // reaching the renderer before — we now use onAnalysis to get it.
+  const beatRef = useRef(0);
+  const displayBeatRef = useRef(0);
   const phasesRef = useRef(
     Array.from({ length: VIS_BAR_COUNT }, (_, i) => ({
       freq: 1.4 + (i % 5) * 0.35 + Math.random() * 0.2,
@@ -211,9 +216,11 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
       window.electronAPI.audio.start().then((res) => {
         if (cancelled) return;
       });
-      unsubscribe = window.electronAPI.audio.onBands((bands) => {
+      unsubscribe = window.electronAPI.audio.onAnalysis((analysis) => {
+        const bands = analysis?.bands;
         if (!bands || bands.length === 0) return;
         bandsRef.current = Float32Array.from(bands);
+        beatRef.current = Math.max(beatRef.current, analysis?.beat || 0);
         lastRealAudioTimeRef.current = Date.now();
       });
     }
@@ -255,11 +262,22 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
       const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
       const hasRealAudio = (Date.now() - lastRealAudioTimeRef.current) < 2000;
 
+      // Decay the beat pulse locally every frame (independent of how often
+      // the worker posts) so the hit reads as an instant snap-and-fall
+      // regardless of animation frame timing vs. worker post timing.
+      displayBeatRef.current += (beatRef.current - displayBeatRef.current) * Math.min(1, dt * 22);
+      beatRef.current *= Math.max(0, 1 - dt * 10);
+      const beatPunch = displayBeatRef.current;
+
       for (let i = 0; i < VIS_BAR_COUNT; i++) {
         let amp = 0;
         if (hasRealAudio) {
           const rawVal = bandsRef.current[i] || 0;
           amp = Math.min(1.0, Math.pow(rawVal, 0.55) * 2.2) * fallbackLevel;
+          // Punch every bar upward on a detected beat, strongest for the
+          // lower bars (kick/bass range) where beats are felt most.
+          const beatWeight = 1 - (i / VIS_BAR_COUNT) * 0.6;
+          amp = Math.min(1.0, amp + beatPunch * beatWeight * 0.8);
         } else {
           const p = phasesRef.current[i];
           const wave = 0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.6 + 0.25 * Math.sin(t * p.speed * 1.7 + p.phase * 1.3);
@@ -267,7 +285,9 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
         }
 
         const disp = displayRef.current;
-        const speed = amp > disp[i] ? 60 : 25;
+        // Rise faster on a beat hit so the punch actually snaps into view
+        // instead of being smoothed away by the normal envelope speed.
+        const speed = amp > disp[i] ? (beatPunch > 0.15 ? 90 : 60) : 25;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
         const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);
@@ -309,6 +329,10 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
   const lastRealAudioTimeRef = useRef(0);
   const isPlayingRef = useRef(isPlaying);
   const fallbackLevelRef = useRef(isPlaying ? 1.0 : 0.0);
+  // Beat pulse from the worker's onset detector — same fix as the big pill's
+  // AlbumAudioVisualizer: onBands drops this field, onAnalysis keeps it.
+  const beatRef = useRef(0);
+  const displayBeatRef = useRef(0);
 
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
@@ -320,9 +344,11 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
       window.electronAPI.audio.start().then((res) => {
         if (cancelled) return;
       });
-      unsubscribe = window.electronAPI.audio.onBands((bands) => {
+      unsubscribe = window.electronAPI.audio.onAnalysis((analysis) => {
+        const bands = analysis?.bands;
         if (!bands || bands.length === 0) return;
         bandsRef.current = Float32Array.from(bands);
+        beatRef.current = Math.max(beatRef.current, analysis?.beat || 0);
         lastRealAudioTimeRef.current = Date.now();
       });
     }
@@ -364,6 +390,12 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
       ctx.clearRect(0, 0, width, height);
       const cluster = VIS_BAR_COUNT / MINI_BAR_COUNT;
 
+      // Same local beat decay as the big pill so both visualizers snap on
+      // the exact same beats, in sync with each other.
+      displayBeatRef.current += (beatRef.current - displayBeatRef.current) * Math.min(1, dt * 22);
+      beatRef.current *= Math.max(0, 1 - dt * 10);
+      const beatPunch = displayBeatRef.current;
+
       for (let i = 0; i < MINI_BAR_COUNT; i++) {
         let amp = 0;
         if (hasRealAudio && bandsRef.current.length > 0) {
@@ -372,6 +404,8 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
           for (let b = start; b < end; b++) { sum += bandsRef.current[b] || 0; count++; }
           const avg = count > 0 ? sum / count : 0;
           amp = Math.min(1.0, Math.pow(avg, 0.55) * 2.2) * fallbackLevel;
+          const beatWeight = 1 - (i / MINI_BAR_COUNT) * 0.6;
+          amp = Math.min(1.0, amp + beatPunch * beatWeight * 0.8);
         } else {
           const timeSec = now / 1000;
           const phaseShift = i * 0.95;
@@ -381,7 +415,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
         }
 
         const disp = displayRef.current;
-        const speed = amp > disp[i] ? 60 : 25;
+        const speed = amp > disp[i] ? (beatPunch > 0.15 ? 90 : 60) : 25;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
         const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);

@@ -25,12 +25,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // when the native addon isn't available, so the renderer can fall back.
     start: () => ipcRenderer.invoke('audio-viz-start'),
     stop: () => ipcRenderer.invoke('audio-viz-stop'),
-    // Subscribes to live band-level updates (Array<number> 0..1, length 24).
+    // Subscribes to live audio analysis updates:
+    // { bands: Array<number> 0..1 length 24, beat: number 0..1, bass: number 0..1 }.
     // Returns an unsubscribe function.
+    onAnalysis: (callback) => {
+      const listener = (_event, analysis) => callback(analysis);
+      ipcRenderer.on('audio-analysis', listener);
+      return () => ipcRenderer.removeListener('audio-analysis', listener);
+    },
+    // Backwards-compatible subscription for older renderer code.
     onBands: (callback) => {
-      const listener = (_event, bands) => callback(bands);
-      ipcRenderer.on('audio-bands', listener);
-      return () => ipcRenderer.removeListener('audio-bands', listener);
+      const listener = (_event, analysis) => callback(analysis?.bands || analysis);
+      ipcRenderer.on('audio-analysis', listener);
+      return () => ipcRenderer.removeListener('audio-analysis', listener);
     }
   }
 });

@@ -1045,9 +1045,10 @@ function ensureAudioWorker() {
 
     audioWorker = new Worker(workerPath);
 
-    // Forward FFT band analysis results to the renderer at ~60fps.
     audioWorker.on("message", (msg) => {
       if (msg?.type === "analysis" && mainWindow && !mainWindow.isDestroyed()) {
+        const payload = { bands: msg.bands, beat: msg.beat, bass: msg.bass };
+        mainWindow.webContents.send("audio-analysis", payload);
         mainWindow.webContents.send("audio-bands", msg.bands);
       }
     });
