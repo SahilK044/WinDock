@@ -969,9 +969,13 @@ try {
   if (process.platform === "win32") {
     // The native addon is shipped next to the packaged resources.
     const addonCandidates = [
+      path.join(process.resourcesPath || "", "wasapi_loopback.node"),
       path.join(process.resourcesPath || "", "wasapi-loopback.node"),
+      path.join(app.getAppPath(), "resources", "wasapi_loopback.node"),
       path.join(app.getAppPath(), "resources", "wasapi-loopback.node"),
+      path.join(__dirname, "../../resources/wasapi_loopback.node"),
       path.join(__dirname, "../../resources/wasapi-loopback.node"),
+      path.join(__dirname, "../native/wasapi-loopback/build/Release/wasapi_loopback.node"),
     ];
     for (const candidate of addonCandidates) {
       try {

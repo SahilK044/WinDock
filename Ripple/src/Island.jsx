@@ -191,7 +191,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
   const canvasRef = useRef(null);
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const displayRef = useRef(new Float32Array(VIS_BAR_COUNT));
-  const usingRealAudioRef = useRef(false);
+  const lastRealAudioTimeRef = useRef(0);
   const fallbackLevelRef = useRef(isPlaying ? 1.0 : 0.0);
   const phasesRef = useRef(
     Array.from({ length: VIS_BAR_COUNT }, (_, i) => ({
@@ -210,11 +210,11 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
     if (window.electronAPI?.audio) {
       window.electronAPI.audio.start().then((res) => {
         if (cancelled) return;
-        usingRealAudioRef.current = !!res?.started;
       });
       unsubscribe = window.electronAPI.audio.onBands((bands) => {
-        if (!bands) return;
+        if (!bands || bands.length === 0) return;
         bandsRef.current = Float32Array.from(bands);
+        lastRealAudioTimeRef.current = Date.now();
       });
     }
 
@@ -243,13 +243,13 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
 
       // Smooth play/pause amplitude fade
       const targetLevel = isPlayingRef.current ? 1.0 : 0.0;
-      fallbackLevelRef.current += (targetLevel - fallbackLevelRef.current) * Math.min(1, dt * 4);
+      fallbackLevelRef.current += (targetLevel - fallbackLevelRef.current) * Math.min(1, dt * 6);
       const level = fallbackLevelRef.current;
 
       const gap = 2.5;
       const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
       const t = now / 1000;
-      const real = usingRealAudioRef.current;
+      const hasRealAudio = (Date.now() - lastRealAudioTimeRef.current) < 1500;
       const palette = paletteRef?.current || { primary: "rgba(16,185,129,1)", secondary: "rgba(52,211,153,1)" };
       const primaryColor = ensureMinBrightness(palette.primary || "rgba(16,185,129,1)", 180);
       const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(52,211,153,1)", 140);
@@ -261,35 +261,38 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
 
       for (let i = 0; i < VIS_BAR_COUNT; i++) {
         let amp = 0;
-        if (real && bandsRef.current && bandsRef.current[i] > 0.005) {
-          amp = Math.min(1.0, bandsRef.current[i] * 2.2);
-        }
 
-        if (!real || amp < 0.01) {
+        if (hasRealAudio) {
+          // Accurate 1:1 real FFT audio spectrum amplitude
+          const rawVal = bandsRef.current[i] || 0;
+          amp = Math.min(1.0, Math.pow(rawVal, 0.75) * 1.6);
+        } else {
+          // Synthetic ambient fallback when no real audio feed present
           const p = phasesRef.current[i];
           const wave =
             0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.55 +
             0.2 * Math.sin(t * p.speed * 1.8 + p.phase * 1.5) +
             0.1 * Math.cos(t * p.speed * 0.7 + p.phase * 0.6);
-          amp = Math.max(0.12, Math.min(0.92, wave));
+          amp = Math.max(0.08, Math.min(0.92, wave));
         }
 
-        // Apply play/pause level
-        amp = 0.08 + amp * level * 0.92;
+        // Apply play/pause multiplier
+        amp = amp * level;
 
         const disp = displayRef.current;
-        disp[i] += (amp - disp[i]) * Math.min(1, dt * 14);
-        const barHalf = Math.max(2, disp[i] * halfHeight * 0.88);
+        // Fast attack for crisp beats, smooth release
+        const speed = amp > disp[i] ? 24 : 14;
+        disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
+        const barHalf = Math.max(1.2, disp[i] * halfHeight * 0.90);
 
         const x = i * (barWidth + gap);
         const yTop = halfHeight - barHalf;
         const yBot = halfHeight + barHalf;
-        const totalBarHeight = yBot - yTop;
 
-        // Glow shadow behind bars
+        // Dynamic reactive glow
         ctx.save();
         ctx.shadowColor = primaryColor;
-        ctx.shadowBlur = 6 * disp[i];
+        ctx.shadowBlur = 8 * disp[i];
 
         // Gradient fill
         const grad = ctx.createLinearGradient(0, yTop, 0, yBot);
@@ -322,19 +325,13 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
 }
 
 // ---- Mini visualizer for the compact/small pill mode -----------------------
-// Unlike AlbumAudioVisualizer (expanded view), this one deliberately has NO
-// fake continuous idle animation. When real WASAPI band data is available it
-// draws 4 clustered bars driven by the actual audio. When it isn't (non-
-// Windows, addon not built), it shows still bars that only step between a
-// "paused" and "playing" resting height — it never fakes reactivity it
-// doesn't have.
 const MINI_BAR_COUNT = 4;
 
 function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 }) {
   const canvasRef = useRef(null);
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const displayRef = useRef(new Float32Array(MINI_BAR_COUNT));
-  const usingRealAudioRef = useRef(false);
+  const lastRealAudioTimeRef = useRef(0);
   const isPlayingRef = useRef(isPlaying);
   const fallbackLevelRef = useRef(isPlaying ? 1.0 : 0.0);
 
@@ -347,11 +344,11 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
     if (window.electronAPI?.audio) {
       window.electronAPI.audio.start().then((res) => {
         if (cancelled) return;
-        usingRealAudioRef.current = !!res?.started;
       });
       unsubscribe = window.electronAPI.audio.onBands((bands) => {
-        if (!bands) return;
+        if (!bands || bands.length === 0) return;
         bandsRef.current = Float32Array.from(bands);
+        lastRealAudioTimeRef.current = Date.now();
       });
     }
 
@@ -378,14 +375,13 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
-      // Smooth play/pause level
       const targetLevel = isPlayingRef.current ? 1.0 : 0.0;
-      fallbackLevelRef.current += (targetLevel - fallbackLevelRef.current) * Math.min(1, dt * 5);
+      fallbackLevelRef.current += (targetLevel - fallbackLevelRef.current) * Math.min(1, dt * 6);
       const level = fallbackLevelRef.current;
 
       const gap = 2;
       const barWidth = (width - gap * (MINI_BAR_COUNT - 1)) / MINI_BAR_COUNT;
-      const real = usingRealAudioRef.current;
+      const hasRealAudio = (Date.now() - lastRealAudioTimeRef.current) < 1500;
       const palette = paletteRef?.current || { primary: "rgba(16,185,129,1)", secondary: "rgba(52,211,153,1)" };
       const primaryColor = ensureMinBrightness(palette.primary || "rgba(16,185,129,1)", 180);
       const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(52,211,153,1)", 140);
@@ -396,38 +392,36 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
       const halfH = height / 2;
 
       for (let i = 0; i < MINI_BAR_COUNT; i++) {
-        let amp = 0.1;
-        if (real && bandsRef.current && bandsRef.current.length > 0) {
+        let amp = 0;
+        if (hasRealAudio && bandsRef.current.length > 0) {
           const clusterSize = VIS_BAR_COUNT / MINI_BAR_COUNT;
           const start = Math.floor(i * clusterSize);
           const end = Math.floor((i + 1) * clusterSize);
           let sum = 0, count = 0;
           for (let b = start; b < end; b++) { sum += bandsRef.current[b] || 0; count++; }
-          amp = count > 0 ? Math.min(1.0, (sum / count) * 2.0) : 0;
-        }
-
-        if (!real || amp < 0.01) {
+          const avg = count > 0 ? sum / count : 0;
+          amp = Math.min(1.0, Math.pow(avg, 0.75) * 1.7);
+        } else {
           const phaseShift = i * 0.95;
           const wave1 = Math.sin(timeSec * 6.5 + phaseShift) * 0.3 + 0.5;
           const wave2 = Math.cos(timeSec * 10.0 - phaseShift * 1.2) * 0.2;
-          amp = Math.max(0.2, Math.min(0.9, wave1 + wave2));
+          amp = Math.max(0.12, Math.min(0.9, wave1 + wave2));
         }
 
-        // Apply play/pause easing
-        amp = 0.08 + amp * level * 0.92;
+        amp = amp * level;
 
         const disp = displayRef.current;
-        disp[i] += (amp - disp[i]) * Math.min(1, dt * 14);
-        const barHalf = Math.max(1.5, disp[i] * halfH * 0.85);
+        const speed = amp > disp[i] ? 24 : 14;
+        disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
+        const barHalf = Math.max(1.2, disp[i] * halfH * 0.88);
 
         const x = i * (barWidth + gap);
         const yTop = halfH - barHalf;
         const yBot = halfH + barHalf;
 
-        // Subtle glow
         ctx.save();
         ctx.shadowColor = primaryColor;
-        ctx.shadowBlur = 3 * disp[i];
+        ctx.shadowBlur = 4 * disp[i];
 
         const grad = ctx.createLinearGradient(0, yTop, 0, yBot);
         grad.addColorStop(0, secondaryColor);
