@@ -279,11 +279,9 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
         let amp = 0;
         if (hasRealAudio) {
           const rawVal = bandsRef.current[i] || 0;
-          amp = Math.min(1.0, Math.pow(rawVal, 0.55) * 2.2) * fallbackLevel;
-          // Punch every bar upward on a detected beat, strongest for the
-          // lower bars (kick/bass range) where beats are felt most.
-          const beatWeight = 1 - (i / VIS_BAR_COUNT) * 0.6;
-          amp = Math.min(1.0, amp + beatPunch * beatWeight * 0.8);
+          amp = Math.min(1.0, rawVal * 1.35) * fallbackLevel;
+          const beatWeight = 1 - (i / VIS_BAR_COUNT) * 0.5;
+          amp = Math.min(1.0, amp + beatPunch * beatWeight * 0.5);
         } else {
           const p = phasesRef.current[i];
           const wave = 0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.6 + 0.25 * Math.sin(t * p.speed * 1.7 + p.phase * 1.3);
@@ -291,9 +289,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
         }
 
         const disp = displayRef.current;
-        // Rise faster on a beat hit so the punch actually snaps into view
-        // instead of being smoothed away by the normal envelope speed.
-        const speed = amp > disp[i] ? (beatPunch > 0.15 ? 90 : 60) : 25;
+        const speed = amp > disp[i] ? 120 : 35;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
         const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);
@@ -410,9 +406,9 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
           let sum = 0, count = 0;
           for (let b = start; b < end; b++) { sum += bandsRef.current[b] || 0; count++; }
           const avg = count > 0 ? sum / count : 0;
-          amp = Math.min(1.0, Math.pow(avg, 0.55) * 2.2) * fallbackLevel;
-          const beatWeight = 1 - (i / MINI_BAR_COUNT) * 0.6;
-          amp = Math.min(1.0, amp + beatPunch * beatWeight * 0.8);
+          amp = Math.min(1.0, avg * 1.35) * fallbackLevel;
+          const beatWeight = 1 - (i / MINI_BAR_COUNT) * 0.5;
+          amp = Math.min(1.0, amp + beatPunch * beatWeight * 0.5);
         } else {
           const timeSec = now / 1000;
           const phaseShift = i * 0.95;
@@ -422,7 +418,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
         }
 
         const disp = displayRef.current;
-        const speed = amp > disp[i] ? (beatPunch > 0.15 ? 90 : 60) : 25;
+        const speed = amp > disp[i] ? 120 : 35;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
         const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);

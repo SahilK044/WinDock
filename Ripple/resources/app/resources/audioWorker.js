@@ -13,24 +13,15 @@ const FFT_SIZE = 1024; // ~21ms at 48kHz; lower latency matters for beat sync.
 // ~480 full FFTs per ~10ms WASAPI packet at 48kHz — far more analysis work
 // than the visualizer needs, and enough to make the worker thread fall
 // behind real-time under load. Falling behind compounds over time: each
-// backlog gets analyzed later than the last, which is what actually causes
-// the visualizer to drift into reacting "late" the longer music plays.
-// A ~5ms hop (256 samples @ 48kHz) is still far tighter than perceptible
-// beat-timing resolution, so nothing is lost by not analyzing every sample.
-const HOP_SIZE = 256;
 const BAND_COUNT = 24;
-const POST_INTERVAL_MS = 8; // post every processed window so the UI reacts frame-by-frame, not throttled
-const ATTACK = 0.9; // was 0.85 — near-instant rise, combined with the renderer fix this removes most of the perceived lag
-const RELEASE = 0.28; // was 0.20 — bars fall back down a bit quicker after a hit, feels less "stuck"
-const BEAT_COOLDOWN_MS = 65; // was 90 — catches faster/denser beats without merging back-to-back hits
+const POST_INTERVAL_MS = 0; // Post on every hop (~5.3ms) for 1:1 zero-lag frame reactivity
+const ATTACK = 1.0; // Instant rise (0ms attack lag)
+const RELEASE = 0.45; // Snappy, clean decay
+const BEAT_COOLDOWN_MS = 60;
 const ONSET_HISTORY_SIZE = 48;
-const SENSITIVITY = 0.7; // lower = more sensitive; multiplies onsetStd in the threshold (was 1.15)
-// Flat gain applied to incoming PCM before analysis. WASAPI loopback level
-// tracks the system/app volume, so on a quiet capture everything downstream
-// (bands, onset, bass, and the energy gate below) reads artificially low and
-// real beats fail to clear the gate. Boosting the raw signal up front fixes
-// that at the source instead of just chasing thresholds further down.
-const INPUT_GAIN = 2.2;
+const HOP_SIZE = 256; // Sliding window stride (~5.3ms at 48kHz)
+const SENSITIVITY = 0.65; // Lower = higher transient beat sensitivity
+const INPUT_GAIN = 2.5; // Gain multiplier to ensure full 0..1 range even at lower system volumes
 
 let ringBuffer = new Float32Array(FFT_SIZE);
 let writeIndex = 0;
@@ -38,8 +29,8 @@ let filled = false;
 let samplesSinceLastWindow = 0; // counts up to HOP_SIZE before the next FFT
 let sampleRate = 48000;
 let smoothedBands = new Float32Array(BAND_COUNT);
-let adaptiveFloor = new Float32Array(BAND_COUNT).fill(0.03);
-let adaptivePeak = new Float32Array(BAND_COUNT).fill(0.25);
+let adaptiveFloor = new Float32Array(BAND_COUNT).fill(0.02);
+let adaptivePeak = new Float32Array(BAND_COUNT).fill(0.20);
 let previousMagnitudes = new Float32Array(FFT_SIZE / 2);
 let bassEnvelope = 0;
 let onsetHistory = new Float32Array(ONSET_HISTORY_SIZE);
@@ -90,11 +81,11 @@ let bandEdges = null;
 let bandEdgesSampleRate = null;
 function getBandEdges(sr) {
   if (bandEdges && bandEdgesSampleRate === sr) return bandEdges;
-  const minHz = 30, maxHz = Math.min(16000, sr / 2);
+  const minHz = 35, maxHz = Math.min(16000, sr / 2);
   const edges = new Array(BAND_COUNT + 1);
   for (let i = 0; i <= BAND_COUNT; i++) {
     const t = i / BAND_COUNT;
-    edges[i] = minHz * Math.pow(maxHz / minHz, t);
+    edges[i] = minHz * Math.pow(maxHz / minHz, Math.pow(t, 1.05));
   }
   bandEdges = edges;
   bandEdgesSampleRate = sr;
@@ -166,37 +157,37 @@ function processWindow() {
       count++;
     }
     const avg = count > 0 ? sum / count : 0;
-    rawBands[b] = Math.min(1, Math.log10(1 + avg * 40) / 2.2);
+    rawBands[b] = Math.min(1, Math.log10(1 + avg * 45) / 2.0);
   }
 
   let bassLevel = 0;
   for (let b = 0; b < 6; b++) bassLevel += rawBands[b];
   bassLevel /= 6;
 
-  const kickEnergy = averageMagnitude(magnitudes, 45, 170, binHz);
-  const lowMidEnergy = averageMagnitude(magnitudes, 170, 420, binHz);
-  const musicEnergy = averageMagnitude(magnitudes, 45, 6000, binHz);
-  const kickFlux = positiveFlux(magnitudes, 45, 170, binHz);
-  const lowMidFlux = positiveFlux(magnitudes, 170, 420, binHz);
-  const fullFlux = positiveFlux(magnitudes, 45, 6000, binHz);
+  const kickEnergy = averageMagnitude(magnitudes, 40, 160, binHz);
+  const lowMidEnergy = averageMagnitude(magnitudes, 160, 400, binHz);
+  const musicEnergy = averageMagnitude(magnitudes, 40, 6000, binHz);
+  const kickFlux = positiveFlux(magnitudes, 40, 160, binHz);
+  const lowMidFlux = positiveFlux(magnitudes, 160, 400, binHz);
+  const fullFlux = positiveFlux(magnitudes, 40, 6000, binHz);
 
   for (let b = 0; b < BAND_COUNT; b++) {
     const raw = rawBands[b];
-    const floorRate = raw < adaptiveFloor[b] ? 0.08 : 0.003;
-    const peakRate = raw > adaptivePeak[b] ? 0.16 : 0.004;
+    const floorRate = raw < adaptiveFloor[b] ? 0.04 : 0.001;
+    const peakRate = raw > adaptivePeak[b] ? 0.22 : 0.003;
     adaptiveFloor[b] += (raw - adaptiveFloor[b]) * floorRate;
     adaptivePeak[b] += (raw - adaptivePeak[b]) * peakRate;
-    const range = Math.max(0.09, adaptivePeak[b] - adaptiveFloor[b]);
-    rawBands[b] = Math.max(0, Math.min(1, (raw - adaptiveFloor[b] * 0.95) / range));
+    const range = Math.max(0.08, adaptivePeak[b] - adaptiveFloor[b]);
+    rawBands[b] = Math.max(0, Math.min(1, (raw - adaptiveFloor[b] * 0.9) / range));
   }
 
   const bassAttack = Math.max(0, bassLevel - bassEnvelope);
-  bassEnvelope += (bassLevel - bassEnvelope) * (bassLevel > bassEnvelope ? 0.20 : 0.045);
+  bassEnvelope += (bassLevel - bassEnvelope) * (bassLevel > bassEnvelope ? 0.25 : 0.05);
 
   const onset = kickFlux * 0.55 + lowMidFlux * 0.25 + fullFlux * 0.12 + bassAttack * 2.2;
   const { mean: onsetMean, std: onsetStd } = getOnsetStats();
-  const threshold = Math.max(0.07, onsetMean + onsetStd * SENSITIVITY);
-  const energyGate = musicEnergy > 0.0012 && kickEnergy + lowMidEnergy > 0.002; // was 0.003 / 0.005 — quieter passages were failing this gate and dropping real beats entirely
+  const threshold = Math.max(0.06, onsetMean + onsetStd * SENSITIVITY);
+  const energyGate = musicEnergy > 0.0010 && kickEnergy + lowMidEnergy > 0.0015;
   const strength = Math.max(0, (onset - threshold) / Math.max(0.05, threshold));
   const now = Date.now();
 
@@ -206,9 +197,9 @@ function processWindow() {
 
   if (energyGate && onset > threshold && now - lastBeatTime > BEAT_COOLDOWN_MS) {
     lastBeatTime = now;
-    beatPulse = Math.min(1, 0.45 + strength * 0.55);
+    beatPulse = Math.min(1, 0.5 + strength * 0.5);
   }
-  beatPulse *= 0.76; // was 0.72 — a touch more hang time so hits read as a visible pulse, not a single-frame flash
+  beatPulse *= 0.78;
   previousMagnitudes.set(magnitudes);
 
   for (let b = 0; b < BAND_COUNT; b++) {
@@ -222,9 +213,6 @@ function processWindow() {
       type: "analysis",
       bands: Array.from(smoothedBands),
       beat: beatPulse,
-      // Continuous per-frame onset strength (0 = quiet, >0 = building toward a
-      // beat) so the UI can show reaction on every analyzed frame, not just
-      // the discrete gated beat pulses.
       onset: Math.max(0, Math.min(1, strength)),
       bass: Math.max(0, Math.min(1, bassLevel)),
     });
