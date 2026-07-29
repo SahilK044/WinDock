@@ -196,7 +196,8 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
   // Beat pulse (0..1) from the worker's onset detector. onBands (legacy
   // shim) strips this field out entirely, which is why beats weren't
   // reaching the renderer before — we now use onAnalysis to get it.
-  const beatRef = useRef(0);
+  // Written to directly on arrival (no incoming lerp) so a real beat shows
+  // up the instant it's detected instead of fading in late.
   const displayBeatRef = useRef(0);
   const phasesRef = useRef(
     Array.from({ length: VIS_BAR_COUNT }, (_, i) => ({
@@ -220,7 +221,13 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
         const bands = analysis?.bands;
         if (!bands || bands.length === 0) return;
         bandsRef.current = Float32Array.from(bands);
-        beatRef.current = Math.max(beatRef.current, analysis?.beat || 0);
+        // Write the raw beat value straight through — do NOT lerp it in here.
+        // The worker already gives an instant-attack pulse (it jumps the
+        // moment a beat is detected and only decays afterward), so any
+        // additional "rise" smoothing on this side just delays how long it
+        // takes for a real beat to become visible, stacking on top of the
+        // worker's own decay and making hits look late.
+        displayBeatRef.current = Math.max(displayBeatRef.current, analysis?.beat || 0);
         lastRealAudioTimeRef.current = Date.now();
       });
     }
@@ -262,12 +269,11 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
       const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
       const hasRealAudio = (Date.now() - lastRealAudioTimeRef.current) < 2000;
 
-      // Decay the beat pulse locally every frame (independent of how often
-      // the worker posts) so the hit reads as an instant snap-and-fall
-      // regardless of animation frame timing vs. worker post timing.
-      displayBeatRef.current += (beatRef.current - displayBeatRef.current) * Math.min(1, dt * 22);
-      beatRef.current *= Math.max(0, 1 - dt * 10);
+      // Only decay here, on the render side — never delay the rise. The beat
+      // value already jumped to its peak the instant onAnalysis received it;
+      // this loop just lets that value fall off smoothly between frames.
       const beatPunch = displayBeatRef.current;
+      displayBeatRef.current *= Math.max(0, 1 - dt * 10);
 
       for (let i = 0; i < VIS_BAR_COUNT; i++) {
         let amp = 0;
@@ -331,7 +337,8 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
   const fallbackLevelRef = useRef(isPlaying ? 1.0 : 0.0);
   // Beat pulse from the worker's onset detector — same fix as the big pill's
   // AlbumAudioVisualizer: onBands drops this field, onAnalysis keeps it.
-  const beatRef = useRef(0);
+  // Written to directly on arrival (no incoming lerp) so beats aren't
+  // delayed before becoming visible.
   const displayBeatRef = useRef(0);
 
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -348,7 +355,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
         const bands = analysis?.bands;
         if (!bands || bands.length === 0) return;
         bandsRef.current = Float32Array.from(bands);
-        beatRef.current = Math.max(beatRef.current, analysis?.beat || 0);
+        displayBeatRef.current = Math.max(displayBeatRef.current, analysis?.beat || 0);
         lastRealAudioTimeRef.current = Date.now();
       });
     }
@@ -390,11 +397,11 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
       ctx.clearRect(0, 0, width, height);
       const cluster = VIS_BAR_COUNT / MINI_BAR_COUNT;
 
-      // Same local beat decay as the big pill so both visualizers snap on
-      // the exact same beats, in sync with each other.
-      displayBeatRef.current += (beatRef.current - displayBeatRef.current) * Math.min(1, dt * 22);
-      beatRef.current *= Math.max(0, 1 - dt * 10);
+      // Only decay here — the value already jumped to its peak the instant
+      // onAnalysis received a beat, so there's no incoming smoothing to
+      // delay it. Same approach as the big pill so both stay in sync.
       const beatPunch = displayBeatRef.current;
+      displayBeatRef.current *= Math.max(0, 1 - dt * 10);
 
       for (let i = 0; i < MINI_BAR_COUNT; i++) {
         let amp = 0;

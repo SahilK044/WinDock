@@ -8,18 +8,34 @@
 const { parentPort } = require("worker_threads");
 
 const FFT_SIZE = 1024; // ~21ms at 48kHz; lower latency matters for beat sync.
+// How many new samples must accumulate before we run another FFT. Running
+// processWindow() on every single incoming sample (as this used to do) means
+// ~480 full FFTs per ~10ms WASAPI packet at 48kHz — far more analysis work
+// than the visualizer needs, and enough to make the worker thread fall
+// behind real-time under load. Falling behind compounds over time: each
+// backlog gets analyzed later than the last, which is what actually causes
+// the visualizer to drift into reacting "late" the longer music plays.
+// A ~5ms hop (256 samples @ 48kHz) is still far tighter than perceptible
+// beat-timing resolution, so nothing is lost by not analyzing every sample.
+const HOP_SIZE = 256;
 const BAND_COUNT = 24;
-const POST_INTERVAL_MS = 16;
-const ATTACK = 1.0;
-const RELEASE = 0.65;
-const BEAT_COOLDOWN_MS = 120;
+const POST_INTERVAL_MS = 8; // post every processed window so the UI reacts frame-by-frame, not throttled
+const ATTACK = 0.9; // was 0.85 — near-instant rise, combined with the renderer fix this removes most of the perceived lag
+const RELEASE = 0.28; // was 0.20 — bars fall back down a bit quicker after a hit, feels less "stuck"
+const BEAT_COOLDOWN_MS = 65; // was 90 — catches faster/denser beats without merging back-to-back hits
 const ONSET_HISTORY_SIZE = 48;
-const HOP_SIZE = 256; // Sliding window stride (~5.3ms at 48kHz)
+const SENSITIVITY = 0.7; // lower = more sensitive; multiplies onsetStd in the threshold (was 1.15)
+// Flat gain applied to incoming PCM before analysis. WASAPI loopback level
+// tracks the system/app volume, so on a quiet capture everything downstream
+// (bands, onset, bass, and the energy gate below) reads artificially low and
+// real beats fail to clear the gate. Boosting the raw signal up front fixes
+// that at the source instead of just chasing thresholds further down.
+const INPUT_GAIN = 2.2;
 
 let ringBuffer = new Float32Array(FFT_SIZE);
 let writeIndex = 0;
 let filled = false;
-let samplesSinceLastFFT = 0;
+let samplesSinceLastWindow = 0; // counts up to HOP_SIZE before the next FFT
 let sampleRate = 48000;
 let smoothedBands = new Float32Array(BAND_COUNT);
 let adaptiveFloor = new Float32Array(BAND_COUNT).fill(0.03);
@@ -150,7 +166,7 @@ function processWindow() {
       count++;
     }
     const avg = count > 0 ? sum / count : 0;
-    rawBands[b] = Math.min(1, Math.log10(1 + avg * 250) / 1.8);
+    rawBands[b] = Math.min(1, Math.log10(1 + avg * 40) / 2.2);
   }
 
   let bassLevel = 0;
@@ -167,11 +183,11 @@ function processWindow() {
   for (let b = 0; b < BAND_COUNT; b++) {
     const raw = rawBands[b];
     const floorRate = raw < adaptiveFloor[b] ? 0.08 : 0.003;
-    const peakRate = raw > adaptivePeak[b] ? 0.25 : 0.004;
+    const peakRate = raw > adaptivePeak[b] ? 0.16 : 0.004;
     adaptiveFloor[b] += (raw - adaptiveFloor[b]) * floorRate;
     adaptivePeak[b] += (raw - adaptivePeak[b]) * peakRate;
-    const range = Math.max(0.04, adaptivePeak[b] - adaptiveFloor[b]);
-    rawBands[b] = Math.max(0, Math.min(1, (raw - adaptiveFloor[b] * 0.75) / range));
+    const range = Math.max(0.09, adaptivePeak[b] - adaptiveFloor[b]);
+    rawBands[b] = Math.max(0, Math.min(1, (raw - adaptiveFloor[b] * 0.95) / range));
   }
 
   const bassAttack = Math.max(0, bassLevel - bassEnvelope);
@@ -179,9 +195,9 @@ function processWindow() {
 
   const onset = kickFlux * 0.55 + lowMidFlux * 0.25 + fullFlux * 0.12 + bassAttack * 2.2;
   const { mean: onsetMean, std: onsetStd } = getOnsetStats();
-  const threshold = Math.max(0.12, onsetMean + onsetStd * 1.85);
-  const energyGate = musicEnergy > 0.006 && kickEnergy + lowMidEnergy > 0.01;
-  const strength = Math.max(0, (onset - threshold) / Math.max(0.08, threshold));
+  const threshold = Math.max(0.07, onsetMean + onsetStd * SENSITIVITY);
+  const energyGate = musicEnergy > 0.0012 && kickEnergy + lowMidEnergy > 0.002; // was 0.003 / 0.005 — quieter passages were failing this gate and dropping real beats entirely
+  const strength = Math.max(0, (onset - threshold) / Math.max(0.05, threshold));
   const now = Date.now();
 
   onsetHistory[onsetHistoryIndex] = onset;
@@ -192,7 +208,7 @@ function processWindow() {
     lastBeatTime = now;
     beatPulse = Math.min(1, 0.45 + strength * 0.55);
   }
-  beatPulse *= 0.72;
+  beatPulse *= 0.76; // was 0.72 — a touch more hang time so hits read as a visible pulse, not a single-frame flash
   previousMagnitudes.set(magnitudes);
 
   for (let b = 0; b < BAND_COUNT; b++) {
@@ -206,6 +222,10 @@ function processWindow() {
       type: "analysis",
       bands: Array.from(smoothedBands),
       beat: beatPulse,
+      // Continuous per-frame onset strength (0 = quiet, >0 = building toward a
+      // beat) so the UI can show reaction on every analyzed frame, not just
+      // the discrete gated beat pulses.
+      onset: Math.max(0, Math.min(1, strength)),
       bass: Math.max(0, Math.min(1, bassLevel)),
     });
   }
@@ -216,14 +236,25 @@ parentPort.on("message", (msg) => {
     const chunk = msg.samples;
     sampleRate = msg.sampleRate || sampleRate;
     for (let i = 0; i < chunk.length; i++) {
-      ringBuffer[writeIndex] = chunk[i];
+      // Clamp after gain so a loud source doesn't wrap/distort the ring
+      // buffer — gain is meant to lift quiet signals, not push loud ones
+      // out of range.
+      const boosted = chunk[i] * INPUT_GAIN;
+      ringBuffer[writeIndex] = boosted > 1 ? 1 : boosted < -1 ? -1 : boosted;
       writeIndex = (writeIndex + 1) % FFT_SIZE;
-      samplesSinceLastFFT++;
-      if (!filled && writeIndex === 0) filled = true;
+      if (writeIndex === 0) filled = true;
+      samplesSinceLastWindow++;
     }
-    if (filled && samplesSinceLastFFT >= HOP_SIZE) {
-      samplesSinceLastFFT = 0;
-      processWindow();
+    // Analyze at a fixed hop size instead of on every incoming sample.
+    // Multiple hops' worth of samples can arrive in one chunk (a WASAPI
+    // packet is much bigger than HOP_SIZE), so this can run processWindow()
+    // more than once per chunk — but always a bounded, fixed amount of work
+    // per unit of audio time, instead of scaling with raw sample count.
+    if (filled) {
+      while (samplesSinceLastWindow >= HOP_SIZE) {
+        processWindow();
+        samplesSinceLastWindow -= HOP_SIZE;
+      }
     }
   } else if (msg?.type === "reset") {
     ringBuffer.fill(0);
@@ -238,7 +269,7 @@ parentPort.on("message", (msg) => {
     beatPulse = 0;
     lastBeatTime = 0;
     writeIndex = 0;
-    samplesSinceLastFFT = 0;
     filled = false;
+    samplesSinceLastWindow = 0;
   }
 });
