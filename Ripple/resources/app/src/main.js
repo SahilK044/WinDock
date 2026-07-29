@@ -182,7 +182,20 @@ function parseCommand(input) {
 
 // --- Launch abstraction ---
 function launchWindows(input) {
-  const trimmed = input.trim();
+  let trimmed = input.trim();
+
+  // If launching Spotify, use protocol URI for 100% reliable Win32/UWP launch
+  if (trimmed.toLowerCase().includes("spotify")) {
+    shell.openExternal("spotify:").catch(() => {
+      exec('start "" spotify:');
+    });
+    return;
+  }
+
+  // Auto-prepend shell:AppsFolder\ for UWP AppUserModelId strings missing the prefix
+  if (!trimmed.startsWith("shell:") && trimmed.includes("!")) {
+    trimmed = `shell:AppsFolder\\${trimmed}`;
+  }
 
   // UWP apps and schemes
   if (trimmed.startsWith("shell:")) {
@@ -283,33 +296,28 @@ ipcMain.handle("open-external", async (event, url) => {
 
 ipcMain.handle("launch-app", async (event, appName) => {
   const platform = process.platform;
+  const q = (appName || "").trim().toLowerCase();
+
+  if (q.includes("spotify")) {
+    try {
+      await shell.openExternal("spotify:");
+      return;
+    } catch {}
+  }
+
   if (platform === "darwin") {
     exec(`open -a "${appName}"`);
   } else if (platform === "win32") {
-    // Prefer the cached, discovery-resolved path (a real .exe found via the
-    // Start Menu, or a UWP shell:AppsFolder entry) over launching the bare
-    // name directly. Bare names get resolved by Windows via PATH, which
-    // includes %LOCALAPPDATA%\Microsoft\WindowsApps — where Microsoft Store
-    // apps register "App Execution Alias" stubs. A stale/orphaned alias
-    // (e.g. left over from a since-uninstalled Store version of an app)
-    // will try to resolve back to a dead AUMID and fail with a confusing
-    // "Windows cannot find '...'" error, even though the real desktop app
-    // is installed and already sitting in our cache with a working path.
     let resolved = null;
     try {
       const cacheFile = path.join(app.getPath("userData"), "app-cache.json");
       if (fs.existsSync(cacheFile)) {
         const entries = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
-        const q = appName.trim().toLowerCase();
-        // Exact name match first, then prefer a win32 (real .exe) entry
-        // over a uwp (shell:AppsFolder) entry if both exist for the name.
         const matches = entries.filter((e) => e.name && e.name.toLowerCase() === q);
         const win32Match = matches.find((e) => !e.launch.startsWith("shell:"));
         resolved = (win32Match || matches[0])?.launch || null;
       }
-    } catch {
-      // Cache missing/corrupt — fall through to raw-name resolution below.
-    }
+    } catch {}
     launchWindows(resolved || appName);
   } else {
     exec(appName);

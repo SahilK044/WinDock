@@ -506,16 +506,17 @@ function openApp(app) {
 
 // Open music player based on source (Spotify, Music, etc.)
 function openMusicPlayer(source) {
-  if (!source) return;
-
-  if (source === "Spotify") {
+  if (!source) {
     openApp("Spotify");
-  } else if (source === "Music") {
-    openApp("Music");
-  } else if (source === "music.apple.com" || source.includes("Apple")) {
+    return;
+  }
+
+  const s = source.toLowerCase();
+  if (s.includes("spotify")) {
+    openApp("Spotify");
+  } else if (s.includes("apple") || s.includes("music")) {
     openApp("Music");
   } else {
-    // Fallback: try to open by source name
     openApp(source);
   }
 }
