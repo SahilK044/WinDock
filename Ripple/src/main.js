@@ -867,11 +867,14 @@ ipcMain.handle("get-system-media", async () => {
             const songName = data.Title || "Unknown Title";
             const artistName = data.Artist || "Unknown Artist";
             let artworkUrl = data.Artwork || null;
+            const isBrowserSource = /chrome|msedge|firefox|brave|opera|edge/i.test(data.Source || "");
 
-            if (songName !== "Unknown Title") {
-              const exactArt = await fetchArtworkFallback(artistName, songName, data.Album);
-              if (exactArt) {
-                artworkUrl = exactArt;
+            // For YouTube / web media playing in browsers, preserve the actual native video thumbnail stream (data.Artwork).
+            // Only query iTunes fallback if artwork is missing or for Spotify/Music tracks.
+            if (!artworkUrl || (!isBrowserSource && songName !== "Unknown Title")) {
+              const fallback = await fetchArtworkFallback(artistName, songName, data.Album);
+              if (fallback && (!artworkUrl || !isBrowserSource)) {
+                artworkUrl = fallback;
               }
             }
 
