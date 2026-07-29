@@ -26,6 +26,13 @@ function measureTextWidth(text, font = "600 13px OpenRunde, Arial, sans-serif") 
   return ctx.measureText(text).width;
 }
 
+// Safe JSON.parse wrapper — returns fallback on any parse error instead of
+// crashing the component tree during useState initialization.
+function safeJsonParse(raw, fallback) {
+  if (!raw) return fallback;
+  try { return JSON.parse(raw); } catch { return fallback; }
+}
+
 // ---- Album-art color extraction (smooth cross-fade) ----------------------
 function clampByte(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
 function rgbToCss(r, g, b, a = 1) { return `rgba(${clampByte(r) | 0}, ${clampByte(g) | 0}, ${clampByte(b) | 0}, ${a})`; }
@@ -185,13 +192,16 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const displayRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const usingRealAudioRef = useRef(false);
+  const fallbackLevelRef = useRef(isPlaying ? 1.0 : 0.0);
   const phasesRef = useRef(
     Array.from({ length: VIS_BAR_COUNT }, (_, i) => ({
-      freq: 1.4 + (i % 5) * 0.35 + Math.random() * 0.2,
+      freq: 1.2 + (i % 6) * 0.28 + Math.random() * 0.15,
       phase: Math.random() * Math.PI * 2,
-      speed: 1.6 + Math.random() * 1.2,
+      speed: 1.3 + Math.random() * 0.9,
     }))
   );
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
   useEffect(() => {
     let unsubscribe = null;
@@ -231,51 +241,74 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
-      const gap = 3;
+      // Smooth play/pause amplitude fade
+      const targetLevel = isPlayingRef.current ? 1.0 : 0.0;
+      fallbackLevelRef.current += (targetLevel - fallbackLevelRef.current) * Math.min(1, dt * 4);
+      const level = fallbackLevelRef.current;
+
+      const gap = 2.5;
       const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
       const t = now / 1000;
       const real = usingRealAudioRef.current;
-      const palette = paletteRef?.current || { primary: "#10b981", secondary: "#34d399" };
-      const primaryColor = ensureMinBrightness(palette.primary || "#10b981", 180);
-      const secondaryColor = ensureMinBrightness(palette.secondary || "#34d399", 140);
+      const palette = paletteRef?.current || { primary: "rgba(16,185,129,1)", secondary: "rgba(52,211,153,1)" };
+      const primaryColor = ensureMinBrightness(palette.primary || "rgba(16,185,129,1)", 180);
+      const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(52,211,153,1)", 140);
 
       ctx.clearRect(0, 0, width, height);
 
+      // Draw mirrored bars (from center)
+      const halfHeight = height / 2;
+
       for (let i = 0; i < VIS_BAR_COUNT; i++) {
         let amp = 0;
-        if (real && bandsRef.current && bandsRef.current[i] > 0.01) {
-          amp = Math.min(1.0, bandsRef.current[i] * 1.8);
+        if (real && bandsRef.current && bandsRef.current[i] > 0.005) {
+          amp = Math.min(1.0, bandsRef.current[i] * 2.2);
         }
 
         if (!real || amp < 0.01) {
           const p = phasesRef.current[i];
           const wave =
-            0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.6 +
-            0.25 * Math.sin(t * p.speed * 1.7 + p.phase * 1.3);
-          amp = Math.max(0.25, Math.min(0.95, wave));
+            0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.55 +
+            0.2 * Math.sin(t * p.speed * 1.8 + p.phase * 1.5) +
+            0.1 * Math.cos(t * p.speed * 0.7 + p.phase * 0.6);
+          amp = Math.max(0.12, Math.min(0.92, wave));
         }
 
+        // Apply play/pause level
+        amp = 0.08 + amp * level * 0.92;
+
         const disp = displayRef.current;
-        disp[i] += (amp - disp[i]) * Math.min(1, dt * 10);
-        const barHeight = Math.max(6, disp[i] * height);
+        disp[i] += (amp - disp[i]) * Math.min(1, dt * 14);
+        const barHalf = Math.max(2, disp[i] * halfHeight * 0.88);
 
         const x = i * (barWidth + gap);
-        const y = height - barHeight;
+        const yTop = halfHeight - barHalf;
+        const yBot = halfHeight + barHalf;
+        const totalBarHeight = yBot - yTop;
 
-        const grad = ctx.createLinearGradient(0, y, 0, height);
-        grad.addColorStop(0, primaryColor);
+        // Glow shadow behind bars
+        ctx.save();
+        ctx.shadowColor = primaryColor;
+        ctx.shadowBlur = 6 * disp[i];
+
+        // Gradient fill
+        const grad = ctx.createLinearGradient(0, yTop, 0, yBot);
+        grad.addColorStop(0, secondaryColor);
+        grad.addColorStop(0.5, primaryColor);
         grad.addColorStop(1, secondaryColor);
         ctx.fillStyle = grad;
 
-        const r = Math.min(barWidth / 2, 2.5);
+        // Rounded bar
+        const r = Math.min(barWidth / 2, 2);
         ctx.beginPath();
-        ctx.moveTo(x, y + r);
-        ctx.arcTo(x, y, x + r, y, r);
-        ctx.arcTo(x + barWidth, y, x + barWidth, y + r, r);
-        ctx.lineTo(x + barWidth, height);
-        ctx.lineTo(x, height);
+        ctx.moveTo(x + r, yTop);
+        ctx.arcTo(x + barWidth, yTop, x + barWidth, yTop + r, r);
+        ctx.arcTo(x + barWidth, yBot, x + barWidth - r, yBot, r);
+        ctx.arcTo(x, yBot, x, yBot - r, r);
+        ctx.arcTo(x, yTop, x + r, yTop, r);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
       }
 
       raf = requestAnimationFrame(draw);
@@ -303,6 +336,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
   const displayRef = useRef(new Float32Array(MINI_BAR_COUNT));
   const usingRealAudioRef = useRef(false);
   const isPlayingRef = useRef(isPlaying);
+  const fallbackLevelRef = useRef(isPlaying ? 1.0 : 0.0);
 
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
@@ -344,57 +378,73 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 })
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
-      const gap = 2.5;
+      // Smooth play/pause level
+      const targetLevel = isPlayingRef.current ? 1.0 : 0.0;
+      fallbackLevelRef.current += (targetLevel - fallbackLevelRef.current) * Math.min(1, dt * 5);
+      const level = fallbackLevelRef.current;
+
+      const gap = 2;
       const barWidth = (width - gap * (MINI_BAR_COUNT - 1)) / MINI_BAR_COUNT;
       const real = usingRealAudioRef.current;
-      const palette = paletteRef?.current || { primary: "#10b981", secondary: "#34d399" };
-      const primaryColor = ensureMinBrightness(palette.primary || "#10b981", 180);
-      const secondaryColor = ensureMinBrightness(palette.secondary || "#34d399", 140);
+      const palette = paletteRef?.current || { primary: "rgba(16,185,129,1)", secondary: "rgba(52,211,153,1)" };
+      const primaryColor = ensureMinBrightness(palette.primary || "rgba(16,185,129,1)", 180);
+      const secondaryColor = ensureMinBrightness(palette.secondary || "rgba(52,211,153,1)", 140);
 
       ctx.clearRect(0, 0, width, height);
 
       const timeSec = now / 1000;
-      const playing = isPlayingRef.current;
+      const halfH = height / 2;
 
       for (let i = 0; i < MINI_BAR_COUNT; i++) {
-        let amp = 0.15;
+        let amp = 0.1;
         if (real && bandsRef.current && bandsRef.current.length > 0) {
           const clusterSize = VIS_BAR_COUNT / MINI_BAR_COUNT;
           const start = Math.floor(i * clusterSize);
           const end = Math.floor((i + 1) * clusterSize);
           let sum = 0, count = 0;
           for (let b = start; b < end; b++) { sum += bandsRef.current[b] || 0; count++; }
-          amp = count > 0 ? Math.min(1.0, (sum / count) * 1.8) : 0;
+          amp = count > 0 ? Math.min(1.0, (sum / count) * 2.0) : 0;
         }
 
         if (!real || amp < 0.01) {
-          const phaseShift = i * 0.85;
-          const wave1 = Math.sin(timeSec * 7.5 + phaseShift) * 0.35 + 0.5;
-          const wave2 = Math.cos(timeSec * 11.2 - phaseShift) * 0.25;
-          amp = Math.max(0.35, Math.min(0.95, wave1 + wave2));
+          const phaseShift = i * 0.95;
+          const wave1 = Math.sin(timeSec * 6.5 + phaseShift) * 0.3 + 0.5;
+          const wave2 = Math.cos(timeSec * 10.0 - phaseShift * 1.2) * 0.2;
+          amp = Math.max(0.2, Math.min(0.9, wave1 + wave2));
         }
 
+        // Apply play/pause easing
+        amp = 0.08 + amp * level * 0.92;
+
         const disp = displayRef.current;
-        disp[i] += (amp - disp[i]) * Math.min(1, dt * 12);
-        const barHeight = Math.max(isPlayingRef.current ? 5 : 2, disp[i] * height);
+        disp[i] += (amp - disp[i]) * Math.min(1, dt * 14);
+        const barHalf = Math.max(1.5, disp[i] * halfH * 0.85);
 
         const x = i * (barWidth + gap);
-        const y = height - barHeight;
+        const yTop = halfH - barHalf;
+        const yBot = halfH + barHalf;
 
-        const grad = ctx.createLinearGradient(0, y, 0, height);
-        grad.addColorStop(0, primaryColor);
+        // Subtle glow
+        ctx.save();
+        ctx.shadowColor = primaryColor;
+        ctx.shadowBlur = 3 * disp[i];
+
+        const grad = ctx.createLinearGradient(0, yTop, 0, yBot);
+        grad.addColorStop(0, secondaryColor);
+        grad.addColorStop(0.5, primaryColor);
         grad.addColorStop(1, secondaryColor);
         ctx.fillStyle = grad;
 
         const r = Math.min(barWidth / 2, 1.5);
         ctx.beginPath();
-        ctx.moveTo(x, y + r);
-        ctx.arcTo(x, y, x + r, y, r);
-        ctx.arcTo(x + barWidth, y, x + barWidth, y + r, r);
-        ctx.lineTo(x + barWidth, height);
-        ctx.lineTo(x, height);
+        ctx.moveTo(x + r, yTop);
+        ctx.arcTo(x + barWidth, yTop, x + barWidth, yTop + r, r);
+        ctx.arcTo(x + barWidth, yBot, x + barWidth - r, yBot, r);
+        ctx.arcTo(x, yBot, x, yBot - r, r);
+        ctx.arcTo(x, yTop, x + r, yTop, r);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
       }
 
       raf = requestAnimationFrame(draw);
@@ -491,8 +541,8 @@ const TABS = [
 export default function Island() {
   const [time, setTime] = useState(null);
   const [mode, setMode] = useState("still");
-  const [tabOrder, setTabOrder] = useState(() => JSON.parse(localStorage.getItem("tab-order") || "[0,1,2,3,4,5,6,7]"));
-  const [hiddenTabs, setHiddenTabs] = useState(() => JSON.parse(localStorage.getItem("hidden-tabs") || "[]"));
+  const [tabOrder, setTabOrder] = useState(() => safeJsonParse(localStorage.getItem("tab-order"), [0,1,2,3,4,5,6,7]));
+  const [hiddenTabs, setHiddenTabs] = useState(() => safeJsonParse(localStorage.getItem("hidden-tabs"), []));
   const [defaultTabId, setDefaultTabId] = useState(() => Number(localStorage.getItem("default-tab") || 0));
 
 
@@ -555,9 +605,9 @@ export default function Island() {
   const captureAlertQueue = useRef([]);
   const captureAlertTimer = useRef(null);
   const captureAlertDisplayed = useRef({ camera: false, microphone: false });
-  const [tasks, setTasks] = useState(JSON.parse(localStorage.getItem("tasks") || "[]"));
+  const [tasks, setTasks] = useState(safeJsonParse(localStorage.getItem("tasks"), []));
   const [taskText, setTaskText] = useState("");
-  const [workflows, setWorkflows] = useState(JSON.parse(localStorage.getItem("workflows") || "[]"));
+  const [workflows, setWorkflows] = useState(safeJsonParse(localStorage.getItem("workflows"), []));
   const [workflowName, setWorkflowName] = useState("");
   const [workflowUrls, setWorkflowUrls] = useState("");
   const [aiProvider, setAiProvider] = useState(localStorage.getItem("ai-provider") || "groq");
@@ -782,7 +832,7 @@ export default function Island() {
 
   const normalizeApps = (arr) => arr.map(a => typeof a === 'string' ? { name: a, launch: a } : a);
   const [quickApps, setQuickApps] = useState(() =>
-    normalizeApps(JSON.parse(localStorage.getItem("quick-apps") || '["Notes", "Spotify", "Calculator", "Terminal"]'))
+    normalizeApps(safeJsonParse(localStorage.getItem("quick-apps"), ["Notes", "Spotify", "Calculator", "Terminal"]))
   );
   const [newQuickApp, setNewQuickApp] = useState("");
   const [appSuggestions, setAppSuggestions] = useState([]);
