@@ -575,6 +575,8 @@ function getMediaScriptPath() {
   const path = require('path');
   const userDataScript = path.join(app.getPath('userData'), 'get_media.ps1');
   const scriptContent = `
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 [System.Reflection.Assembly]::LoadWithPartialName('System.Runtime.WindowsRuntime') | Out-Null
 $asTaskGeneric = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' }[0]
 
@@ -664,7 +666,7 @@ return 'null'
 
   try {
     if (!fs.existsSync(userDataScript) || fs.readFileSync(userDataScript, 'utf8') !== scriptContent) {
-      fs.writeFileSync(userDataScript, scriptContent, 'utf8');
+      fs.writeFileSync(userDataScript, '\uFEFF' + scriptContent, 'utf8');
     }
   } catch (e) {}
   return userDataScript;
@@ -836,7 +838,7 @@ ipcMain.handle("get-system-media", async () => {
     } else if (platform === "win32") {
       const scriptPath = getMediaScriptPath();
       exec(
-        `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`,
+        `powershell -NoProfile -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8; & '${scriptPath}'"`,
         { maxBuffer: 10 * 1024 * 1024, encoding: "utf8" },
         async (error, stdout) => {
           if (
