@@ -755,12 +755,16 @@ ipcMain.handle("control-system-media", async (event, command) => {
     }
     exec(`osascript -e '${script}'`);
   } else if (platform === "win32") {
-    let charCode = 179; // Play/Pause (VK_MEDIA_PLAY_PAUSE)
-    if (command === "previous" || command === "prev") charCode = 177; // Prev Track
-    else if (command === "next") charCode = 176; // Next Track
+    let vkCode = 0xB3; // VK_MEDIA_PLAY_PAUSE (179)
+    if (command === "previous" || command === "prev") vkCode = 0xB1; // VK_MEDIA_PREV_TRACK (177)
+    else if (command === "next") vkCode = 0xB0; // VK_MEDIA_NEXT_TRACK (176)
 
-    const psCommand = `(New-Object -ComObject WScript.Shell).SendKeys([char]${charCode})`;
-    exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
+    if (loopback && typeof loopback.sendMediaKey === "function") {
+      loopback.sendMediaKey(vkCode);
+    } else {
+      const psCommand = `(New-Object -ComObject WScript.Shell).SendKeys([char]${vkCode})`;
+      exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
+    }
   } else if (platform === "linux") {
     let cmd = "playerctl play-pause";
     if (command === "next") cmd = "playerctl next";

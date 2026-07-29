@@ -256,9 +256,21 @@ Napi::Value Stop(const Napi::CallbackInfo& info) {
   return Napi::Boolean::New(env, true);
 }
 
+Napi::Value SendMediaKey(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    return Napi::Boolean::New(env, false);
+  }
+  int vkCode = info[0].As<Napi::Number>().Int32Value();
+  keybd_event(static_cast<BYTE>(vkCode), 0, 0, 0);
+  keybd_event(static_cast<BYTE>(vkCode), 0, KEYEVENTF_KEYUP, 0);
+  return Napi::Boolean::New(env, true);
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
   exports.Set("start", Napi::Function::New(env, Start));
   exports.Set("stop", Napi::Function::New(env, Stop));
+  exports.Set("sendMediaKey", Napi::Function::New(env, SendMediaKey));
   return exports;
 }
 
