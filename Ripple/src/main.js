@@ -670,25 +670,54 @@ return 'null'
   return userDataScript;
 }
 
-async function fetchArtworkFallback(artist, title) {
+async function fetchArtworkFallback(artist, title, album) {
   if (!artist || !title || artist === "Unknown Artist" || title === "Unknown Title") return null;
-  const cacheKey = `${artist}-${title}`.toLowerCase();
+  const cacheKey = `${artist}-${title}-${album || ''}`.toLowerCase();
   if (mediaArtworkCache.has(cacheKey)) {
     return mediaArtworkCache.get(cacheKey);
   }
 
   return new Promise((resolve) => {
-    const query = encodeURIComponent(`${artist} ${title}`);
-    const url = `https://itunes.apple.com/search?term=${query}&entity=song&limit=1`;
+    const query = encodeURIComponent(`${artist} ${title} ${album || ''}`.trim());
+    const url = `https://itunes.apple.com/search?term=${query}&entity=song&limit=10`;
     const https = require("https");
-    const req = https.get(url, { timeout: 2500 }, (res) => {
+    const req = https.get(url, { timeout: 3500 }, (res) => {
       let body = "";
       res.on("data", (chunk) => body += chunk);
       res.on("end", () => {
         try {
           const data = JSON.parse(body);
-          if (data.results && data.results.length > 0) {
-            const art100 = data.results[0].artworkUrl100;
+          const results = data.results || [];
+          if (results.length > 0) {
+            let bestItem = null;
+            let bestScore = -999;
+            const tLower = title.toLowerCase();
+            const aLower = artist.toLowerCase();
+            const albLower = (album || '').toLowerCase();
+
+            for (const item of results) {
+              let score = 0;
+              const tName = (item.trackName || '').toLowerCase();
+              const aName = (item.artistName || '').toLowerCase();
+              const cName = (item.collectionName || '').toLowerCase();
+
+              // Heavily penalize DJ mixes, compilations, playlists, and generic hit collections
+              if (/dj mix|mixtape|today's hits|compilation|various artists/i.test(cName) || /dj mix|mixed|remix/i.test(tName)) {
+                score -= 50;
+              }
+              if (aName.includes(aLower)) score += 30;
+              if (tName === tLower) score += 40;
+              else if (tName.includes(tLower)) score += 20;
+              if (albLower && cName.includes(albLower)) score += 50;
+
+              if (score > bestScore) {
+                bestScore = score;
+                bestItem = item;
+              }
+            }
+
+            const chosen = bestItem || results[0];
+            const art100 = chosen.artworkUrl100;
             const highRes = art100 ? art100.replace("100x100bb", "600x600bb") : null;
             mediaArtworkCache.set(cacheKey, highRes);
             return resolve(highRes);
@@ -825,8 +854,11 @@ ipcMain.handle("get-system-media", async () => {
             const artistName = data.Artist || "Unknown Artist";
             let artworkUrl = data.Artwork || null;
 
-            if (!artworkUrl && songName !== "Unknown Title") {
-              artworkUrl = await fetchArtworkFallback(artistName, songName);
+            if (songName !== "Unknown Title") {
+              const exactArt = await fetchArtworkFallback(artistName, songName, data.Album);
+              if (exactArt) {
+                artworkUrl = exactArt;
+              }
             }
 
             resolve({

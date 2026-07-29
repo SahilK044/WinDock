@@ -267,7 +267,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 26 
         }
 
         const disp = displayRef.current;
-        const speed = amp > disp[i] ? 45 : 25;
+        const speed = amp > disp[i] ? 60 : 25;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
         const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);
@@ -381,7 +381,7 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
         }
 
         const disp = displayRef.current;
-        const speed = amp > disp[i] ? 45 : 25;
+        const speed = amp > disp[i] ? 60 : 25;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * speed);
         const barHeight = Math.max(2, disp[i] * height);
         const x = i * (barWidth + gap);

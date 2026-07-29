@@ -10,14 +10,16 @@ const { parentPort } = require("worker_threads");
 const FFT_SIZE = 1024; // ~21ms at 48kHz; lower latency matters for beat sync.
 const BAND_COUNT = 24;
 const POST_INTERVAL_MS = 16;
-const ATTACK = 0.95;
-const RELEASE = 0.50;
+const ATTACK = 1.0;
+const RELEASE = 0.65;
 const BEAT_COOLDOWN_MS = 120;
 const ONSET_HISTORY_SIZE = 48;
+const HOP_SIZE = 256; // Sliding window stride (~5.3ms at 48kHz)
 
 let ringBuffer = new Float32Array(FFT_SIZE);
 let writeIndex = 0;
 let filled = false;
+let samplesSinceLastFFT = 0;
 let sampleRate = 48000;
 let smoothedBands = new Float32Array(BAND_COUNT);
 let adaptiveFloor = new Float32Array(BAND_COUNT).fill(0.03);
@@ -216,9 +218,13 @@ parentPort.on("message", (msg) => {
     for (let i = 0; i < chunk.length; i++) {
       ringBuffer[writeIndex] = chunk[i];
       writeIndex = (writeIndex + 1) % FFT_SIZE;
-      if (writeIndex === 0) filled = true;
+      samplesSinceLastFFT++;
+      if (!filled && writeIndex === 0) filled = true;
     }
-    if (filled) processWindow();
+    if (filled && samplesSinceLastFFT >= HOP_SIZE) {
+      samplesSinceLastFFT = 0;
+      processWindow();
+    }
   } else if (msg?.type === "reset") {
     ringBuffer.fill(0);
     smoothedBands.fill(0);
@@ -232,6 +238,7 @@ parentPort.on("message", (msg) => {
     beatPulse = 0;
     lastBeatTime = 0;
     writeIndex = 0;
+    samplesSinceLastFFT = 0;
     filled = false;
   }
 });
