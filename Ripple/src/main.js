@@ -286,7 +286,31 @@ ipcMain.handle("launch-app", async (event, appName) => {
   if (platform === "darwin") {
     exec(`open -a "${appName}"`);
   } else if (platform === "win32") {
-    launchWindows(appName);
+    // Prefer the cached, discovery-resolved path (a real .exe found via the
+    // Start Menu, or a UWP shell:AppsFolder entry) over launching the bare
+    // name directly. Bare names get resolved by Windows via PATH, which
+    // includes %LOCALAPPDATA%\Microsoft\WindowsApps — where Microsoft Store
+    // apps register "App Execution Alias" stubs. A stale/orphaned alias
+    // (e.g. left over from a since-uninstalled Store version of an app)
+    // will try to resolve back to a dead AUMID and fail with a confusing
+    // "Windows cannot find '...'" error, even though the real desktop app
+    // is installed and already sitting in our cache with a working path.
+    let resolved = null;
+    try {
+      const cacheFile = path.join(app.getPath("userData"), "app-cache.json");
+      if (fs.existsSync(cacheFile)) {
+        const entries = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+        const q = appName.trim().toLowerCase();
+        // Exact name match first, then prefer a win32 (real .exe) entry
+        // over a uwp (shell:AppsFolder) entry if both exist for the name.
+        const matches = entries.filter((e) => e.name && e.name.toLowerCase() === q);
+        const win32Match = matches.find((e) => !e.launch.startsWith("shell:"));
+        resolved = (win32Match || matches[0])?.launch || null;
+      }
+    } catch {
+      // Cache missing/corrupt — fall through to raw-name resolution below.
+    }
+    launchWindows(resolved || appName);
   } else {
     exec(appName);
   }
@@ -543,6 +567,176 @@ app.whenReady().then(() => {
   }
 });
 
+const mediaArtworkCache = new Map();
+
+function getMediaScriptPath() {
+  const fs = require('fs');
+  const path = require('path');
+  const userDataScript = path.join(app.getPath('userData'), 'get_media.ps1');
+  const scriptContent = `
+[System.Reflection.Assembly]::LoadWithPartialName('System.Runtime.WindowsRuntime') | Out-Null
+$asTaskGeneric = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' }[0]
+
+function AwaitOperation($asyncOp, $type) {
+    $asTask = $asTaskGeneric.MakeGenericMethod($type)
+    $task = $asTask.Invoke($null, @($asyncOp))
+    $task.Wait()
+    return $task.Result
+}
+
+try {
+    $asyncOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]::RequestAsync()
+    $manager = AwaitOperation $asyncOp ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+    if ($manager) {
+        $sessions = @($manager.GetSessions())
+        $session = $sessions | Where-Object {
+            $_.SourceAppUserModelId -like '*Spotify*' -and
+            $_.GetPlaybackInfo().PlaybackStatus.ToString() -eq 'Playing'
+        } | Select-Object -First 1
+        if (-not $session) {
+            $session = $sessions | Where-Object { $_.SourceAppUserModelId -like '*Spotify*' } | Select-Object -First 1
+        }
+        if (-not $session) {
+            $session = $manager.GetCurrentSession()
+        }
+        if (-not $session) {
+            $session = $sessions | Where-Object {
+                $_.GetPlaybackInfo().PlaybackStatus.ToString() -eq 'Playing'
+            } | Select-Object -First 1
+        }
+        if (-not $session) { $session = $sessions | Select-Object -First 1 }
+        if ($session) {
+            $propsOp = $session.TryGetMediaPropertiesAsync()
+            $props = AwaitOperation $propsOp ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
+            $playback = $session.GetPlaybackInfo()
+            
+            $artwork = ""
+            if ($props.Thumbnail) {
+                try {
+                    $streamOp = $props.Thumbnail.OpenReadAsync()
+                    $stream = AwaitOperation $streamOp ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
+                    if ($stream) {
+                        $buffer = New-Object byte[] $stream.Size
+                        $reader = New-Object Windows.Storage.Streams.DataReader $stream
+                        $reader.LoadAsync($stream.Size).GetAwaiter().GetResult() | Out-Null
+                        $reader.ReadBytes($buffer)
+                        $artwork = 'data:image/png;base64,' + [Convert]::ToBase64String($buffer)
+                        $reader.Close()
+                        $stream.Close()
+                    }
+                } catch {}
+            }
+
+            $info = @{
+                Title = $props.Title
+                Artist = $props.Artist
+                Album = $props.AlbumTitle
+                Status = $playback.PlaybackStatus.ToString().ToLower()
+                Source = $session.SourceAppUserModelId
+                Artwork = $artwork
+            }
+            return $info | ConvertTo-Json -Compress
+        }
+    }
+} catch {}
+
+try {
+    $proc = Get-Process | Where-Object { $_.ProcessName -eq 'Spotify' -and $_.MainWindowTitle -ne '' } | Select-Object -First 1
+    if ($proc -and $proc.MainWindowTitle -like '*-*') {
+        $parts = $proc.MainWindowTitle -split ' - '
+        $artist = $parts[0]
+        $title = ($parts[1..($parts.Length-1)]) -join ' - '
+        $info = @{
+            Title = $title
+            Artist = $artist
+            Album = ''
+            Status = 'playing'
+            Source = 'Spotify'
+            Artwork = ''
+        }
+        return $info | ConvertTo-Json -Compress
+    }
+} catch {}
+
+return 'null'
+`;
+
+  try {
+    if (!fs.existsSync(userDataScript) || fs.readFileSync(userDataScript, 'utf8') !== scriptContent) {
+      fs.writeFileSync(userDataScript, scriptContent, 'utf8');
+    }
+  } catch (e) {}
+  return userDataScript;
+}
+
+async function fetchArtworkFallback(artist, title) {
+  if (!artist || !title || artist === "Unknown Artist" || title === "Unknown Title") return null;
+  const cacheKey = `${artist}-${title}`.toLowerCase();
+  if (mediaArtworkCache.has(cacheKey)) {
+    return mediaArtworkCache.get(cacheKey);
+  }
+
+  return new Promise((resolve) => {
+    const query = encodeURIComponent(`${artist} ${title}`);
+    const url = `https://itunes.apple.com/search?term=${query}&entity=song&limit=1`;
+    const https = require("https");
+    const req = https.get(url, { timeout: 2500 }, (res) => {
+      let body = "";
+      res.on("data", (chunk) => body += chunk);
+      res.on("end", () => {
+        try {
+          const data = JSON.parse(body);
+          if (data.results && data.results.length > 0) {
+            const art100 = data.results[0].artworkUrl100;
+            const highRes = art100 ? art100.replace("100x100bb", "600x600bb") : null;
+            mediaArtworkCache.set(cacheKey, highRes);
+            return resolve(highRes);
+          }
+        } catch (e) {}
+        mediaArtworkCache.set(cacheKey, null);
+        resolve(null);
+      });
+    });
+    req.on("error", () => {
+      mediaArtworkCache.set(cacheKey, null);
+      resolve(null);
+    });
+    req.on("timeout", () => {
+      req.destroy();
+      mediaArtworkCache.set(cacheKey, null);
+      resolve(null);
+    });
+  });
+}
+
+
+ipcMain.handle("control-system-media", async (event, command) => {
+  const platform = process.platform;
+  if (platform === "darwin") {
+    let script = "";
+    if (command === "playpause") {
+      script = 'tell application "System Events"\nif (name of every process) contains "Spotify" then\ntell application "Spotify" to playpause\nelse if (name of every process) contains "Music" then\ntell application "Music" to playpause\nend if\nend tell';
+    } else if (command === "next") {
+      script = 'tell application "System Events"\nif (name of every process) contains "Spotify" then\ntell application "Spotify" to next track\nelse if (name of every process) contains "Music" then\ntell application "Music" to next track\nend if\nend tell';
+    } else if (command === "previous") {
+      script = 'tell application "System Events"\nif (name of every process) contains "Spotify" then\ntell application "Spotify" to previous track\nelse if (name of every process) contains "Music" then\ntell application "Music" to previous track\nend if\nend tell';
+    }
+    exec(`osascript -e '${script}'`);
+  } else if (platform === "win32") {
+    let charCode = 179; // Play/Pause (VK_MEDIA_PLAY_PAUSE)
+    if (command === "previous" || command === "prev") charCode = 177; // Prev Track
+    else if (command === "next") charCode = 176; // Next Track
+
+    const psCommand = `(New-Object -ComObject WScript.Shell).SendKeys([char]${charCode})`;
+    exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
+  } else if (platform === "linux") {
+    let cmd = "playerctl play-pause";
+    if (command === "next") cmd = "playerctl next";
+    else if (command === "previous") cmd = "playerctl previous";
+    exec(cmd);
+  }
+});
+
 ipcMain.handle("get-system-media", async () => {
   return new Promise((resolve) => {
     const platform = process.platform;
@@ -610,59 +804,44 @@ ipcMain.handle("get-system-media", async () => {
         }
       });
     } else if (platform === "win32") {
-      const psScript = `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Add-Type -AssemblyName System.Runtime.WindowsRuntime; $manager = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]::RequestAsync().GetAwaiter().GetResult(); $session = $manager.GetCurrentSession(); if ($session) { $props = $session.TryGetMediaPropertiesAsync().GetAwaiter().GetResult(); $playback = $session.GetPlaybackInfo(); $status = $playback.PlaybackStatus; $thumbnail = $props.Thumbnail; $artwork = ''; if ($thumbnail) { try { $stream = $thumbnail.OpenReadAsync().GetAwaiter().GetResult(); $buffer = New-Object byte[] $stream.Size; $reader = New-Object Windows.Storage.Streams.DataReader $stream; $reader.LoadAsync($stream.Size).GetAwaiter().GetResult() | Out-Null; $reader.ReadBytes($buffer); $artwork = 'data:image/png;base64,' + [Convert]::ToBase64String($buffer); $reader.Close(); $stream.Close(); } catch { } } $info = @{ Title = $props.Title; Artist = $props.Artist; Album = $props.AlbumTitle; Status = $status.ToString().ToLower(); Source = $session.SourceAppUserModelId; Artwork = $artwork }; return $info | ConvertTo-Json -Compress; } return 'null';`;
+      const scriptPath = getMediaScriptPath();
       exec(
-        `powershell -NoProfile -Command "${psScript}"`,
-        { maxBuffer: 5 * 1024 * 1024, encoding: "utf8" },
-        (error, stdout) => {
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`,
+        { maxBuffer: 10 * 1024 * 1024, encoding: "utf8" },
+        async (error, stdout) => {
           if (
             error ||
             !stdout ||
             stdout.trim() === "null" ||
             stdout.trim() === "'null'"
           ) {
-            exec(
-              `powershell -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Process | Where-Object {$_.ProcessName -eq 'Spotify'} | Select-Object MainWindowTitle"`,
-              { encoding: "utf8" },
-              (err, out) => {
-                if (err || !out) return resolve(null);
-                const title = out
-                  .split("\n")
-                  .find((l) => l.includes("-"))
-                  ?.trim();
-                if (title) {
-                  const [artist, ...songParts] = title.split(" - ");
-                  const song = songParts.join(" - ");
-                  resolve({
-                    name: song || title,
-                    artist: artist || "Unknown",
-                    state: "playing",
-                    source: "Spotify",
-                  });
-                } else {
-                  resolve(null);
-                }
-              },
-            );
-            return;
+            return resolve(null);
           }
 
           try {
-            const data = JSON.parse(stdout);
+            const data = JSON.parse(stdout.trim());
+            const songName = data.Title || "Unknown Title";
+            const artistName = data.Artist || "Unknown Artist";
+            let artworkUrl = data.Artwork || null;
+
+            if (!artworkUrl && songName !== "Unknown Title") {
+              artworkUrl = await fetchArtworkFallback(artistName, songName);
+            }
+
             resolve({
-              name: data.Title || "Unknown Title",
-              artist: data.Artist || "Unknown Artist",
+              name: songName,
+              artist: artistName,
               album: data.Album || "",
-              artwork_url: data.Artwork || null,
-              state: data.Status === "playing" ? "playing" : "paused",
-              source: data.Source || "System",
+              artwork_url: artworkUrl,
+              state: (data.Status === "playing" || data.Status === "opened") ? "playing" : "paused",
+              source: data.Source || "Spotify",
             });
           } catch (e) {
             resolve(null);
           }
-        },
+        }
       );
-    } else if (platform === "linux") {
+  } else if (platform === "linux") {
       exec(
         'playerctl metadata --format "{{title}}||{{artist}}||{{album}}||{{status}}"',
         (err, stdout) => {
@@ -706,7 +885,7 @@ ipcMain.handle("get-bluetooth-status", async () => {
         if (error) return resolve(false);
         resolve(stdout.trim().toLowerCase() === "true");
       });
-    } else if (platform === "linux") {
+  } else if (platform === "linux") {
       exec("bluetoothctl devices Connected", (error, stdout) => {
         if (error) return resolve(false);
         resolve(stdout.trim().length > 0);
@@ -741,7 +920,7 @@ ipcMain.handle("get-camera-status", async () => {
         if (error) return resolve(false);
         resolve(stdout.trim().toLowerCase() === "true");
       });
-    } else if (platform === "linux") {
+  } else if (platform === "linux") {
       exec("fuser /dev/video* 2>/dev/null", (error, stdout) => {
         resolve(stdout.trim().length > 0);
       });
@@ -764,7 +943,7 @@ ipcMain.handle("get-microphone-status", async () => {
         if (error) return resolve(false);
         resolve(stdout.trim().toLowerCase() === "true");
       });
-    } else if (platform === "linux") {
+  } else if (platform === "linux") {
       exec("pactl list source-outputs | grep -q 'Source #'", (error) => {
         resolve(!error);
       });
@@ -781,87 +960,6 @@ app.on("window-all-closed", () => {
 });
 
 // System Media Controls Handler
-ipcMain.handle("control-system-media", async (event, command) => {
-  const platform = process.platform;
-  if (platform === "darwin") {
-    const script = `
-        tell application "System Events"
-            set spotifyRunning to (name of every process) contains "Spotify"
-            set musicRunning to (name of every process) contains "Music"
-        end tell
-        if spotifyRunning then
-            tell application "Spotify" to ${command} track
-        else if musicRunning then
-            tell application "Music" to ${command} track
-        end if
-        `;
-    exec(`osascript -e '${script}'`);
-  } else if (platform === "linux") {
-    let cmd = command;
-    if (command === "playpause") cmd = "play-pause";
-    exec(`playerctl ${cmd}`);
-  }
-});
-
-// --- Audio visualizer: WASAPI loopback capture + FFT worker ---------------
-//
-// Windows-only for now (see native/wasapi-loopback). The native addon reads
-// raw PCM off the default audio render device and hands it to a worker
-// thread here for FFT + banding, which then streams smoothed band levels to
-// the renderer. On non-Windows platforms `loopback.available` is false and
-// the renderer falls back to its metadata-driven visualizer automatically.
-const { Worker } = require("worker_threads");
-let loopback = null;
-try {
-  // Resolved as a normal node_modules dependency (see package.json ->
-  // "wasapi-loopback": "file:native/wasapi-loopback") rather than a relative
-  // path, since a relative require here breaks once Vite bundles main.js
-  // into .vite/build/ (the ".." would resolve from the wrong directory).
-  // As a real node_modules dependency it also gets picked up automatically
-  // by @electron-forge/plugin-auto-unpack-natives when packaged.
-  loopback = require("wasapi-loopback");
-} catch (err) {
-  loopback = { available: false, start: () => false, stop: () => false };
-}
-
-let audioWorker = null;
-let audioCaptureActive = false;
-let audioRefCount = 0; // multiple visualizer instances (mini pill + expanded view) can be mounted at once
-
-// __dirname inside the compiled main.js does NOT point at src/ (Vite bundles
-// main.js into .vite/build/), so a __dirname-relative path to audioWorker.js
-// resolves to the wrong folder. In dev, app.getAppPath() reliably returns the
-// project root (where package.json lives) regardless of where the bundled
-// output sits. In a packaged build we instead read it from extraResource
-// (see forge.config.js), which places a copy outside the asar archive —
-// worker_threads loading a script from inside an asar is unreliable, so we
-// deliberately keep this file unpacked rather than relying on that.
-function resolveAudioWorkerPath() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, "audioWorker.js");
-  }
-  return path.join(app.getAppPath(), "src", "audio", "audioWorker.js");
-}
-
-function ensureAudioWorker() {
-  if (audioWorker) return audioWorker;
-  const workerPath = resolveAudioWorkerPath();
-  if (!fs.existsSync(workerPath)) {
-    console.error(`[audio-worker] script not found at ${workerPath}`);
-    return null;
-  }
-  audioWorker = new Worker(workerPath);
-  audioWorker.on("message", (msg) => {
-    if (msg?.type === "bands" && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("audio-bands", msg.bands);
-    }
-  });
-  audioWorker.on("error", (err) => {
-    console.error("[audio-worker] error:", err);
-  });
-  return audioWorker;
-}
-
 ipcMain.handle("audio-viz-start", () => {
   if (!loopback.available) return { started: false, reason: "unsupported-platform" };
 
@@ -909,9 +1007,16 @@ function loadSpotifyConfig() {
   try {
     const fs = require('fs');
     const path = require('path');
-    const configPath = path.join(app.getAppPath(), "spotify-config.json");
-    if (fs.existsSync(configPath)) {
-      const data = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    const userPath = path.join(app.getPath('userData'), "spotify-config.json");
+    const appPath = path.join(app.getAppPath(), "spotify-config.json");
+    let targetPath = null;
+    if (fs.existsSync(userPath)) {
+      targetPath = userPath;
+    } else if (fs.existsSync(appPath)) {
+      targetPath = appPath;
+    }
+    if (targetPath) {
+      const data = JSON.parse(fs.readFileSync(targetPath, "utf-8"));
       spotifyConfig.clientId = data.SPOTIFY_CLIENT_ID || spotifyConfig.clientId;
       spotifyConfig.clientSecret = data.SPOTIFY_CLIENT_SECRET || spotifyConfig.clientSecret;
       spotifyConfig.apiKey = data.SPOTIFY_API_KEY || spotifyConfig.apiKey;
@@ -930,8 +1035,8 @@ ipcMain.handle("save-spotify-config", (event, newConfig) => {
     try {
       const fs = require('fs');
       const path = require('path');
-      const configPath = path.join(app.getAppPath(), "spotify-config.json");
-      fs.writeFileSync(configPath, JSON.stringify({
+      const userPath = path.join(app.getPath('userData'), "spotify-config.json");
+      fs.writeFileSync(userPath, JSON.stringify({
         SPOTIFY_CLIENT_ID: spotifyConfig.clientId,
         SPOTIFY_CLIENT_SECRET: spotifyConfig.clientSecret,
         SPOTIFY_API_KEY: spotifyConfig.apiKey,

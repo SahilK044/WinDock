@@ -32,6 +32,21 @@ function rgbToCss(r, g, b, a = 1) { return `rgba(${clampByte(r) | 0}, ${clampByt
 
 // Downsamples the artwork to a tiny canvas and buckets pixels to find a
 // vivid "primary" color and a darker "secondary" color for gradients.
+function ensureMinBrightness(colorStr, minLuminance = 140) {
+  if (!colorStr) return "rgba(225, 45, 45, 1)";
+  const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (!match) return colorStr;
+  let r = Number(match[1]), g = Number(match[2]), b = Number(match[3]), a = match[4] !== undefined ? Number(match[4]) : 1;
+  let max = Math.max(r, g, b);
+  if (max < minLuminance) {
+    let scale = minLuminance / Math.max(1, max);
+    r = Math.min(255, r * scale);
+    g = Math.min(255, g * scale);
+    b = Math.min(255, b * scale);
+  }
+  return `rgba(${r | 0}, ${g | 0}, ${b | 0}, ${a})`;
+}
+
 function extractPaletteFromImage(img) {
   try {
     const c = document.createElement("canvas");
@@ -165,12 +180,11 @@ function AlbumGlow({ paletteRef, isPlaying }) {
 // it doesn't have access to.
 const VIS_BAR_COUNT = 24;
 
-function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 }) {
+function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 220, height = 32 }) {
   const canvasRef = useRef(null);
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
-  const displayRef = useRef(new Float32Array(VIS_BAR_COUNT)); // eased for smooth rendering
+  const displayRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const usingRealAudioRef = useRef(false);
-  const isPlayingRef = useRef(isPlaying);
   const phasesRef = useRef(
     Array.from({ length: VIS_BAR_COUNT }, (_, i) => ({
       freq: 1.4 + (i % 5) * 0.35 + Math.random() * 0.2,
@@ -178,15 +192,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 
       speed: 1.6 + Math.random() * 1.2,
     }))
   );
-  const fallbackLevelRef = useRef(0);
 
-  // Keep isPlaying available to the draw loop without forcing the loop
-  // itself to tear down and restart on every play/pause toggle.
-  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
-
-  // Start/stop real audio capture whenever this visualizer is mounted
-  // (i.e. the Now Playing tab is open) and unsubscribe on unmount so we
-  // don't burn CPU capturing audio nobody is looking at.
   useEffect(() => {
     let unsubscribe = null;
     let cancelled = false;
@@ -229,32 +235,29 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 
       const barWidth = (width - gap * (VIS_BAR_COUNT - 1)) / VIS_BAR_COUNT;
       const t = now / 1000;
       const real = usingRealAudioRef.current;
-      const { primary: primaryColor, secondary: secondaryColor } = paletteRef.current;
-
-      // Fallback amplitude ramps toward play/pause state when we have no
-      // real audio pipeline (non-Windows, or addon failed to load/build).
-      const target = isPlayingRef.current ? 1 : 0;
-      fallbackLevelRef.current += (target - fallbackLevelRef.current) * Math.min(1, dt * 6);
+      const palette = paletteRef?.current || { primary: "#10b981", secondary: "#34d399" };
+      const primaryColor = ensureMinBrightness(palette.primary || "#10b981", 180);
+      const secondaryColor = ensureMinBrightness(palette.secondary || "#34d399", 140);
 
       ctx.clearRect(0, 0, width, height);
 
       for (let i = 0; i < VIS_BAR_COUNT; i++) {
-        let amp;
-        if (real) {
-          amp = bandsRef.current[i] || 0;
-        } else {
+        let amp = 0;
+        if (real && bandsRef.current && bandsRef.current[i] > 0.01) {
+          amp = Math.min(1.0, bandsRef.current[i] * 1.8);
+        }
+
+        if (!real || amp < 0.01) {
           const p = phasesRef.current[i];
           const wave =
             0.5 + 0.5 * Math.sin(t * p.speed * p.freq + p.phase) * 0.6 +
             0.25 * Math.sin(t * p.speed * 1.7 + p.phase * 1.3);
-          amp = Math.max(0.04, Math.min(1, wave)) * fallbackLevelRef.current;
+          amp = Math.max(0.25, Math.min(0.95, wave));
         }
 
-        // Light easing on top of the real data too, purely for visual
-        // smoothness between the ~60fps redraw and the audio-driven updates.
         const disp = displayRef.current;
         disp[i] += (amp - disp[i]) * Math.min(1, dt * 10);
-        const barHeight = Math.max(2, disp[i] * height);
+        const barHeight = Math.max(6, disp[i] * height);
 
         const x = i * (barWidth + gap);
         const y = height - barHeight;
@@ -280,13 +283,9 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-    // Deliberately NOT depending on paletteRef.current / isPlaying here —
-    // both are read live from refs each frame so the loop only needs to
-    // restart when the canvas itself is resized.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height]);
 
-  return <canvas ref={canvasRef} style={{ width, height, display: "block" }} />;
+  return <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, minWidth: `${width}px`, minHeight: `${height}px`, display: "block", position: "relative", zIndex: 50 }} />;
 }
 
 // ---- Mini visualizer for the compact/small pill mode -----------------------
@@ -298,7 +297,7 @@ function AlbumAudioVisualizer({ isPlaying, paletteRef, width = 175, height = 28 
 // doesn't have.
 const MINI_BAR_COUNT = 4;
 
-function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 }) {
+function MiniAudioVisualizer({ isPlaying, paletteRef, width = 22, height = 16 }) {
   const canvasRef = useRef(null);
   const bandsRef = useRef(new Float32Array(VIS_BAR_COUNT));
   const displayRef = useRef(new Float32Array(MINI_BAR_COUNT));
@@ -345,32 +344,39 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
-      const gap = 2;
+      const gap = 2.5;
       const barWidth = (width - gap * (MINI_BAR_COUNT - 1)) / MINI_BAR_COUNT;
       const real = usingRealAudioRef.current;
-      const { primary: primaryColor, secondary: secondaryColor } = paletteRef.current;
+      const palette = paletteRef?.current || { primary: "#10b981", secondary: "#34d399" };
+      const primaryColor = ensureMinBrightness(palette.primary || "#10b981", 180);
+      const secondaryColor = ensureMinBrightness(palette.secondary || "#34d399", 140);
 
       ctx.clearRect(0, 0, width, height);
 
+      const timeSec = now / 1000;
+      const playing = isPlayingRef.current;
+
       for (let i = 0; i < MINI_BAR_COUNT; i++) {
-        let amp;
-        if (real) {
-          // Cluster the 24 full-res bands into 4 (bass -> treble) by averaging.
+        let amp = 0.15;
+        if (real && bandsRef.current && bandsRef.current.length > 0) {
           const clusterSize = VIS_BAR_COUNT / MINI_BAR_COUNT;
           const start = Math.floor(i * clusterSize);
           const end = Math.floor((i + 1) * clusterSize);
           let sum = 0, count = 0;
           for (let b = start; b < end; b++) { sum += bandsRef.current[b] || 0; count++; }
-          amp = count > 0 ? sum / count : 0;
-        } else {
-          // No real audio pipeline: rest at a fixed height that only
-          // reflects play/pause state — no invented motion.
-          amp = isPlayingRef.current ? (0.45 + i * 0.08) : 0.12;
+          amp = count > 0 ? Math.min(1.0, (sum / count) * 1.8) : 0;
+        }
+
+        if (!real || amp < 0.01) {
+          const phaseShift = i * 0.85;
+          const wave1 = Math.sin(timeSec * 7.5 + phaseShift) * 0.35 + 0.5;
+          const wave2 = Math.cos(timeSec * 11.2 - phaseShift) * 0.25;
+          amp = Math.max(0.35, Math.min(0.95, wave1 + wave2));
         }
 
         const disp = displayRef.current;
-        disp[i] += (amp - disp[i]) * Math.min(1, dt * 8);
-        const barHeight = Math.max(2, disp[i] * height);
+        disp[i] += (amp - disp[i]) * Math.min(1, dt * 12);
+        const barHeight = Math.max(isPlayingRef.current ? 5 : 2, disp[i] * height);
 
         const x = i * (barWidth + gap);
         const y = height - barHeight;
@@ -396,10 +402,9 @@ function MiniAudioVisualizer({ isPlaying, paletteRef, width = 16, height = 14 })
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height]);
 
-  return <canvas ref={canvasRef} style={{ width, height, display: "block", flexShrink: 0 }} />;
+  return <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, minWidth: `${width}px`, minHeight: `${height}px`, display: "block", flexShrink: 0, zIndex: 50 }} />;
 }
 
 const WeatherIcon = ({ status, size = 16, color = "currentColor" }) => {
@@ -753,7 +758,7 @@ export default function Island() {
     }, 800);
   };
 
-  let isPlaying = spotifyTrack?.state === 'playing';
+  let isPlaying = !!spotifyTrack?.state && String(spotifyTrack.state).toLowerCase() === 'playing' || (!!spotifyTrack?.name && String(spotifyTrack?.state).toLowerCase() !== 'paused');
   const nowPlayingText = spotifyTrack?.name ? `${spotifyTrack.name}${spotifyTrack.artist ? ` • ${spotifyTrack.artist}` : ''}` : '';
   const textWidth = measureTextWidth(nowPlayingText) || (nowPlayingText.length * 7);
   const hoverExtraWidth = 36;
@@ -761,11 +766,11 @@ export default function Island() {
     300,
     Math.max(
       122,
-      Math.ceil(textWidth + 24 + 6 + 20)
+      Math.ceil(textWidth + 24 + 6 + 26 + 20)
     )
   );
   let width = mode === "large"
-    ? (currentTab === 7 ? 495 : currentTab === 1 ? 480 : currentTab === 3 ? 330 : currentTab === 0 ? 405 : 380)
+    ? (currentTab === 7 ? 495 : currentTab === 1 ? 480 : currentTab === 3 ? 335 : currentTab === 0 ? 405 : 380)
     : (mode === "quick" && isPlaying && !alert && !chargingAlert && !bluetoothAlert && !cameraAlert && !microphoneAlert)
       ? nowPlayingWidth
       : (mode === "quick" || alert || chargingAlert || bluetoothAlert || cameraAlert || microphoneAlert)
@@ -773,7 +778,7 @@ export default function Island() {
         : isPlaying
           ? nowPlayingWidth
           : 170;
-  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 150 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
+  let height = mode === "large" ? (currentTab === 7 ? (positionMode === "free" ? 425 : 345) : currentTab === 6 ? 250 : currentTab === 3 ? 140 : currentTab === 0 ? 120 : currentTab === 1 ? 210 : 190) : 40;
 
   const normalizeApps = (arr) => arr.map(a => typeof a === 'string' ? { name: a, launch: a } : a);
   const [quickApps, setQuickApps] = useState(() =>
@@ -1577,7 +1582,12 @@ export default function Island() {
           document.activeElement.blur();
         }
 
-        setMode(prev => prev === "large" ? "quick" : "large");
+        setMode(prev => {
+          if (prev !== "large" && isMusicActive) {
+            setTabState([3, 0]);
+          }
+          return prev === "large" ? "quick" : "large";
+        });
         if (window.electronAPI) {
           window.electronAPI.setIgnoreMouseEvents(false, false);
         }
@@ -1710,12 +1720,7 @@ export default function Island() {
                     <Music size={14} color={textColor} />
                   </div>
                 )}
-                {spotifyTrack && (
-                  <MiniAudioVisualizer
-                    isPlaying={spotifyTrack.state === 'playing'}
-                    paletteRef={albumPaletteRef}
-                  />
-                )}
+
                 <div style={{
                   flex: 1,
                   minWidth: 0,
@@ -1753,6 +1758,16 @@ export default function Island() {
                     )}
                   </motion.div>
                 </div>
+                {spotifyTrack && (
+                  <div style={{ marginLeft: 6, marginRight: 4, display: 'flex', alignItems: 'center', flexShrink: 0, zIndex: 10 }}>
+                    <MiniAudioVisualizer
+                      isPlaying={isPlaying}
+                      paletteRef={albumPaletteRef}
+                      width={22}
+                      height={16}
+                    />
+                  </div>
+                )}
                 <AnimatePresence>
                   {isHovered && (
                     <motion.button
@@ -2070,7 +2085,7 @@ export default function Island() {
               }}>
                 {/* Album-art color wash — fades smoothly track-to-track, updates via its own rAF loop instead of React state so it doesn't re-render the rest of the Island */}
                 {spotifyTrack?.artwork_url && (
-                  <AlbumGlow paletteRef={albumPaletteRef} isPlaying={spotifyTrack.state === 'playing'} />
+                  <AlbumGlow paletteRef={albumPaletteRef} isPlaying={isPlaying} />
                 )}
                 <AnimatePresence mode="wait">
                   {spotifyTrack ? (
@@ -2086,8 +2101,9 @@ export default function Island() {
                         justifyContent: 'flex-start',
                         width: '100%',
                         height: '100%',
-                        gap: '8px',
-                        paddingLeft: '17px',
+                        gap: '14px',
+                        padding: '10px 16px',
+                        boxSizing: 'border-box',
                         opacity: spotifyTrack.state === 'playing' ? 1 : 0.5,
                         filter: spotifyTrack.state === 'playing' ? 'none' : 'grayscale(1)',
                         transition: 'opacity 0.3s ease, filter 0.3s ease'
@@ -2097,7 +2113,7 @@ export default function Island() {
                         <img
                           ref={albumRef}
                           src={spotifyTrack.artwork_url}
-                          onClick={() => openMusicPlayer(spotifyTrack.source)}
+                          onClick={(e) => { e.stopPropagation(); openMusicPlayer(spotifyTrack.source); }}
                           onMouseEnter={() => setAlbumHovered(true)}
                           onMouseLeave={() => {
                             setAlbumHovered(false);
@@ -2117,9 +2133,9 @@ export default function Island() {
                             }
                           }}
                           style={{
-                            width: 110, height: 110, minWidth: 110,
+                            width: 78, height: 78, minWidth: 78,
                             flexShrink: 0,
-                            borderRadius: 13, objectFit: 'cover',
+                            borderRadius: 12, objectFit: 'cover',
                             boxShadow: albumHovered ? '0 8px 24px rgba(0,0,0,0.35)' : '0 4px 12px rgba(0,0,0,0.2)',
                             cursor: 'pointer',
                             transition: 'transform 0.3s ease-out, box-shadow 0.3s ease-out',
@@ -2129,13 +2145,13 @@ export default function Island() {
                         />
                       ) : (
                         <div style={{
-                          width: 110, height: 110, minWidth: 110,
+                          width: 78, height: 78, minWidth: 78,
                           flexShrink: 0,
                           borderRadius: 12, background: 'rgba(255,255,255,0.1)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 24
                         }}>
-                          <Music size={40} color={textColor} />
+                          <Music size={32} color={textColor} />
                         </div>
                       )}
 
@@ -2149,102 +2165,108 @@ export default function Island() {
                         minWidth: 0,
                       }}>
                         <div style={{ 
-                          width: '175px', 
+                          width: '185px', 
                           overflow: 'hidden',
-                          WebkitMaskImage: measureTextWidth(spotifyTrack.name, 18) > 175 
-                            ? 'linear-gradient(to right, transparent, black 15px, black 160px, transparent)' 
+                          WebkitMaskImage: measureTextWidth(spotifyTrack.name, 15) > 185 
+                            ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none',
-                          maskImage: measureTextWidth(spotifyTrack.name, 18) > 175 
-                            ? 'linear-gradient(to right, transparent, black 15px, black 160px, transparent)' 
+                          maskImage: measureTextWidth(spotifyTrack.name, 15) > 185 
+                            ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none'
                         }}>
                           <motion.h2
-                            animate={measureTextWidth(spotifyTrack.name, 18) > 175 ? { x: [0, -(measureTextWidth(spotifyTrack.name, 18) + 30)] } : {}}
+                            animate={measureTextWidth(spotifyTrack.name, 15) > 185 ? { x: [0, -(measureTextWidth(spotifyTrack.name, 15) + 30)] } : {}}
                             transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                             style={{
-                              margin: '0 0 0 5px',
-                              fontSize: 18,
+                              margin: '0 0 0 0px',
+                              fontSize: 15,
                               fontWeight: 600,
                               whiteSpace: 'nowrap',
                               display: 'inline-block',
                               color: textColor,
                               fontFamily: theme === "win95" ? "w95" : "OpenRunde"
                             }}>
-                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.name, 18) > 175 ? 30 : 0 }}>{spotifyTrack.name || "Unknown Title"}</span>
-                            {measureTextWidth(spotifyTrack.name, 18) > 175 && (
+                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.name, 15) > 185 ? 30 : 0 }}>{spotifyTrack.name || "Unknown Title"}</span>
+                            {measureTextWidth(spotifyTrack.name, 15) > 185 && (
                               <span style={{ paddingRight: 30 }}>{spotifyTrack.name || "Unknown Title"}</span>
                             )}
                           </motion.h2>
                         </div>
                         <div style={{ 
-                          width: '175px', 
+                          width: '185px', 
                           overflow: 'hidden',
-                          WebkitMaskImage: measureTextWidth(spotifyTrack.artist, 13) > 175 
-                            ? 'linear-gradient(to right, transparent, black 15px, black 160px, transparent)' 
+                          WebkitMaskImage: measureTextWidth(spotifyTrack.artist, 12) > 185 
+                            ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none',
-                          maskImage: measureTextWidth(spotifyTrack.artist, 13) > 175 
-                            ? 'linear-gradient(to right, transparent, black 15px, black 160px, transparent)' 
+                          maskImage: measureTextWidth(spotifyTrack.artist, 12) > 185 
+                            ? 'linear-gradient(to right, transparent, black 15px, black 170px, transparent)' 
                             : 'none'
                         }}>
                           <motion.p
-                            animate={measureTextWidth(spotifyTrack.artist, 13) > 175 ? { x: [0, -(measureTextWidth(spotifyTrack.artist, 13) + 30)] } : {}}
+                            animate={measureTextWidth(spotifyTrack.artist, 12) > 185 ? { x: [0, -(measureTextWidth(spotifyTrack.artist, 12) + 30)] } : {}}
                             transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                             style={{
-                              margin: '4px 0 0 5px',
-                              fontSize: 13,
+                              margin: '1px 0 0 0px',
+                              fontSize: 12,
                               opacity: 0.8,
                               whiteSpace: 'nowrap',
                               display: 'inline-block',
                               color: textColor,
                               fontFamily: theme === "win95" ? "w95" : "OpenRunde"
                             }}>
-                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.artist, 13) > 175 ? 30 : 0 }}>{spotifyTrack.artist || "Unknown Artist"}</span>
-                            {measureTextWidth(spotifyTrack.artist, 13) > 175 && (
+                            <span style={{ paddingRight: measureTextWidth(spotifyTrack.artist, 12) > 185 ? 30 : 0 }}>{spotifyTrack.artist || "Unknown Artist"}</span>
+                            {measureTextWidth(spotifyTrack.artist, 12) > 185 && (
                               <span style={{ paddingRight: 30 }}>{spotifyTrack.artist || "Unknown Artist"}</span>
                             )}
                           </motion.p>
                         </div>
-                        <div style={{ marginTop: 8, marginLeft: 5 }}>
+                        <div style={{ marginTop: 2, marginBottom: 2, marginLeft: 0, display: 'flex', alignItems: 'center', minHeight: 16, width: '185px' }}>
                           <AlbumAudioVisualizer
-                            isPlaying={spotifyTrack.state === 'playing'}
+                            isPlaying={isPlaying}
                             paletteRef={albumPaletteRef}
-                            width={175}
-                            height={26}
+                            width={185}
+                            height={16}
                           />
                         </div>
-                        <div style={{ display: 'flex', gap: 15, marginTop: 10, alignItems: 'center', marginLeft: 5 }}>
+                        <div style={{ display: 'flex', gap: 14, marginTop: 2, alignItems: 'center', justifyContent: 'center', width: '185px' }}>
                           <button
                             className="media-btn"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               window.electronAPI.controlSystemMedia('previous');
                             }}
-                            style={{ background: 'none', border: 'none', color: textColor, cursor: 'pointer', padding: 4, opacity: 0.8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          ><SkipBackIcon size={20} color={textColor} fill={textColor} /></button>
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 5, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+                          ><SkipBackIcon size={16} color={textColor} fill={textColor} /></button>
                           <button
                             className="media-btn"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               window.electronAPI.controlSystemMedia('playpause');
                             }}
                             style={{
-                              background: 'none',
-                              border: 'none',
+                              background: 'rgba(255,255,255,0.18)',
+                              border: '1px solid rgba(255,255,255,0.25)',
+                              borderRadius: '50%',
                               color: textColor,
                               cursor: 'pointer',
-                              padding: 4,
+                              padding: 6,
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'center'
+                              justifyContent: 'center',
+                              transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                             }}
                           >
-                            {spotifyTrack.state === 'playing' ? <Pause size={24} color={textColor} fill={textColor} /> : <Play size={24} color={textColor} fill={textColor} />}
+                            {spotifyTrack.state === 'playing' ? <Pause size={18} color={textColor} fill={textColor} /> : <Play size={18} color={textColor} fill={textColor} />}
                           </button>
                           <button
                             className="media-btn"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               window.electronAPI.controlSystemMedia('next');
                             }}
-                            style={{ background: 'none', border: 'none', color: textColor, cursor: 'pointer', padding: 4, opacity: 0.8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          ><SkipForwardIcon size={20} color={textColor} fill={textColor} /></button>
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', color: textColor, cursor: 'pointer', padding: 5, opacity: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+                          ><SkipForwardIcon size={16} color={textColor} fill={textColor} /></button>
                         </div>
                       </div>
                     </motion.div>
