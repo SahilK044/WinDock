@@ -680,6 +680,40 @@ return 'null'
   return userDataScript;
 }
 
+function fetchYouTubeThumbnail(artist, title) {
+  return new Promise((resolve) => {
+    const https = require("https");
+    const q = encodeURIComponent(`${title} ${artist}`.trim());
+    const url = `https://www.youtube.com/results?search_query=${q}`;
+    const req = https.get(
+      url,
+      {
+        timeout: 3500,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk) => (body += chunk));
+        res.on("end", () => {
+          const m = body.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+          if (m && m[1]) {
+            return resolve(`https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg`);
+          }
+          resolve(null);
+        });
+      },
+    );
+    req.on("error", () => resolve(null));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(null);
+    });
+  });
+}
+
 async function fetchArtworkFallback(artist, title, album) {
   if (!artist || !title || artist === "Unknown Artist" || title === "Unknown Title") return null;
   const cacheKey = `${artist}-${title}-${album || ''}`.toLowerCase();
@@ -687,7 +721,7 @@ async function fetchArtworkFallback(artist, title, album) {
     return mediaArtworkCache.get(cacheKey);
   }
 
-  return new Promise((resolve) => {
+  let art = await new Promise((resolve) => {
     const query = encodeURIComponent(`${artist} ${title} ${album || ''}`.trim());
     const url = `https://itunes.apple.com/search?term=${query}&entity=song&limit=10`;
     const https = require("https");
@@ -711,7 +745,6 @@ async function fetchArtworkFallback(artist, title, album) {
               const aName = (item.artistName || '').toLowerCase();
               const cName = (item.collectionName || '').toLowerCase();
 
-              // Heavily penalize DJ mixes, compilations, playlists, and generic hit collections
               if (/dj mix|mixtape|today's hits|compilation|various artists/i.test(cName) || /dj mix|mixed|remix/i.test(tName)) {
                 score -= 50;
               }
@@ -729,24 +762,26 @@ async function fetchArtworkFallback(artist, title, album) {
             const chosen = bestItem || results[0];
             const art100 = chosen.artworkUrl100;
             const highRes = art100 ? art100.replace("100x100bb", "600x600bb") : null;
-            mediaArtworkCache.set(cacheKey, highRes);
             return resolve(highRes);
           }
         } catch (e) {}
-        mediaArtworkCache.set(cacheKey, null);
         resolve(null);
       });
     });
-    req.on("error", () => {
-      mediaArtworkCache.set(cacheKey, null);
-      resolve(null);
-    });
+    req.on("error", () => resolve(null));
     req.on("timeout", () => {
       req.destroy();
-      mediaArtworkCache.set(cacheKey, null);
       resolve(null);
     });
   });
+
+  // If iTunes returned no artwork (e.g. YouTube video or non-iTunes track), fetch YouTube Video Thumbnail
+  if (!art) {
+    art = await fetchYouTubeThumbnail(artist, title);
+  }
+
+  mediaArtworkCache.set(cacheKey, art);
+  return art;
 }
 
 
