@@ -79,22 +79,9 @@ function extractPaletteFromImage(img) {
     }
     if (n === 0) return null;
 
-    let secondBestScore = -1, sr = 0, sg = 0, sb = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-      if (a < 32) continue;
-      const dist = Math.abs(r - vr) + Math.abs(g - vg) + Math.abs(b - vb);
-      if (dist < 40) continue;
-      const max = Math.max(r, g, b), min = Math.min(r, g, b);
-      const sat = max === 0 ? 0 : (max - min) / max;
-      const lum = (r + g + b) / 3;
-      const score = sat * (1 - Math.abs(lum - 128) / 128);
-      if (score > secondBestScore) { secondBestScore = score; sr = r; sg = g; sb = b; }
-    }
-
     const avgR = rSum / n, avgG = gSum / n, avgB = bSum / n;
     const primary = bestScore > 0.08 ? [vr, vg, vb] : [avgR, avgG, avgB];
-    const secondary = secondBestScore > 0.05 ? [sr, sg, sb] : [avgR * 0.6, avgG * 0.6, avgB * 0.6];
+    const secondary = [avgR * 0.35, avgG * 0.35, avgB * 0.35];
     return { primary, secondary };
   } catch (err) {
     return null;
@@ -102,14 +89,14 @@ function extractPaletteFromImage(img) {
 }
 
 function useAlbumPalette(artworkUrl) {
-  const targetRef = useRef({ primary: [16, 185, 129], secondary: [52, 211, 153] });
-  const currentRef = useRef({ primary: [16, 185, 129], secondary: [52, 211, 153] });
-  const paletteRef = useRef({ primary: "rgba(16,185,129,1)", secondary: "rgba(52,211,153,1)" });
+  const targetRef = useRef({ primary: [120, 120, 130], secondary: [30, 30, 35] });
+  const currentRef = useRef({ primary: [120, 120, 130], secondary: [30, 30, 35] });
+  const paletteRef = useRef({ primary: "rgba(120,120,130,1)", secondary: "rgba(30,30,35,1)" });
 
   useEffect(() => {
     let cancelled = false;
     if (!artworkUrl) {
-      targetRef.current = { primary: [16, 185, 129], secondary: [52, 211, 153] };
+      targetRef.current = { primary: [120, 120, 130], secondary: [30, 30, 35] };
       return;
     }
     const img = new Image();
@@ -125,7 +112,7 @@ function useAlbumPalette(artworkUrl) {
   }, [artworkUrl]);
 
   useEffect(() => {
-    const FADE_SPEED = 0.08;
+    const FADE_SPEED = 0.06;
     let raf;
     const tick = () => {
       const cur = currentRef.current;
@@ -152,7 +139,7 @@ function AlbumGlow({ paletteRef, isPlaying }) {
       const el = glowRef.current;
       if (el) {
         const { primary, secondary } = paletteRef.current;
-        el.style.background = `radial-gradient(circle at 20% 25%, ${primary} 0%, transparent 65%), radial-gradient(circle at 80% 75%, ${secondary} 0%, transparent 70%), linear-gradient(135deg, rgba(12,12,18,0.92) 0%, rgba(22,22,32,0.92) 100%)`;
+        el.style.background = `radial-gradient(circle at 15% 50%, ${primary} 0%, ${secondary} 70%)`;
       }
       raf = requestAnimationFrame(tick);
     };
@@ -163,16 +150,13 @@ function AlbumGlow({ paletteRef, isPlaying }) {
   return (
     <div
       ref={glowRef}
-      className="album-ambient-glow"
       style={{
         position: 'absolute',
         inset: 0,
-        borderRadius: 'inherit',
-        opacity: isPlaying ? 0.85 : 0.20,
-        transition: 'opacity 0.8s ease-in-out, background 0.8s ease-in-out',
+        opacity: isPlaying ? 0.35 : 0.15,
+        transition: 'opacity 0.6s ease',
         pointerEvents: 'none',
-        zIndex: 0,
-        overflow: 'hidden'
+        zIndex: 0
       }}
     />
   );

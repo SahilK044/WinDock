@@ -881,22 +881,3 @@ button:focus-visible {
   display: inline-block;
   white-space: nowrap;
 }
-
-.album-ambient-glow {
-  animation: ambientMeshGlow 14s ease-in-out infinite alternate;
-}
-
-@keyframes ambientMeshGlow {
-  0% {
-    filter: hue-rotate(0deg) scale(1);
-    transform: rotate(0deg);
-  }
-  50% {
-    filter: hue-rotate(15deg) scale(1.04);
-    transform: rotate(2deg);
-  }
-  100% {
-    filter: hue-rotate(-10deg) scale(1);
-    transform: rotate(-1deg);
-  }
-}
