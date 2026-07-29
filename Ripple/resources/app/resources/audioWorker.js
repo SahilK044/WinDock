@@ -148,7 +148,7 @@ function processWindow() {
       count++;
     }
     const avg = count > 0 ? sum / count : 0;
-    rawBands[b] = Math.min(1, Math.log10(1 + avg * 40) / 2.2);
+    rawBands[b] = Math.min(1, Math.log10(1 + avg * 250) / 1.8);
   }
 
   let bassLevel = 0;
@@ -165,11 +165,11 @@ function processWindow() {
   for (let b = 0; b < BAND_COUNT; b++) {
     const raw = rawBands[b];
     const floorRate = raw < adaptiveFloor[b] ? 0.08 : 0.003;
-    const peakRate = raw > adaptivePeak[b] ? 0.16 : 0.004;
+    const peakRate = raw > adaptivePeak[b] ? 0.25 : 0.004;
     adaptiveFloor[b] += (raw - adaptiveFloor[b]) * floorRate;
     adaptivePeak[b] += (raw - adaptivePeak[b]) * peakRate;
-    const range = Math.max(0.09, adaptivePeak[b] - adaptiveFloor[b]);
-    rawBands[b] = Math.max(0, Math.min(1, (raw - adaptiveFloor[b] * 0.95) / range));
+    const range = Math.max(0.04, adaptivePeak[b] - adaptiveFloor[b]);
+    rawBands[b] = Math.max(0, Math.min(1, (raw - adaptiveFloor[b] * 0.75) / range));
   }
 
   const bassAttack = Math.max(0, bassLevel - bassEnvelope);
