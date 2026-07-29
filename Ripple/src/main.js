@@ -100,10 +100,9 @@ Get-StartApps -EA SilentlyContinue | ForEach-Object {
 // Converts provider-specific shapes to { name, launch } and deduplicates.
 // win32: launch = exe path   |   uwp: launch = shell:AppsFolder\\appId
 async function buildCache() {
-  const [startMenu, uwp] = await Promise.all([
-    discoverStartMenu(),
-    discoverUWP(),
-  ]);
+  // Run startMenu and UWP sequentially to avoid CPU spikes on startup
+  const startMenu = await discoverStartMenu();
+  const uwp = await discoverUWP();
   const seen = new Set();
   const entries = [];
   for (const item of [...startMenu, ...uwp]) {
@@ -327,12 +326,20 @@ ipcMain.handle("launch-app", async (event, appName) => {
 ipcMain.handle("build-app-cache", async () => {
   if (process.platform !== "win32") return;
   const cacheFile = path.join(app.getPath("userData"), "app-cache.json");
-  try {
-    const entries = await buildCache();
-    fs.writeFileSync(cacheFile, JSON.stringify(entries));
-  } catch {
-    // Silently ignore cache build failures
+  // If app cache already exists on disk, load instantly with 0ms startup delay
+  if (fs.existsSync(cacheFile)) {
+    try {
+      const stats = fs.statSync(cacheFile);
+      if (stats.size > 100) return;
+    } catch {}
   }
+  // Schedule background index building after 12s idle delay on first run
+  setTimeout(async () => {
+    try {
+      const entries = await buildCache();
+      fs.writeFileSync(cacheFile, JSON.stringify(entries));
+    } catch {}
+  }, 12000);
 });
 
 ipcMain.handle("search-apps", async (event, query) => {
@@ -577,10 +584,10 @@ app.whenReady().then(() => {
 });
 
 const mediaArtworkCache = new Map();
+let cachedScriptPath = null;
 
 function getMediaScriptPath() {
-  const fs = require('fs');
-  const path = require('path');
+  if (cachedScriptPath && fs.existsSync(cachedScriptPath)) return cachedScriptPath;
   const userDataScript = path.join(app.getPath('userData'), 'get_media.ps1');
   const scriptContent = `
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -677,6 +684,7 @@ return 'null'
       fs.writeFileSync(userDataScript, '\uFEFF' + scriptContent, 'utf8');
     }
   } catch (e) {}
+  cachedScriptPath = userDataScript;
   return userDataScript;
 }
 
@@ -816,8 +824,17 @@ ipcMain.handle("control-system-media", async (event, command) => {
   }
 });
 
+let isPollingMedia = false;
+
 ipcMain.handle("get-system-media", async () => {
+  if (isPollingMedia) return null;
+  isPollingMedia = true;
+
   return new Promise((resolve) => {
+    const done = (res) => {
+      isPollingMedia = false;
+      resolve(res);
+    };
     const platform = process.platform;
 
     if (platform === "darwin") {
@@ -861,16 +878,16 @@ ipcMain.handle("get-system-media", async () => {
             `;
       exec(`osascript -e '${script}'`, (error, stdout) => {
         if (error) {
-          return resolve(null);
+          return done(null);
         }
         const output = stdout.trim();
 
         if (!output || output === "None" || output === "Error")
-          return resolve(null);
+          return done(null);
 
         const parts = output.split("||");
         if (parts.length >= 4) {
-          resolve({
+          done({
             name: parts[2],
             artist: parts[3],
             album: parts[4],
@@ -879,7 +896,7 @@ ipcMain.handle("get-system-media", async () => {
             source: parts[0],
           });
         } else {
-          resolve(null);
+          done(null);
         }
       });
     } else if (platform === "win32") {
@@ -894,7 +911,7 @@ ipcMain.handle("get-system-media", async () => {
             stdout.trim() === "null" ||
             stdout.trim() === "'null'"
           ) {
-            return resolve(null);
+            return done(null);
           }
 
           try {
@@ -913,7 +930,7 @@ ipcMain.handle("get-system-media", async () => {
               }
             }
 
-            resolve({
+            done({
               name: songName,
               artist: artistName,
               album: data.Album || "",
@@ -922,7 +939,7 @@ ipcMain.handle("get-system-media", async () => {
               source: data.Source || "Spotify",
             });
           } catch (e) {
-            resolve(null);
+            done(null);
           }
         }
       );
@@ -930,19 +947,20 @@ ipcMain.handle("get-system-media", async () => {
       exec(
         'playerctl metadata --format "{{title}}||{{artist}}||{{album}}||{{status}}"',
         (err, stdout) => {
-          if (err || !stdout) return resolve(null);
+          if (err || !stdout) return done(null);
           const parts = stdout.trim().split("||");
-          resolve({
+          done({
             name: parts[0],
             artist: parts[1],
             album: parts[2],
-            state: parts[3].toLowerCase(),
-            source: "System",
+            artwork_url: null,
+            state: parts[3]?.toLowerCase() === "playing" ? "playing" : "paused",
+            source: "playerctl",
           });
         },
       );
     } else {
-      resolve(null);
+      done(null);
     }
   });
 });
