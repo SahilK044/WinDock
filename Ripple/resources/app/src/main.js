@@ -1019,13 +1019,22 @@ try {
     for (const candidate of addonCandidates) {
       try {
         if (fs.existsSync(candidate)) {
-          loopback = require(candidate);
-          break;
+          const addon = require(candidate);
+          if (addon && typeof addon.start === "function") {
+            loopback = addon;
+            loopback.available = true;
+            console.log("[WASAPI] Loaded native loopback addon from:", candidate);
+            break;
+          }
         }
-      } catch { /* try next candidate */ }
+      } catch (err) {
+        console.error("[WASAPI] Error loading candidate:", candidate, err);
+      }
     }
   }
-} catch { /* no native addon – fall through to silent fallback */ }
+} catch (err) {
+  console.error("[WASAPI] Addon initialization error:", err);
+}
 
 let audioWorker = null;
 let audioCaptureActive = false;
@@ -1074,8 +1083,9 @@ function ensureAudioWorker() {
 
 // Audio visualizer IPC handlers
 ipcMain.handle("audio-viz-start", () => {
-
-  if (!loopback.available) return { started: false, reason: "unsupported-platform" };
+  if (!loopback || (!loopback.available && typeof loopback.start !== "function")) {
+    return { started: false, reason: "unsupported-platform" };
+  }
 
   audioRefCount++;
   if (audioCaptureActive) return { started: true };
@@ -1090,8 +1100,9 @@ ipcMain.handle("audio-viz-start", () => {
       [pcmFloat32.buffer]
     );
   });
-  audioCaptureActive = started;
-  return { started };
+  audioCaptureActive = !!started;
+  console.log("[WASAPI] Native audio capture started successfully:", audioCaptureActive);
+  return { started: audioCaptureActive };
 });
 
 ipcMain.handle("audio-viz-stop", () => {
