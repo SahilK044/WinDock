@@ -1309,7 +1309,7 @@ namespace MacStyleDock
 
 		public static double activeTemperature = 22.5;
 
-
+		public static string activeTemperatureUnit = "C";
 
 		public static int activeWeatherCode = 0;
 
@@ -2567,6 +2567,7 @@ namespace MacStyleDock
 								if (TryParseJsonDouble (json2, "\"temperature\"", out var value5)) {
 
 									activeTemperature = value5;
+									activeTemperatureUnit = (arg == "fahrenheit") ? "F" : "C";
 
 								}
 
@@ -5276,9 +5277,9 @@ namespace MacStyleDock
 				string effectiveTheme = GetEffectiveTheme ().ToLower ();
 				string unit = (settings != null && !string.IsNullOrEmpty (settings.WeatherUnit) && (settings.WeatherUnit.Equals ("fahrenheit", StringComparison.OrdinalIgnoreCase) || settings.WeatherUnit.Equals ("F", StringComparison.OrdinalIgnoreCase))) ? "F" : "C";
 
-				// Always normalize to Celsius so the frontend can reliably convert
+				// Convert activeTemperature to Celsius based on the unit it was actually recorded in
 				double tempCelsius = activeTemperature;
-				if (unit == "F") {
+				if (activeTemperatureUnit == "F") {
 					tempCelsius = (activeTemperature - 32.0) * 5.0 / 9.0;
 				}
 
@@ -17313,6 +17314,10 @@ namespace MacStyleDock
 				radioButton.Checked += delegate {
 
 					settings.WeatherUnit = "C";
+					if (DockWindow.activeTemperatureUnit == "F") {
+						DockWindow.activeTemperature = (DockWindow.activeTemperature - 32.0) * 5.0 / 9.0;
+						DockWindow.activeTemperatureUnit = "C";
+					}
 
 					ownerWindow.ApplySettings (settings);
 
@@ -17323,6 +17328,10 @@ namespace MacStyleDock
 				radioButton2.Checked += delegate {
 
 					settings.WeatherUnit = "F";
+					if (DockWindow.activeTemperatureUnit == "C") {
+						DockWindow.activeTemperature = DockWindow.activeTemperature * 9.0 / 5.0 + 32.0;
+						DockWindow.activeTemperatureUnit = "F";
+					}
 
 					ownerWindow.ApplySettings (settings);
 
