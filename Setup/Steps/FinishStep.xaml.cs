@@ -32,7 +32,7 @@ namespace WinDockSetup.Steps
             else
             {
                 TitleText.Text = "WinDock Suite is Ready";
-                SubtitleText.Text = "WinDock, Ripple, and Weather App installed successfully.";
+                SubtitleText.Text = "WinDock, Winland, and Weather App installed successfully.";
                 LaunchCheckBox.Visibility = Visibility.Visible;
                 FinishButton.Content = "Launch & Finish";
                 

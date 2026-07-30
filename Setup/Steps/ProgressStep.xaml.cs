@@ -189,10 +189,10 @@ namespace WinDockSetup.Steps
         {
             string installPath = mainWindow.InstallPath;
 
-            // Kill all running suite processes (WinDock, Ripple, Weather)
+            // Kill all running suite processes (WinDock, Winland, Weather)
             try
             {
-                string[] procsToKill = new[] { "WinDock", "WinDockConsole", "ripple", "Ripple", "weather", "Weather", "node", "electron" };
+                string[] procsToKill = new[] { "WinDock", "WinDockConsole", "winland", "WinLand", "ripple", "Ripple", "weather", "Weather", "node", "electron" };
                 foreach (string procName in procsToKill)
                 {
                     try

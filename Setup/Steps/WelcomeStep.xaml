@@ -56,14 +56,14 @@
                 </StackPanel>
             </Border>
 
-            <!-- Card 2: Ripple -->
+            <!-- Card 2: Winland -->
             <Border Grid.Column="2" Background="#FFFFFF" BorderBrush="#93C5FD" BorderThickness="1.5" CornerRadius="12" Padding="16,20">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="20" ShadowDepth="3" Opacity="0.08" Color="#2563EB"/>
                 </Border.Effect>
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="🌊" FontSize="26" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                    <TextBlock Text="Ripple" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#2563EB" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <Image Source="pack://application:,,,/winland_logo.png" Width="30" Height="30" HorizontalAlignment="Center" Margin="0,0,0,8" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="Winland" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#2563EB" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                     <TextBlock Text="Dynamic Island &amp; Media" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </StackPanel>
             </Border>

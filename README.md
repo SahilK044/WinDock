@@ -10,7 +10,7 @@
 ---
 
 
-**WinDock Suite** is an all-in-one desktop enhancement suite for Windows 10 and 11. It combines a macOS-style dock, the Ripple Dynamic Island helper, and a live weather widget into a unified, high-performance Windows desktop experience.
+**WinDock Suite** is an all-in-one desktop enhancement suite for Windows 10 and 11. It combines a macOS-style dock, the Winland Dynamic Island helper, and a live weather widget into a unified, high-performance Windows desktop experience.
 
 ---
 
@@ -39,7 +39,7 @@
 ## 🛠️ Integrated Components
 
 - **WinDock**: Fluid desktop dock with app magnification, stack folders, an app launcher, and Spotlight-style search utilities.
-- **Ripple Dynamic Island**: Floating media and system-status pill with track artwork, controls, and quick workflows.
+- **Winland Dynamic Island**: Floating media and system-status pill with track artwork, controls, and quick workflows.
 - **Weather App**: Live forecast widget with current conditions and hourly weather data.
 - **Setup Installer**: Light-themed setup wizard with animated progress and install options.
 - **Deep Uninstaller**: Removes suite processes and installed files cleanly during uninstall.
@@ -52,7 +52,7 @@
 
 - Windows 10 or Windows 11
 - .NET Framework 4.8 SDK or Visual Studio 2022
-- Node.js 18+ and npm (for compiling the Ripple Electron helper)
+- Node.js 18+ and npm (for compiling the Winland Electron helper)
 
 ### Build Steps
 
@@ -90,7 +90,7 @@ WinDock/
 ├── WinDock.csproj          # Main WinDock WPF project
 ├── config.example.json     # Safe template configuration
 ├── Setup/                  # Setup installer project
-├── Ripple/                 # Packaged Dynamic Island helper and runtime assets
+├── Winland/                # Packaged Dynamic Island helper and runtime assets
 ├── Weather/                # Packaged Weather helper and runtime assets
 ├── F1 Cars/                # F1 car renders
 ├── Drivers/                # F1 driver full-body assets
@@ -104,7 +104,13 @@ WinDock/
 
 ## 👏 Credits
 
-- **Dynamic Island**: Thanks to [Ripple](https://github.com/TopMyster/Ripple) by TopMyster for the initial foundation of the Dynamic Island widget experience.
+- **Dynamic Island**: Powered by **Winland** dynamic island widget experience.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
 
 ---
 

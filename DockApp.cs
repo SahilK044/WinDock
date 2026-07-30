@@ -3904,13 +3904,13 @@ namespace MacStyleDock
 				if (isFS && !_wasFullscreenHidden) {
 					_wasFullscreenHidden = true;
 					HideDock ();
-					SetRippleVisibility (false);
+					SetWinlandVisibility (false);
 				} else if (!isFS && _wasFullscreenHidden) {
 					_wasFullscreenHidden = false;
 					if (!settings.AutoHide) {
 						ShowDock ();
 					}
-					SetRippleVisibility (true);
+					SetWinlandVisibility (true);
 				}
 			};
 			_fullscreenTimer.Start ();
@@ -3973,17 +3973,17 @@ namespace MacStyleDock
 
 				_isPresentationSourceValid = true;
 				SetupFullscreenWatcher ();
-				// External visualizer window disabled - visualizer is inside Ripple pill
+				// External visualizer window disabled - visualizer is inside Winland pill
 // try { new VisualizerOverlayWindow().Show(); } catch { }
 
-				// Perf fix: ManageRippleState() runs a WMI process query and (on first run)
-				// launches the ~200MB Chromium-based Ripple helper process. Doing that
+				// Perf fix: ManageWinlandState() runs a WMI process query and (on first run)
+				// launches the ~200MB Chromium-based Winland helper process. Doing that
 				// synchronously here blocked the UI thread right as the window was created,
 				// which is what caused the brutal multi-second system-wide stutter on launch.
 				// Now it runs entirely on a background thread pool thread instead.
 				ThreadPool.QueueUserWorkItem (delegate {
 					try {
-						ManageRippleState ();
+						ManageWinlandState ();
 					} catch { }
 				});
 			};
@@ -3991,7 +3991,7 @@ namespace MacStyleDock
 			base.Closed += delegate {
 				_isPresentationSourceValid = false;
 				try {
-					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("ripple")) {
+					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("winland").Concat(System.Diagnostics.Process.GetProcessesByName ("WinLand"))) {
 						using (proc) {
 							try { KillProcessAndChildren (proc.Id); } catch { }
 						}
@@ -5673,7 +5673,7 @@ namespace MacStyleDock
 
 			UpdateSpotifyDockIcon (null);
 
-			ManageRippleState ();
+			ManageWinlandState ();
 
 		}
 
@@ -7303,7 +7303,7 @@ namespace MacStyleDock
 
 			int num = 0;
 			foreach (DockItemControl itemControl in runningItems) {
-				if (itemControl.Config != null && itemControl.Config.ProcessName != null && itemControl.Config.ProcessName.Equals ("ripple", StringComparison.OrdinalIgnoreCase)) {
+				if (itemControl.Config != null && itemControl.Config.ProcessName != null && (itemControl.Config.ProcessName.Equals ("winland", StringComparison.OrdinalIgnoreCase) || itemControl.Config.ProcessName.Equals ("WinLand", StringComparison.OrdinalIgnoreCase))) {
 					continue;
 				}
 				itemControl.UpdateBaseSize (baseSize);
@@ -12038,7 +12038,7 @@ namespace MacStyleDock
 								}
 
 								foreach (ProcessWindowInfo appInfo in minimizedApps) {
-									if (appInfo.ProcessName != null && appInfo.ProcessName.Equals ("ripple", StringComparison.OrdinalIgnoreCase)) {
+									if (appInfo.ProcessName != null && (appInfo.ProcessName.Equals ("winland", StringComparison.OrdinalIgnoreCase) || appInfo.ProcessName.Equals ("WinLand", StringComparison.OrdinalIgnoreCase))) {
 										continue;
 									}
 									if (minimizedItems.Any (x => x.TargetHwnd == appInfo.Hwnd)) {
@@ -12113,7 +12113,7 @@ namespace MacStyleDock
 								}
 
 								foreach (ProcessWindowInfo appInfo in activeRunningApps) {
-									if (appInfo.ProcessName != null && appInfo.ProcessName.Equals ("ripple", StringComparison.OrdinalIgnoreCase)) {
+									if (appInfo.ProcessName != null && (appInfo.ProcessName.Equals ("winland", StringComparison.OrdinalIgnoreCase) || appInfo.ProcessName.Equals ("WinLand", StringComparison.OrdinalIgnoreCase))) {
 										continue;
 									}
 
@@ -12437,42 +12437,45 @@ namespace MacStyleDock
 			} catch { }
 		}
 
-		private void ManageRippleState ()
+		private void ManageWinlandState ()
 		{
 			try {
 				CleanOrphanedMediaProcesses ();
 				if (settings.EnableDynamicIsland) {
-					string rippleDir = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Ripple");
-					string rippleExe = System.IO.Path.Combine (rippleDir, "ripple.exe");
-					if (System.IO.File.Exists (rippleExe)) {
+					string winlandDir = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Winland");
+					string winlandExe = System.IO.Path.Combine (winlandDir, "WinLand.exe");
+					if (!System.IO.File.Exists (winlandExe)) {
+						winlandExe = System.IO.Path.Combine (winlandDir, "winland.exe");
+					}
+					if (System.IO.File.Exists (winlandExe)) {
 						bool isRunning = false;
-						foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("ripple")) {
+						foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("winland").Concat(System.Diagnostics.Process.GetProcessesByName ("WinLand"))) {
 							isRunning = true;
 							break;
 						}
 						if (!isRunning) {
 							// Perf fix: give the dock's own startup a moment to finish laying out
-							// and rendering before we cold-start the ~200MB Chromium-based Ripple
+							// and rendering before we cold-start the ~200MB Chromium-based Winland
 							// helper. Launching both heavy processes at the exact same instant was
 							// the main cause of the multi-second system-wide stutter on startup.
 							// We're already on a background thread here, so sleeping is safe.
 							Thread.Sleep (2500);
 							try {
-								var rippleProcess = System.Diagnostics.Process.Start (new System.Diagnostics.ProcessStartInfo (rippleExe) {
-									WorkingDirectory = rippleDir,
+								var winlandProcess = System.Diagnostics.Process.Start (new System.Diagnostics.ProcessStartInfo (winlandExe) {
+									WorkingDirectory = winlandDir,
 									UseShellExecute = true
 								});
-								// Keep Ripple's own cold-start (Chromium/GPU init) from competing
+								// Keep Winland's own cold-start (Chromium/GPU init) from competing
 								// for CPU with the desktop compositor and other apps.
-								if (rippleProcess != null) {
-									rippleProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
+								if (winlandProcess != null) {
+									winlandProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
 								}
 							} catch { }
 						}
-						SetRippleVisibility (true);
+						SetWinlandVisibility (true);
 					}
 				} else {
-					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("ripple")) {
+					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("winland").Concat(System.Diagnostics.Process.GetProcessesByName ("WinLand"))) {
 						try { KillProcessAndChildren (proc.Id); } catch { }
 					}
 				}
@@ -12495,7 +12498,7 @@ namespace MacStyleDock
 			} catch { }
 		}
 
-		private void SetRippleVisibility (bool visible)
+		private void SetWinlandVisibility (bool visible)
 		{
 		}
 	}
@@ -52406,11 +52409,12 @@ namespace MacStyleDock
 				try {
 					var ctx = _listener.GetContext();
 					if (ctx.Request.Url.AbsolutePath.Contains("download") && !string.IsNullOrEmpty(_sharedFilePath) && System.IO.File.Exists(_sharedFilePath)) {
-						byte[] bytes = System.IO.File.ReadAllBytes(_sharedFilePath);
-						ctx.Response.ContentType = "application/octet-stream";
-						ctx.Response.AddHeader("Content-Disposition", $"attachment; filename=\"{System.IO.Path.GetFileName(_sharedFilePath)}\"");
-						ctx.Response.ContentLength64 = bytes.Length;
-						ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
+						using (var fs = System.IO.File.OpenRead(_sharedFilePath)) {
+							ctx.Response.ContentType = "application/octet-stream";
+							ctx.Response.AddHeader("Content-Disposition", $"attachment; filename=\"{System.IO.Path.GetFileName(_sharedFilePath)}\"");
+							ctx.Response.ContentLength64 = fs.Length;
+							fs.CopyTo(ctx.Response.OutputStream);
+						}
 					}
 					ctx.Response.Close();
 				} catch { }

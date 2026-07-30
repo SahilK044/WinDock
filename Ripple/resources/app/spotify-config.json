@@ -1,6 +1,0 @@
-{
-  "SPOTIFY_CLIENT_ID": "",
-  "SPOTIFY_CLIENT_SECRET": "",
-  "SPOTIFY_API_KEY": "",
-  "INSTRUCTIONS": "Add your Spotify API Key, Client ID, or Client Secret here for high-res Spotify Web API track artwork & metadata."
-}

@@ -7,7 +7,7 @@
     <LangVersion>12</LangVersion>
     <AssemblyName>WinDock</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefaultItemExcludes>$(DefaultItemExcludes);dotnet\**;scratch\**;Setup\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);dotnet\**;scratch\**;Setup\**;Winland\**\*.cs;Winland\**\*.csproj</DefaultItemExcludes>
     <ApplicationIcon>windock.ico</ApplicationIcon>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
@@ -69,7 +69,7 @@
     <None Include="Track\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Ripple\**\*">
+    <None Include="Winland\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Weather\**\*">
@@ -80,5 +80,6 @@
 
   <ItemGroup>
     <Compile Remove="scratch\**\*.cs" />
+    <Compile Remove="Winland\**\*.cs" />
   </ItemGroup>
 </Project>

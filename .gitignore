@@ -155,7 +155,7 @@ test_exec.exe
 test_intents.exe
 
 # Extracted third-party app bundles. Keep packaged runtime assets instead.
-Ripple/resources/app_extracted/
+Winland/resources/app_extracted/
 Weather/resources/app_extracted/
 
 # Dev tools
@@ -192,5 +192,5 @@ implementation_plan.md
 !scripts/toggle_radio.ps1
 
 
-Ripple_backup/
+Winland_backup/
 *.bak

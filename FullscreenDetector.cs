@@ -67,7 +67,8 @@ public static class FullscreenDetector
                     using (Process proc = Process.GetProcessById((int)procId))
                     {
                         if (string.Equals(proc.ProcessName, "windock", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(proc.ProcessName, "ripple", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(proc.ProcessName, "winland", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(proc.ProcessName, "WinLand", StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(proc.ProcessName, "explorer", StringComparison.OrdinalIgnoreCase))
                         {
                             return false;
