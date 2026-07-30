@@ -102,12 +102,6 @@ WinDock/
 
 ---
 
-## 👏 Credits
-
-- **Dynamic Island**: Powered by **Winland** dynamic island widget experience.
-
----
-
 ## 📄 License
 
 This project is licensed under the MIT License.
