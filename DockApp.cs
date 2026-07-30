@@ -2428,7 +2428,7 @@ namespace MacStyleDock
 
 							string string2 = Encoding.UTF8.GetString (bytes2);
 
-							if (!string.IsNullOrEmpty (string2) && string2.Contains ("\"success\"") && TryParseJsonDouble (string2, "\"lat\"", out var value3) && TryParseJsonDouble (string2, "\"lon\"", out var value4)) {
+							if (!string.IsNullOrEmpty (string2) && string2.Contains ("success") && TryParseJsonDouble (string2, "\"lat\"", out var value3) && TryParseJsonDouble (string2, "\"lon\"", out var value4)) {
 
 								num = value3;
 
@@ -2562,6 +2562,7 @@ namespace MacStyleDock
 
 									activeTemperature = value5;
 									activeTemperatureUnit = "C";
+									WriteWinlandThemeSync ();
 
 								}
 
