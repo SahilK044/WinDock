@@ -16847,6 +16847,61 @@ namespace MacStyleDock
 
 			BindSettings ();
 
+			EnableSmoothScrolling (root);
+
+		}
+
+		private void EnableSmoothScrolling (FrameworkElement parent)
+		{
+			if (parent == null) return;
+			List<ScrollViewer> list = new List<ScrollViewer> ();
+			FindScrollViewers (parent, list);
+			foreach (var sv in list) {
+				AttachSmoothScroll (sv);
+			}
+		}
+
+		private void FindScrollViewers (DependencyObject parent, List<ScrollViewer> list)
+		{
+			if (parent == null) return;
+			int count = VisualTreeHelper.GetChildrenCount (parent);
+			for (int i = 0; i < count; i++) {
+				var child = VisualTreeHelper.GetChild (parent, i);
+				if (child is ScrollViewer sv) {
+					list.Add (sv);
+				}
+				FindScrollViewers (child, list);
+			}
+		}
+
+		private void AttachSmoothScroll (ScrollViewer sv)
+		{
+			if (sv == null) return;
+			double targetOffset = sv.VerticalOffset;
+			double currentOffset = sv.VerticalOffset;
+			DispatcherTimer scrollTimer = null;
+
+			sv.PreviewMouseWheel += delegate(object s, MouseWheelEventArgs e) {
+				e.Handled = true;
+				targetOffset = Math.Max (0.0, Math.Min (sv.ScrollableHeight, targetOffset - e.Delta * 0.95));
+
+				if (scrollTimer == null) {
+					scrollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (12.0) };
+					scrollTimer.Tick += delegate {
+						double diff = targetOffset - currentOffset;
+						if (Math.Abs (diff) < 0.5) {
+							currentOffset = targetOffset;
+							sv.ScrollToVerticalOffset (currentOffset);
+							scrollTimer.Stop ();
+							scrollTimer = null;
+						} else {
+							currentOffset += diff * 0.25;
+							sv.ScrollToVerticalOffset (currentOffset);
+						}
+					};
+					scrollTimer.Start ();
+				}
+			};
 		}
 
 

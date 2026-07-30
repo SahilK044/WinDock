@@ -2,6 +2,20 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Background="Transparent" Width="800" Height="600">
     <Grid.Resources>
+        <!-- ScrollViewer Style: Hide ugly scrollbars -->
+        <Style TargetType="ScrollViewer">
+            <Setter Property="VerticalScrollBarVisibility" Value="Hidden"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollViewer">
+                        <ScrollContentPresenter CanContentScroll="{TemplateBinding CanContentScroll}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Font -->
         <FontFamily x:Key="MacFont">Segoe UI, Helvetica Neue, Arial</FontFamily>
         
@@ -260,7 +274,7 @@
                     
                     <!-- APPEARANCE TAB -->
                     <TabItem>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Hidden">
                             <StackPanel Margin="30,20">
                                 <TextBlock Text="Appearance" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
                                 <Border Style="{StaticResource MacCard}">
@@ -323,7 +337,7 @@
 
                     <!-- DESKTOP & DOCK TAB -->
                     <TabItem>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Hidden">
                             <StackPanel Margin="30,20">
                                 <TextBlock Text="Dock Size &amp; Position" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
                                 <Border Style="{StaticResource MacCard}">
@@ -401,7 +415,7 @@
 
                     <!-- ANIMATIONS TAB -->
                     <TabItem>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Hidden">
                             <StackPanel Margin="30,20">
                                 <TextBlock Text="Core Animations" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
                                 <Border Style="{StaticResource MacCard}">
@@ -467,7 +481,7 @@
 
                     <!-- WIDGETS TAB -->
                     <TabItem>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Hidden">
                             <StackPanel Margin="30,20">
                                 <TextBlock Text="Widgets" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
                                 <Border Style="{StaticResource MacCard}">
@@ -555,7 +569,7 @@
 
                     <!-- GENERAL TAB -->
                     <TabItem>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Hidden">
                             <StackPanel Margin="30,20">
                                 <TextBlock Text="System" Foreground="#8E8E93" FontSize="12" Margin="15,0,0,5" FontFamily="{StaticResource MacFont}"/>
                                 <Border Style="{StaticResource MacCard}">
