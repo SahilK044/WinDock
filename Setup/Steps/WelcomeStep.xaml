@@ -50,7 +50,7 @@
                     <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.06" Color="#000000"/>
                 </Border.Effect>
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="🍏" FontSize="26" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <Image Source="pack://application:,,,/windock_logo.png" Width="38" Height="38" HorizontalAlignment="Center" Margin="0,0,0,8" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock Text="WinDock" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                     <TextBlock Text="macOS Dock &amp; Spotlight" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </StackPanel>
@@ -62,7 +62,7 @@
                     <DropShadowEffect BlurRadius="20" ShadowDepth="3" Opacity="0.08" Color="#2563EB"/>
                 </Border.Effect>
                 <StackPanel HorizontalAlignment="Center">
-                    <Image Source="pack://application:,,,/winland_logo.png" Width="30" Height="30" HorizontalAlignment="Center" Margin="0,0,0,8" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <Image Source="pack://application:,,,/winland_logo.png" Width="38" Height="38" HorizontalAlignment="Center" Margin="0,0,0,8" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock Text="Winland" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#2563EB" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                     <TextBlock Text="Dynamic Island &amp; Media" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </StackPanel>
