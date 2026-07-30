@@ -5274,7 +5274,17 @@ namespace MacStyleDock
 		{
 			try {
 				string effectiveTheme = GetEffectiveTheme ().ToLower ();
-				string themeJson = string.Format ("{{\"theme\":\"{0}\",\"enableDynamicIsland\":{1}}}", effectiveTheme, settings.EnableDynamicIsland ? "true" : "false");
+				string unit = (settings != null && !string.IsNullOrEmpty (settings.WeatherUnit) && (settings.WeatherUnit.Equals ("fahrenheit", StringComparison.OrdinalIgnoreCase) || settings.WeatherUnit.Equals ("F", StringComparison.OrdinalIgnoreCase))) ? "F" : "C";
+				string themeJson = string.Format (System.Globalization.CultureInfo.InvariantCulture,
+					"{{\"theme\":\"{0}\",\"enableDynamicIsland\":{1},\"weatherUnit\":\"{2}\",\"temperature\":{3},\"weatherCode\":{4},\"autoHide\":{5},\"hideInFullscreen\":{6}}}",
+					effectiveTheme,
+					(settings != null && settings.EnableDynamicIsland) ? "true" : "false",
+					unit,
+					activeTemperature,
+					activeWeatherCode,
+					(settings != null && settings.AutoHide) ? "true" : "false",
+					(settings != null && settings.HideOnFullscreen) ? "true" : "false"
+				);
 				string tempThemePath = System.IO.Path.Combine (System.IO.Path.GetTempPath (), "winland_theme.json");
 				System.IO.File.WriteAllText (tempThemePath, themeJson);
 			} catch { }
