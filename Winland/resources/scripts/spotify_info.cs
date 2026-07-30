@@ -54,14 +54,8 @@ namespace WinLandMedia {
                         string appId = session.SourceAppUserModelId ?? "";
 
                         bool isPlaying = false;
-                        if (timeline != null) {
-                            var elapsed = DateTimeOffset.UtcNow - timeline.LastUpdatedTime;
-                            if (elapsed.TotalSeconds < 3.5 && timeline.EndTime.TotalMilliseconds > 0) {
-                                isPlaying = true;
-                            }
-                        }
-                        if (playback != null && playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) {
-                            isPlaying = true;
+                        if (playback != null) {
+                            isPlaying = (playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
                         }
 
                         long posMs = 0;
