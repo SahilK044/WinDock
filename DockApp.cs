@@ -16730,9 +16730,9 @@ namespace MacStyleDock
 
 			base.Title = "Settings";
 
-			base.Width = 880.0;
+			base.Width = 800.0;
 
-			base.Height = 680.0;
+			base.Height = 600.0;
 
 			base.WindowStyle = WindowStyle.None;
 
