@@ -968,8 +968,21 @@ namespace MacStyleDock
 				try { File.WriteAllText (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "startup_error.log"), e.ExceptionObject.ToString ()); } catch { }
 			};
 
+			TaskScheduler.UnobservedTaskException += (s, e) => {
+				try {
+					File.WriteAllText (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "task_error.log"), e.Exception.ToString ());
+					e.SetObserved ();
+				} catch { }
+			};
+
 			try {
 				System.Windows.Application app = new System.Windows.Application ();
+				app.DispatcherUnhandledException += (s, e) => {
+					try {
+						File.WriteAllText (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "dispatcher_error.log"), e.Exception.ToString ());
+					} catch { }
+					e.Handled = true; // Prevent WPF application crash!
+				};
 				app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 				app.Run (new DockWindow ());
 			} catch (Exception ex) {

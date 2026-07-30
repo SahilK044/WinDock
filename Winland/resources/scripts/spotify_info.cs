@@ -9,6 +9,7 @@ namespace WinLandMedia {
         [STAThread]
         static void Main(string[] args) {
             try {
+                Console.OutputEncoding = System.Text.Encoding.UTF8;
                 var mgrTask = GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask();
                 mgrTask.Wait(2500);
                 var mgr = mgrTask.Result;
