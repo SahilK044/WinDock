@@ -16703,66 +16703,19 @@ namespace MacStyleDock
 
 
 
-		[DllImport ("user32.dll")]
-
-		internal static extern int SetWindowCompositionAttribute (IntPtr hwnd, ref WinCompositionAttrData data);
-
-
+		[DllImport ("dwmapi.dll")]
+		internal static extern int DwmSetWindowAttribute (IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
 		public void EnableBlur (bool enable)
-
 		{
-
 			try {
-
 				IntPtr handle = new WindowInteropHelper (this).Handle;
-
 				if (handle != IntPtr.Zero) {
-
-					AccentPolicy structure = default(AccentPolicy);
-
-					structure.AccentState = (enable ? 3 : 0);
-
-					if (enable) {
-
-						structure.AccentFlags = 2;
-
-						double blurAmount = (settings != null) ? settings.BlurAmount : 0.7;
-
-						bool isDark = (settings != null) ? (settings.Theme.ToLower () == "dark" || settings.Theme.ToLower () == "tahoe") : true;
-
-						byte alpha = (byte)((1.0 - blurAmount) * 200.0 + 20.0);
-
-						uint colorVal = isDark ? 0x1A1A1AU : 0xF2F2F7U;
-
-						structure.GradientColor = (int)(((uint)alpha << 24) | (colorVal & 0x00FFFFFF));
-
-					}
-
-					int num = Marshal.SizeOf (structure);
-
-					IntPtr intPtr = Marshal.AllocHGlobal (num);
-
-					Marshal.StructureToPtr (structure, intPtr, fDeleteOld: false);
-
-					WinCompositionAttrData data = default(WinCompositionAttrData);
-
-					data.Attribute = 19;
-
-					data.SizeOfData = num;
-
-					data.Data = intPtr;
-
-					SetWindowCompositionAttribute (handle, ref data);
-
-					Marshal.FreeHGlobal (intPtr);
-
+					int cornerPref = 2; // DWMWCP_ROUND
+					DwmSetWindowAttribute (handle, 33, ref cornerPref, 4);
 				}
-
 			} catch {
-
 			}
-
 		}
 
 
@@ -16792,6 +16745,16 @@ namespace MacStyleDock
 			base.Topmost = true;
 
 			base.ShowInTaskbar = false;
+
+			base.SourceInitialized += delegate {
+				try {
+					IntPtr handle = new WindowInteropHelper (this).Handle;
+					if (handle != IntPtr.Zero) {
+						int cornerPref = 2;
+						DwmSetWindowAttribute (handle, 33, ref cornerPref, 4);
+					}
+				} catch { }
+			};
 
 			string text = null;
 			string macSettingsPath = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "MacSettings.txt");
