@@ -2,11 +2,6 @@
 
 ![WinDock Banner](windock_logo.png)
 
-
-## 🎥 Video Preview
-
-![WinDock Suite Preview](preview.gif)
-
 ---
 
 
