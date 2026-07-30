@@ -2898,12 +2898,6 @@ namespace MacStyleDock
 
 				};
 
-				f1Overlay.Deactivated += delegate {
-
-					StartHideF1Overlay ();
-
-				};
-
 				f1Overlay.KeyDown += delegate(object s, System.Windows.Input.KeyEventArgs e) {
 
 					if (e.Key == Key.Escape) {
@@ -2948,7 +2942,6 @@ namespace MacStyleDock
 				if (flag || !f1Overlay.IsVisible) {
 					f1Overlay.Opacity = 0.0;
 					f1Overlay.Show ();
-					f1Overlay.Activate ();
 					f1Overlay.Topmost = true;
 				}
 
@@ -2981,7 +2974,7 @@ namespace MacStyleDock
 
 				f1OverlayTimer = new DispatcherTimer ();
 
-				f1OverlayTimer.Interval = TimeSpan.FromMilliseconds (250.0);
+				f1OverlayTimer.Interval = TimeSpan.FromMilliseconds (350.0);
 
 				f1OverlayTimer.Tick += delegate {
 
@@ -7902,47 +7895,9 @@ namespace MacStyleDock
 
 				}
 
-				bool flag = effectiveTheme == "light";
-
-				string text = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, flag ? "f1_logo_black.png" : "f1_logo_white.png");
-
-				if (!File.Exists (text)) {
-
-					text = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, flag ? "..\\..\\..\\f1_logo_black.png" : "..\\..\\..\\f1_logo_white.png");
-
-				}
-
-				if (File.Exists (text)) {
-
-					try {
-
-						BitmapImage bitmapImage = new BitmapImage ();
-
-						bitmapImage.BeginInit ();
-
-						bitmapImage.UriSource = new Uri (text);
-
-						bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-
-						bitmapImage.EndInit ();
-
-						bitmapImage.Freeze ();
-
-						dockItemControl.IconImage.Source = bitmapImage;
-
-						dockItemControl.IconImage.Width = baseSize;
-
-						dockItemControl.IconImage.Height = baseSize;
-
-						dockItemControl.IconImage.Stretch = Stretch.Uniform;
-
-						dockItemControl.IconImage.VerticalAlignment = VerticalAlignment.Center;
-
-					} catch {
-
-					}
-
-				}
+				try {
+					dockItemControl.IconImage.Source = IconExtractor.CreateF1Icon ();
+				} catch {}
 
 			}
 
@@ -16095,6 +16050,25 @@ namespace MacStyleDock
 
 		{
 
+			string[] candidates = new string[] {
+				System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "f1_logo.png"),
+				System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "..\\..\\..\\f1_logo.png")
+			};
+
+			foreach (string file in candidates) {
+				if (File.Exists (file)) {
+					try {
+						BitmapImage bmp = new BitmapImage ();
+						bmp.BeginInit ();
+						bmp.UriSource = new Uri (file);
+						bmp.CacheOption = BitmapCacheOption.OnLoad;
+						bmp.EndInit ();
+						bmp.Freeze ();
+						return bmp;
+					} catch {}
+				}
+			}
+
 			int num = 128;
 
 			RenderTargetBitmap renderTargetBitmap = new RenderTargetBitmap (num, num, 96.0, 96.0, PixelFormats.Pbgra32);
@@ -16103,21 +16077,17 @@ namespace MacStyleDock
 
 			using (DrawingContext drawingContext = drawingVisual.RenderOpen ()) {
 
-				LinearGradientBrush brush = new LinearGradientBrush (System.Windows.Media.Color.FromRgb (28, 28, 30), System.Windows.Media.Color.FromRgb (10, 10, 12), new System.Windows.Point (0.0, 0.0), new System.Windows.Point (1.0, 1.0));
+				SolidColorBrush bgBrush = new SolidColorBrush (System.Windows.Media.Color.FromRgb (225, 6, 0));
 
-				drawingContext.DrawEllipse (brush, new System.Windows.Media.Pen (new SolidColorBrush (System.Windows.Media.Color.FromArgb (90, 229, 9, 20)), 2.5), new System.Windows.Point ((double)num / 2.0, (double)num / 2.0), (double)num / 2.0 - 4.0, (double)num / 2.0 - 4.0);
+				drawingContext.DrawRoundedRectangle (bgBrush, null, new Rect (4.0, 4.0, 120.0, 120.0), 28.0, 28.0);
 
 				Typeface typeface = new Typeface (new System.Windows.Media.FontFamily ("Impact, Arial Black, sans-serif"), FontStyles.Italic, FontWeights.UltraBold, FontStretches.Normal);
 
-				FormattedText formattedText = new FormattedText ("F1", CultureInfo.InvariantCulture, System.Windows.FlowDirection.LeftToRight, typeface, 54.0, new SolidColorBrush (System.Windows.Media.Color.FromRgb (229, 9, 20)));
-
-				FormattedText formattedText2 = new FormattedText ("F1", CultureInfo.InvariantCulture, System.Windows.FlowDirection.LeftToRight, typeface, 54.0, new SolidColorBrush (Colors.White));
+				FormattedText formattedText = new FormattedText ("F1", CultureInfo.InvariantCulture, System.Windows.FlowDirection.LeftToRight, typeface, 58.0, new SolidColorBrush (Colors.White));
 
 				double num2 = ((double)num - formattedText.Width) / 2.0;
 
-				double num3 = ((double)num - formattedText.Height) / 2.0 - 1.0;
-
-				drawingContext.DrawText (formattedText2, new System.Windows.Point (num2 - 2.0, num3 + 1.0));
+				double num3 = ((double)num - formattedText.Height) / 2.0;
 
 				drawingContext.DrawText (formattedText, new System.Windows.Point (num2, num3));
 
