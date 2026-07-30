@@ -1243,6 +1243,8 @@ namespace MacStyleDock
 
 		internal MediaOverlayWindow mediaOverlay;
 
+		internal DockItemControl lastMediaOverlayTarget;
+
 
 
 		internal CalendarOverlayWindow calendarOverlay;
@@ -3622,8 +3624,8 @@ namespace MacStyleDock
 			}
 
 			try {
-
 				if (targetItem == null || PresentationSource.FromVisual (targetItem) == null) return;
+				lastMediaOverlayTarget = targetItem;
 				System.Windows.Point point = GetLogicalScreenPoint (targetItem);
 
 				if (settings.Position == "Left") {
@@ -3668,44 +3670,34 @@ namespace MacStyleDock
 
 		}
 
-
-
 		private void StartHideMediaOverlay ()
-
 		{
-
 			if (mediaOverlayTimer == null) {
-
 				mediaOverlayTimer = new DispatcherTimer ();
-
-				mediaOverlayTimer.Interval = TimeSpan.FromMilliseconds (300.0);
-
+				mediaOverlayTimer.Interval = TimeSpan.FromMilliseconds (200.0);
 				mediaOverlayTimer.Tick += delegate {
-
-					if (mediaOverlay != null) {
-
-						if (!mediaOverlay.isSeeking && !mediaOverlay.IsMouseOver && !mediaOverlay.isEnlarged && !((DateTime.Now - mediaOverlay.LastInteractionTime).TotalMilliseconds < 1000.0)) {
-
-							mediaOverlayTimer.Stop ();
-
-							mediaOverlay.Hide ();
-
+					if (mediaOverlay != null && mediaOverlay.IsVisible) {
+						bool mouseOverOverlay = mediaOverlay.IsMouseOver;
+						bool mouseOverDockItem = false;
+						if (lastMediaOverlayTarget != null) {
+							try {
+								mouseOverDockItem = lastMediaOverlayTarget.IsMouseOver;
+							} catch {}
 						}
 
+						if (!mediaOverlay.isSeeking && !mouseOverOverlay && !mouseOverDockItem) {
+							mediaOverlayTimer.Stop ();
+							mediaOverlay.Hide ();
+						}
 					} else {
-
-						mediaOverlayTimer.Stop ();
-
+						if (mediaOverlayTimer != null) {
+							mediaOverlayTimer.Stop ();
+						}
 					}
-
 				};
-
 			}
-
 			mediaOverlayTimer.Stop ();
-
 			mediaOverlayTimer.Start ();
-
 		}
 
 
