@@ -206,7 +206,7 @@
         </Style>
     </Grid.Resources>
 
-    <Border CornerRadius="12" Background="#1E1E1E" ClipToBounds="True" Margin="20">
+    <Border CornerRadius="18" Background="#1E1E1E" ClipToBounds="True" Margin="20">
         <Border.Effect>
             <DropShadowEffect BlurRadius="30" ShadowDepth="10" Opacity="0.5"/>
         </Border.Effect>
@@ -220,7 +220,7 @@
             <Border x:Name="TitleBar" Grid.ColumnSpan="2" Height="40" VerticalAlignment="Top" Background="Transparent" Panel.ZIndex="10"/>
 
             <!-- Sidebar -->
-            <Border Background="#282828" CornerRadius="12,0,0,12">
+            <Border Background="#282828" CornerRadius="18,0,0,18" ClipToBounds="True">
                 <StackPanel Margin="0,40,0,0">
 
                     
@@ -242,7 +242,7 @@
             </Border>
 
             <!-- Content Area -->
-            <Border Grid.Column="1" Background="#000000" CornerRadius="0,12,12,0">
+            <Border Grid.Column="1" Background="#000000" CornerRadius="0,18,18,0" ClipToBounds="True">
                 <Grid>
                 <Border Height="50" VerticalAlignment="Top" BorderBrush="#1C1C1E" BorderThickness="0,0,0,1">
                     <Grid>
