@@ -166,6 +166,11 @@ export default function DynamicIsland({
 
   // ── Config sync (weatherUnit, temperature, autoHide, hideInFullscreen) ──────
   useEffect(() => {
+    if (window.electronAPI?.getInitialConfig) {
+      window.electronAPI.getInitialConfig().then((data) => {
+        if (data) setWeatherConfig(data);
+      });
+    }
     if (!window.electronAPI?.onConfigUpdate) return;
     const cleanConfig = window.electronAPI.onConfigUpdate((data) => {
       if (data) setWeatherConfig(data);
