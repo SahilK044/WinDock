@@ -2,12 +2,12 @@ import React from 'react';
 import { Sun, CloudRain, Thermometer, Wind } from 'lucide-react';
 
 export default function WeatherWidget({ isCompact, weatherConfig }) {
-  // Always display in Celsius
+  const unit = (weatherConfig?.weatherUnit === 'F' || weatherConfig?.weatherUnit === 'fahrenheit') ? 'F' : 'C';
   const tempC = weatherConfig?.temperatureC ?? weatherConfig?.temperature ?? 22;
-  const tempVal = Math.round(Number(tempC) || 22);
-  const highTemp = Math.round(tempVal + 4);
-  const lowTemp = Math.round(tempVal - 10);
-  const tempDisplay = `${tempVal}°C`;
+  const tempVal = unit === 'F' ? Math.round(Number(tempC) * 9 / 5 + 32) : Math.round(Number(tempC));
+  const highTemp = unit === 'F' ? Math.round((Number(tempC) + 4) * 9 / 5 + 32) : Math.round(Number(tempC) + 4);
+  const lowTemp = unit === 'F' ? Math.round((Number(tempC) - 10) * 9 / 5 + 32) : Math.round(Number(tempC) - 10);
+  const tempDisplay = `${tempVal}°${unit}`;
 
   if (isCompact) {
     return (

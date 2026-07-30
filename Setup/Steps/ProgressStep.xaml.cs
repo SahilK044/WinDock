@@ -244,7 +244,7 @@ namespace WinDockSetup.Steps
                 bool keepConfig = mainWindow.KeepConfig;
                 string currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
 
-                // Force clear attributes & delete all files including inside subdirectories (Ripple, Weather, etc.)
+                // Force clear attributes & delete all files including inside subdirectories (Winland, Weather, etc.)
                 ForceDeleteDirectoryTree(installPath, keepConfig, currentExe);
             }
             await Task.Delay(400);
@@ -290,7 +290,7 @@ namespace WinDockSetup.Steps
                 }
             }
 
-            // Delete all empty subdirectories (Ripple, Weather, Track, etc.)
+            // Delete all empty subdirectories (Winland, Weather, Track, etc.)
             foreach (string dir in Directory.GetDirectories(rootPath, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
             {
                 try

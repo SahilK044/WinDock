@@ -4,10 +4,10 @@ import { Sun, Cloud, CloudRain } from 'lucide-react';
 export default function IdleWidget({ weatherConfig }) {
   const [timeStr, setTimeStr] = useState('');
 
-  // Always display in Celsius
+  const unit = (weatherConfig?.weatherUnit === 'F' || weatherConfig?.weatherUnit === 'fahrenheit') ? 'F' : 'C';
   const tempC = weatherConfig?.temperatureC ?? weatherConfig?.temperature ?? 22;
-  const tempVal = Math.round(Number(tempC) || 22);
-  const tempStr = `${tempVal}°C`;
+  const tempVal = unit === 'F' ? Math.round(Number(tempC) * 9 / 5 + 32) : Math.round(Number(tempC));
+  const tempStr = `${tempVal}°${unit}`;
 
   useEffect(() => {
     const updateTime = () => {

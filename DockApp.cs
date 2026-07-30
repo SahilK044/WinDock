@@ -2504,12 +2504,6 @@ namespace MacStyleDock
 
 						string arg = "celsius";
 
-						if (settings != null && !string.IsNullOrEmpty (settings.WeatherUnit) && (settings.WeatherUnit.Equals ("fahrenheit", StringComparison.OrdinalIgnoreCase) || settings.WeatherUnit.Equals ("F", StringComparison.OrdinalIgnoreCase))) {
-
-							arg = "fahrenheit";
-
-						}
-
 						string address2 = string.Format (CultureInfo.InvariantCulture, "https://api.open-meteo.com/v1/forecast?latitude={0}&longitude={1}&current_weather=true&temperature_unit={2}&hourly=temperature_2m,weathercode&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto&forecast_days=10", num, num2, arg);
 
 						using (TimeoutWebClient webClient4 = new TimeoutWebClient { TimeoutMs = 8000 }) {
@@ -2567,7 +2561,7 @@ namespace MacStyleDock
 								if (TryParseJsonDouble (json2, "\"temperature\"", out var value5)) {
 
 									activeTemperature = value5;
-									activeTemperatureUnit = (arg == "fahrenheit") ? "F" : "C";
+									activeTemperatureUnit = "C";
 
 								}
 
@@ -5277,11 +5271,8 @@ namespace MacStyleDock
 				string effectiveTheme = GetEffectiveTheme ().ToLower ();
 				string unit = (settings != null && !string.IsNullOrEmpty (settings.WeatherUnit) && (settings.WeatherUnit.Equals ("fahrenheit", StringComparison.OrdinalIgnoreCase) || settings.WeatherUnit.Equals ("F", StringComparison.OrdinalIgnoreCase))) ? "F" : "C";
 
-				// Convert activeTemperature to Celsius based on the unit it was actually recorded in
+				// activeTemperature is always stored in Celsius from Open-Meteo
 				double tempCelsius = activeTemperature;
-				if (activeTemperatureUnit == "F") {
-					tempCelsius = (activeTemperature - 32.0) * 5.0 / 9.0;
-				}
 
 				// Build JSON via concatenation to avoid string.Format brace-escaping pitfalls
 				string tempStr = tempCelsius.ToString ("F1", System.Globalization.CultureInfo.InvariantCulture);
@@ -17314,10 +17305,6 @@ namespace MacStyleDock
 				radioButton.Checked += delegate {
 
 					settings.WeatherUnit = "C";
-					if (DockWindow.activeTemperatureUnit == "F") {
-						DockWindow.activeTemperature = (DockWindow.activeTemperature - 32.0) * 5.0 / 9.0;
-						DockWindow.activeTemperatureUnit = "C";
-					}
 
 					ownerWindow.ApplySettings (settings);
 
@@ -17328,10 +17315,6 @@ namespace MacStyleDock
 				radioButton2.Checked += delegate {
 
 					settings.WeatherUnit = "F";
-					if (DockWindow.activeTemperatureUnit == "C") {
-						DockWindow.activeTemperature = DockWindow.activeTemperature * 9.0 / 5.0 + 32.0;
-						DockWindow.activeTemperatureUnit = "F";
-					}
 
 					ownerWindow.ApplySettings (settings);
 

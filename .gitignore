@@ -28,6 +28,7 @@ ilspy7.zip
 
 # Installer packaging content
 PackageContent/
+payload_staging/
 app_payload.zip
 app_payload_part*.dat
 hist_test*.db
