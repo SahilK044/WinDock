@@ -14,6 +14,7 @@ import ShelfWidget from '../Activities/ShelfWidget';
 import SystemMonitorWidget from '../Activities/SystemMonitorWidget';
 import LauncherWidget from '../Activities/LauncherWidget';
 import ScreenshotWidget from '../Activities/ScreenshotWidget';
+import BluetoothWidget from '../Activities/BluetoothWidget';
 import { soundEngine } from '../../utils/soundEngine';
 
 const IDLE_TRACK = {
@@ -144,6 +145,7 @@ export default function DynamicIsland({
 }) {
   const [trackInfo, setTrackInfo] = useState(IDLE_TRACK);
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT);
+  const [displayAccentColor, setDisplayAccentColor] = useState(DEFAULT_ACCENT);
   const [barHeights, setBarHeights] = useState([3, 3, 3, 3, 3]);
   const [battery, setBattery] = useState({ pct: 0, charging: false, minsLeft: -1 });
   const [volume, setVolume] = useState(50);
@@ -153,6 +155,13 @@ export default function DynamicIsland({
   const [isGhostIdle, setIsGhostIdle] = useState(false);
   const [themeMode, setThemeMode] = useState('dark');
   const [weatherConfig, setWeatherConfig] = useState({ weatherUnit: 'C', temperature: 0 });
+  const [bluetoothData, setBluetoothData] = useState({
+    deviceName: 'AirPods Pro',
+    batteryPct: 88,
+    isCharging: false,
+    leftPct: null,
+    rightPct: null,
+  });
 
   const isLight = themeMode === 'light';
 
@@ -229,6 +238,33 @@ export default function DynamicIsland({
       lastFetchedTitleRef.current = '';
     }
   }, [trackInfo.title]);
+
+  useEffect(() => {
+    let rafId;
+    const easeColor = () => {
+      setDisplayAccentColor((prev) => {
+        const next = {
+          r: prev.r + (accentColor.r - prev.r) * 0.075,
+          g: prev.g + (accentColor.g - prev.g) * 0.075,
+          b: prev.b + (accentColor.b - prev.b) * 0.075,
+        };
+
+        if (
+          Math.abs(next.r - accentColor.r) < 0.5 &&
+          Math.abs(next.g - accentColor.g) < 0.5 &&
+          Math.abs(next.b - accentColor.b) < 0.5
+        ) {
+          return accentColor;
+        }
+
+        rafId = requestAnimationFrame(easeColor);
+        return next;
+      });
+    };
+
+    rafId = requestAnimationFrame(easeColor);
+    return () => cancelAnimationFrame(rafId);
+  }, [accentColor]);
 
   // ── Automatic smooth state morphing when Spotify starts/stops ─────────────
   useEffect(() => {
@@ -363,7 +399,20 @@ export default function DynamicIsland({
       volumeDismiss.current = setTimeout(() => setActiveState('compact-music'), 2000);
     });
 
-    return () => { cleanFS(); cleanSpotify(); cleanBattery(); cleanVolume(); };
+    const cleanBT = window.electronAPI.onBluetoothUpdate
+      ? window.electronAPI.onBluetoothUpdate((data) => {
+          setBluetoothData(data);
+          if (!data.isInitial) {
+            soundEngine.playChime();
+            setActiveState('expanded-bluetooth');
+            setTimeout(() => {
+              setActiveState((prev) => prev === 'expanded-bluetooth' ? (trackInfo.title ? 'compact-music' : 'idle') : prev);
+            }, 4500);
+          }
+        })
+      : () => {};
+
+    return () => { cleanFS(); cleanSpotify(); cleanBattery(); cleanVolume(); cleanBT(); };
   }, []);
 
   const gainRef = useRef(0);
@@ -410,6 +459,7 @@ export default function DynamicIsland({
       'expanded-sysmon':   [370, 150],
       'expanded-launcher': [360, 180],
       'expanded-screenshot':[360, 90],
+      'expanded-bluetooth': [376, 61],
     };
     const [w, h] = sizeMap[activeState] || [250, 44];
     window.electronAPI.resizeWindow(w, h);
@@ -438,6 +488,7 @@ export default function DynamicIsland({
       'expanded-sysmon':   'state-expanded-sysmon',
       'expanded-launcher': 'state-expanded-launcher',
       'expanded-screenshot':'state-expanded-screenshot',
+      'expanded-bluetooth':'state-expanded-bluetooth',
     }[activeState] || 'state-idle';
   };
 
@@ -537,12 +588,15 @@ export default function DynamicIsland({
   const isMusicState = activeState === 'compact-music' || activeState === 'expanded-music' || activeState === 'expanded-lyrics';
 
   // ── Eq bar color & glow ───────────────────────────────────────────────────
-  const { r, g, b } = accentColor;
-  const eqColor  = `rgb(${r},${g},${b})`;
-  const eqGlow   = `rgba(${r},${g},${b},0.35)`;
-  const progGrad = `linear-gradient(90deg, rgb(${r},${g},${b}), rgba(${r},${g},${b},0.75))`;
+  const { r, g, b } = displayAccentColor;
+  const smoothR = Math.round(r);
+  const smoothG = Math.round(g);
+  const smoothB = Math.round(b);
+  const eqColor  = `rgb(${smoothR},${smoothG},${smoothB})`;
+  const eqGlow   = `rgba(${smoothR},${smoothG},${smoothB},0.42)`;
+  const progGrad = `linear-gradient(90deg, rgb(${smoothR},${smoothG},${smoothB}), rgba(${smoothR},${smoothG},${smoothB},0.75))`;
 
-  const expandedGradient = buildPillBg(accentColor, true, true, isLight);
+  const expandedGradient = buildPillBg(displayAccentColor, true, true, isLight);
   const showGradient = (activeState === 'expanded-music' || activeState === 'expanded-lyrics') && trackInfo.isPlaying && !!trackInfo.title;
 
   return (
@@ -642,6 +696,17 @@ export default function DynamicIsland({
           )}
           {activeState === 'expanded-screenshot' && (
             <ScreenshotWidget imageSrc={screenshotData} onDismiss={() => setActiveState('idle')} />
+          )}
+          {activeState === 'expanded-bluetooth' && (
+            <BluetoothWidget
+              deviceName={bluetoothData.deviceName}
+              batteryPct={bluetoothData.batteryPct}
+              isCharging={bluetoothData.isCharging}
+              leftPct={bluetoothData.leftPct}
+              rightPct={bluetoothData.rightPct}
+              typeStr={bluetoothData.typeStr}
+              connectionState={bluetoothData.connectionState || 'connected'}
+            />
           )}
         </div>
       </div>

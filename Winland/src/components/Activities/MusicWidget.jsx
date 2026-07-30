@@ -441,6 +441,16 @@ export default function MusicWidget({
   // ── 60 FPS Sub-millisecond Smooth Real-time Progress Tracking ─────────────
   const [realtimeMs, setRealtimeMs] = useState(progressMs);
   const syncRef = useRef({ baseMs: progressMs, baseTime: performance.now() });
+  const lastTitleRef = useRef(title);
+  const [visualizerOpacity, setVisualizerOpacity] = useState(1);
+
+  useEffect(() => {
+    if (lastTitleRef.current === title) return;
+    lastTitleRef.current = title;
+    setVisualizerOpacity(0.18);
+    const fadeTimer = setTimeout(() => setVisualizerOpacity(1), 170);
+    return () => clearTimeout(fadeTimer);
+  }, [title]);
 
   useEffect(() => {
     const drift = Math.abs(progressMs - realtimeMs);
@@ -517,17 +527,28 @@ export default function MusicWidget({
 
   // Common Equalizer Component (Smooth Liquid Spring Animation)
   const EqBars = ({ h = 14 }) => (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2.5, height: h, flexShrink: 0 }}>
+    <div style={{
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: 2.5,
+      height: h,
+      flexShrink: 0,
+      opacity: visualizerOpacity,
+      transform: `scaleY(${0.92 + visualizerOpacity * 0.08})`,
+      transformOrigin: 'bottom center',
+      filter: visualizerOpacity < 1 ? 'blur(0.4px)' : 'none',
+      transition: 'opacity 0.36s cubic-bezier(0.2, 0.9, 0.2, 1), transform 0.42s cubic-bezier(0.2, 0.9, 0.2, 1), filter 0.36s ease',
+    }}>
       {barHeights.map((bh, i) => (
         <div
           key={i}
           style={{
             width: 2.5,
             height: `${Math.max(8, bh)}%`,
-            background: eqColor,
+            background: `linear-gradient(180deg, rgba(255,255,255,0.94), ${eqColor} 38%, ${eqColor})`,
             borderRadius: 2,
-            boxShadow: bh > 10 ? `0 0 6px ${eqGlow}` : 'none',
-            transition: 'height 0.04s linear, background 0.5s ease, box-shadow 0.3s ease',
+            boxShadow: bh > 10 ? `0 0 7px ${eqGlow}, 0 0 14px ${eqGlow}` : `0 0 4px ${eqGlow}`,
+            transition: 'height 0.05s linear, background 0.9s cubic-bezier(0.2, 0.9, 0.2, 1), box-shadow 0.9s cubic-bezier(0.2, 0.9, 0.2, 1)',
           }}
         />
       ))}
@@ -657,7 +678,8 @@ export default function MusicWidget({
               background: progressGradient,
               borderRadius: 4,
               boxShadow: `0 0 8px ${eqGlow}`,
-              transition: isDragging ? 'none' : 'background 0.8s ease',
+              transition: isDragging ? 'none' : 'background 0.9s cubic-bezier(0.2, 0.9, 0.2, 1), box-shadow 0.9s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.36s ease',
+              opacity: visualizerOpacity,
               willChange: 'width',
             }}
           >
