@@ -3914,8 +3914,15 @@ namespace MacStyleDock
 
 		private void SetupFullscreenWatcher ()
 		{
-			_fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (500.0) };
+			_fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds (400.0) };
 			_fullscreenTimer.Tick += delegate {
+				try {
+					string sigPath = System.IO.Path.Combine (System.IO.Path.GetTempPath (), "windock_open_settings.signal");
+					if (System.IO.File.Exists (sigPath)) {
+						try { System.IO.File.Delete (sigPath); } catch { }
+						OpenSettingsWindow ();
+					}
+				} catch { }
 				if (settings == null || !settings.HideOnFullscreen) return;
 				IntPtr dockHwnd = new WindowInteropHelper (this).Handle;
 				bool isFS = FullscreenDetector.IsFullscreenOnDockMonitor (dockHwnd);
