@@ -5275,21 +5275,29 @@ namespace MacStyleDock
 			try {
 				string effectiveTheme = GetEffectiveTheme ().ToLower ();
 				string unit = (settings != null && !string.IsNullOrEmpty (settings.WeatherUnit) && (settings.WeatherUnit.Equals ("fahrenheit", StringComparison.OrdinalIgnoreCase) || settings.WeatherUnit.Equals ("F", StringComparison.OrdinalIgnoreCase))) ? "F" : "C";
-				// Always store temperature in Celsius so the frontend can convert reliably
+
+				// Always normalize to Celsius so the frontend can reliably convert
 				double tempCelsius = activeTemperature;
 				if (unit == "F") {
 					tempCelsius = (activeTemperature - 32.0) * 5.0 / 9.0;
 				}
-				string themeJson = string.Format (System.Globalization.CultureInfo.InvariantCulture,
-					"{\"theme\":\"{0}\",\"enableDynamicIsland\":{1},\"weatherUnit\":\"{2}\",\"temperatureC\":{3:F1},\"weatherCode\":{4},\"autoHide\":{5},\"hideOnFullscreen\":{6}}}",
-					effectiveTheme,
-					(settings != null && settings.EnableDynamicIsland) ? "true" : "false",
-					unit,
-					tempCelsius,
-					activeWeatherCode,
-					(settings != null && settings.AutoHide) ? "true" : "false",
-					(settings != null && settings.HideOnFullscreen) ? "true" : "false"
-				);
+
+				// Build JSON via concatenation to avoid string.Format brace-escaping pitfalls
+				string tempStr = tempCelsius.ToString ("F1", System.Globalization.CultureInfo.InvariantCulture);
+				string enableDI = (settings != null && settings.EnableDynamicIsland) ? "true" : "false";
+				string autoHide = (settings != null && settings.AutoHide) ? "true" : "false";
+				string hideFS  = (settings != null && settings.HideOnFullscreen) ? "true" : "false";
+
+				string themeJson = "{"
+					+ "\"theme\":\"" + effectiveTheme + "\","
+					+ "\"enableDynamicIsland\":" + enableDI + ","
+					+ "\"weatherUnit\":\"" + unit + "\","
+					+ "\"temperatureC\":" + tempStr + ","
+					+ "\"weatherCode\":" + activeWeatherCode + ","
+					+ "\"autoHide\":" + autoHide + ","
+					+ "\"hideOnFullscreen\":" + hideFS
+					+ "}";
+
 				string tempThemePath = System.IO.Path.Combine (System.IO.Path.GetTempPath (), "winland_theme.json");
 				System.IO.File.WriteAllText (tempThemePath, themeJson);
 			} catch { }
