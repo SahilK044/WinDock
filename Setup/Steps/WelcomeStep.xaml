@@ -68,15 +68,15 @@
                 </StackPanel>
             </Border>
 
-            <!-- Card 3: Weather -->
+            <!-- Card 3: WinCast -->
             <Border Grid.Column="4" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="16,20">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.06" Color="#000000"/>
                 </Border.Effect>
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="⛅" FontSize="26" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                    <TextBlock Text="Weather" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="Live Forecast Overlay" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
+                    <Image Source="pack://application:,,,/wincast_logo.png" Width="38" Height="38" HorizontalAlignment="Center" Margin="0,0,0,8" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="WinCast" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="Live Forecast &amp; Weather" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </StackPanel>
             </Border>
         </Grid>

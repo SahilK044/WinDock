@@ -43,7 +43,7 @@
 
             <!-- Subtitle -->
             <TextBlock x:Name="SubtitleText"
-                       Text="WinDock, Winland, and Weather App installed successfully." 
+                       Text="WinDock, Winland, and WinCast installed successfully." 
                        FontFamily="{DynamicResource BodyFontFamily}" 
                        FontSize="14" 
                        Foreground="#475569" 

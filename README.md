@@ -40,7 +40,7 @@
 
 - **WinDock**: Fluid desktop dock with app magnification, stack folders, an app launcher, and Spotlight-style search utilities.
 - **Winland Dynamic Island**: Floating media and system-status pill with track artwork, controls, and quick workflows.
-- **Weather App**: Live forecast widget with current conditions and hourly weather data.
+- **WinCast**: Live forecast and weather overlay widget with current conditions and hourly weather data.
 - **Setup Installer**: Light-themed setup wizard with animated progress and install options.
 - **Deep Uninstaller**: Removes suite processes and installed files cleanly during uninstall.
 

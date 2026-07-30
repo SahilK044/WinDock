@@ -5115,11 +5115,11 @@ namespace MacStyleDock
 
 							settings.Items.Add (new DockItemConfig {
 
-								Name = "Weather",
+								Name = "WinCast",
 
 								FilePath = "action:weather",
 
-								ProcessName = "Weather"
+								ProcessName = "WinCast"
 
 							});
 
@@ -5424,11 +5424,11 @@ namespace MacStyleDock
 
 			settings.Items.Add (new DockItemConfig {
 
-				Name = "Weather",
+				Name = "WinCast",
 
 				FilePath = "action:weather",
 
-				ProcessName = "Weather"
+				ProcessName = "WinCast"
 
 			});
 
