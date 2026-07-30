@@ -5275,12 +5275,17 @@ namespace MacStyleDock
 			try {
 				string effectiveTheme = GetEffectiveTheme ().ToLower ();
 				string unit = (settings != null && !string.IsNullOrEmpty (settings.WeatherUnit) && (settings.WeatherUnit.Equals ("fahrenheit", StringComparison.OrdinalIgnoreCase) || settings.WeatherUnit.Equals ("F", StringComparison.OrdinalIgnoreCase))) ? "F" : "C";
+				// Always store temperature in Celsius so the frontend can convert reliably
+				double tempCelsius = activeTemperature;
+				if (unit == "F") {
+					tempCelsius = (activeTemperature - 32.0) * 5.0 / 9.0;
+				}
 				string themeJson = string.Format (System.Globalization.CultureInfo.InvariantCulture,
-					"{{\"theme\":\"{0}\",\"enableDynamicIsland\":{1},\"weatherUnit\":\"{2}\",\"temperature\":{3},\"weatherCode\":{4},\"autoHide\":{5},\"hideInFullscreen\":{6}}}",
+					"{\"theme\":\"{0}\",\"enableDynamicIsland\":{1},\"weatherUnit\":\"{2}\",\"temperatureC\":{3:F1},\"weatherCode\":{4},\"autoHide\":{5},\"hideOnFullscreen\":{6}}}",
 					effectiveTheme,
 					(settings != null && settings.EnableDynamicIsland) ? "true" : "false",
 					unit,
-					activeTemperature,
+					tempCelsius,
 					activeWeatherCode,
 					(settings != null && settings.AutoHide) ? "true" : "false",
 					(settings != null && settings.HideOnFullscreen) ? "true" : "false"
@@ -17303,6 +17308,8 @@ namespace MacStyleDock
 
 					ownerWindow.ApplySettings (settings);
 
+					ownerWindow.SaveSettings ();
+
 				};
 
 				radioButton2.Checked += delegate {
@@ -17310,6 +17317,8 @@ namespace MacStyleDock
 					settings.WeatherUnit = "F";
 
 					ownerWindow.ApplySettings (settings);
+
+					ownerWindow.SaveSettings ();
 
 				};
 
