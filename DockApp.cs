@@ -2253,6 +2253,11 @@ namespace MacStyleDock
 
 		private IntPtr HwndHook (IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
 		{
+			if (msg == 0x0709 || msg == 0x0400 + 777) {
+				OpenSettingsWindow ();
+				handled = true;
+				return IntPtr.Zero;
+			}
 			if (msg == 0x0021) {
 				handled = true;
 				return (IntPtr)3;
@@ -5249,6 +5254,33 @@ namespace MacStyleDock
 
 
 
+		public void OpenSettingsWindow ()
+		{
+			Dispatcher.Invoke (delegate {
+				try {
+					foreach (Window win in System.Windows.Application.Current.Windows) {
+						if (win is SettingsWindow sw) {
+							if (sw.WindowState == WindowState.Minimized) sw.WindowState = WindowState.Normal;
+							sw.Activate ();
+							sw.Focus ();
+							return;
+						}
+					}
+					new SettingsWindow (this, settings).Show ();
+				} catch { }
+			});
+		}
+
+		public void WriteWinlandThemeSync ()
+		{
+			try {
+				string effectiveTheme = GetEffectiveTheme ().ToLower ();
+				string themeJson = string.Format ("{{\"theme\":\"{0}\",\"enableDynamicIsland\":{1}}}", effectiveTheme, settings.EnableDynamicIsland ? "true" : "false");
+				string tempThemePath = System.IO.Path.Combine (System.IO.Path.GetTempPath (), "winland_theme.json");
+				System.IO.File.WriteAllText (tempThemePath, themeJson);
+			} catch { }
+		}
+
 		public void SaveSettings ()
 
 		{
@@ -5264,6 +5296,8 @@ namespace MacStyleDock
 			} catch {
 
 			}
+
+			WriteWinlandThemeSync ();
 
 		}
 
@@ -12450,7 +12484,7 @@ namespace MacStyleDock
 			} catch { }
 		}
 
-		private void ManageWinlandState ()
+		public void ManageWinlandState ()
 		{
 			try {
 				CleanOrphanedMediaProcesses ();
@@ -17088,6 +17122,7 @@ namespace MacStyleDock
 			BindToggle ("DynamicIsland", settings.EnableDynamicIsland, delegate(bool v) {
 
 				settings.EnableDynamicIsland = v;
+				try { ownerWindow.ManageWinlandState (); } catch { }
 
 			});
 
