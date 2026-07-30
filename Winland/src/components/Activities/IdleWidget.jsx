@@ -5,8 +5,9 @@ export default function IdleWidget({ weatherConfig }) {
   const [timeStr, setTimeStr] = useState('');
 
   const unit = (weatherConfig?.weatherUnit === 'F' || weatherConfig?.weatherUnit === 'fahrenheit') ? 'F' : 'C';
-  const tempC = weatherConfig?.temperatureC ?? weatherConfig?.temperature ?? 22;
-  const tempVal = unit === 'F' ? Math.round(Number(tempC) * 9 / 5 + 32) : Math.round(Number(tempC));
+  const rawC = weatherConfig?.temperatureC ?? weatherConfig?.temperature;
+  const tempC = (rawC !== undefined && rawC !== null && !isNaN(rawC) && rawC !== 0) ? Number(rawC) : 22;
+  const tempVal = unit === 'F' ? Math.round(tempC * 9 / 5 + 32) : Math.round(tempC);
   const tempStr = `${tempVal}°${unit}`;
 
   useEffect(() => {
