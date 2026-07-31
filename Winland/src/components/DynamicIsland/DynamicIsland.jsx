@@ -154,7 +154,7 @@ export default function DynamicIsland({
   const [screenshotData, setScreenshotData] = useState(null);
   const [isGhostIdle, setIsGhostIdle] = useState(false);
   const [themeMode, setThemeMode] = useState('dark');
-  const [weatherConfig, setWeatherConfig] = useState({ weatherUnit: 'C', temperature: 0 });
+  const [weatherConfig, setWeatherConfig] = useState({ weatherUnit: 'C' });
   const [bluetoothData, setBluetoothData] = useState({
     deviceName: 'AirPods Pro',
     batteryPct: 88,
@@ -195,6 +195,14 @@ export default function DynamicIsland({
   const volumeDismiss         = useRef(null);
   const prevCoverRef          = useRef(null);
   const ghostTimerRef         = useRef(null);
+  const trackInfoRef          = useRef(trackInfo);
+
+  // Keep a ref mirror of trackInfo so the mount-once IPC listener effect below
+  // (empty dep array) can read the *current* track instead of the value it
+  // closed over at mount time.
+  useEffect(() => {
+    trackInfoRef.current = trackInfo;
+  }, [trackInfo]);
 
   // ── Ghost-When-Idle Timer (8s idle -> 3% opacity fade) ────────────────────
   useEffect(() => {
@@ -388,7 +396,7 @@ export default function DynamicIsland({
       setBattery({ pct, charging, minsLeft });
       if (changed && (pct <= 20 || charging)) {
         setActiveState('expanded-battery');
-        setTimeout(() => setActiveState('compact-music'), 5000);
+        setTimeout(() => setActiveState(trackInfoRef.current.title ? 'compact-music' : 'idle'), 5000);
       }
     });
 
@@ -396,7 +404,7 @@ export default function DynamicIsland({
       setVolume(vol);
       setActiveState('volume-osd');
       clearTimeout(volumeDismiss.current);
-      volumeDismiss.current = setTimeout(() => setActiveState('compact-music'), 2000);
+      volumeDismiss.current = setTimeout(() => setActiveState(trackInfoRef.current.title ? 'compact-music' : 'idle'), 2000);
     });
 
     const cleanBT = window.electronAPI.onBluetoothUpdate
@@ -406,7 +414,7 @@ export default function DynamicIsland({
             soundEngine.playChime();
             setActiveState('expanded-bluetooth');
             setTimeout(() => {
-              setActiveState((prev) => prev === 'expanded-bluetooth' ? (trackInfo.title ? 'compact-music' : 'idle') : prev);
+              setActiveState((prev) => prev === 'expanded-bluetooth' ? (trackInfoRef.current.title ? 'compact-music' : 'idle') : prev);
             }, 4500);
           }
         })

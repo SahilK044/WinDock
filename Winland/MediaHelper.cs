@@ -7,12 +7,12 @@ namespace WinMedia {
         public static string GetMediaInfo() {
             try {
                 var task = GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask();
-                task.Wait(1000);
+                if (!task.Wait(1000)) return "";
                 var mgr = task.Result;
                 var session = mgr?.GetCurrentSession();
                 if (session != null) {
                     var propTask = session.TryGetMediaPropertiesAsync().AsTask();
-                    propTask.Wait(1000);
+                    if (!propTask.Wait(1000)) return "";
                     var props = propTask.Result;
                     var timeline = session.GetTimelineProperties();
                     int pos = (int)timeline.Position.TotalMilliseconds;

@@ -523,7 +523,7 @@ export default function MusicWidget({
   const mins = time.getMinutes();
   const displayHours = hours % 12 || 12;
   const timeString = `${displayHours}:${mins < 10 ? '0' : ''}${mins}`;
-  const dateString = time.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const dateString = time.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   // Common Equalizer Component (Smooth Liquid Spring Animation)
   const EqBars = ({ h = 14 }) => (
@@ -594,18 +594,27 @@ export default function MusicWidget({
     );
   }
 
-  /* ─── EXPANDED PILL (1:1 macOS / iOS Layout) ─── */
+  /* ─── EXPANDED PILL (1:1 macOS / iOS Lock Screen clock) ─── */
   if (!title) {
     return (
       <div style={{
         width: '100%', height: '100%',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: 6, padding: '10px 0', fontFamily: MAC_FONT,
+        gap: 8, padding: '10px 0', fontFamily: MAC_FONT,
       }}>
-        <div style={{ fontSize: 34, fontWeight: 800, color: '#ffffff', letterSpacing: '-1px', lineHeight: '36px' }}>
+        <div
+          style={{
+            fontSize: 52,
+            fontWeight: 700,
+            color: '#ffffff',
+            letterSpacing: '-1.5px',
+            lineHeight: '58px',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
           {timeString}
         </div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255, 255, 255, 0.55)' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255, 255, 255, 0.55)', letterSpacing: '0.1px' }}>
           {dateString}
         </div>
       </div>

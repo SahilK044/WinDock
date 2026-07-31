@@ -46,6 +46,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readSettings: () => ipcRenderer.invoke('read-settings'),
   writeSettings: (data) => ipcRenderer.send('write-settings', data),
 
+  // WinDock config sync (theme, weather, island preferences)
+  getInitialConfig: () => ipcRenderer.invoke('get-initial-config'),
+  onConfigUpdate: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('config-update', handler);
+    return () => ipcRenderer.removeListener('config-update', handler);
+  },
+  onThemeUpdate: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('theme-update', handler);
+    return () => ipcRenderer.removeListener('theme-update', handler);
+  },
+
   // App launching & file opening
   launchApp: (cmd) => ipcRenderer.send('launch-app', cmd),
   openPath: (filePath) => ipcRenderer.send('open-path', filePath),

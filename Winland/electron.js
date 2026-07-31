@@ -1,7 +1,7 @@
 import { app, BrowserWindow, screen, ipcMain, globalShortcut, nativeTheme, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 
@@ -41,6 +41,38 @@ function writeSettings(data) {
   } catch (e) {
     console.error('Failed to write settings:', e);
   }
+}
+
+// ── WinDock config bridge (theme / weather / island prefs) ─────────────────
+// WinDock (the .NET host) writes this file every time it refreshes the
+// weather (~every 15 min, plus on launch) and whenever settings are saved.
+// We read it once for the initial state, then watch it for changes.
+const WINLAND_THEME_PATH = path.join(os.tmpdir(), 'winland_theme.json');
+
+function readWinlandConfig() {
+  try {
+    if (!fs.existsSync(WINLAND_THEME_PATH)) return null;
+    return JSON.parse(fs.readFileSync(WINLAND_THEME_PATH, 'utf8'));
+  } catch (e) {
+    return null;
+  }
+}
+
+function broadcastWinlandConfig() {
+  const data = readWinlandConfig();
+  if (!data || !mainWindow || !mainWindow.webContents) return;
+  mainWindow.webContents.send('config-update', data);
+  if (data.theme) mainWindow.webContents.send('theme-update', { theme: data.theme });
+}
+
+function watchWinlandConfig() {
+  // fs.watch is unreliable across platforms (esp. Windows) for files that don't
+  // exist yet; watchFile's polling is slower but predictable, and WinDock only
+  // rewrites this file every ~15 min (or on demand for settings changes), so a
+  // 3s poll is plenty responsive without adding real overhead.
+  fs.watchFile(WINLAND_THEME_PATH, { interval: 3000 }, (curr, prev) => {
+    if (curr.mtimeMs !== prev.mtimeMs) broadcastWinlandConfig();
+  });
 }
 
 function getSpotifyExePath() {
@@ -111,7 +143,6 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
     },
   });
 
@@ -132,6 +163,8 @@ function createWindow() {
     startBatteryPoller();
     startFullscreenPoller();
     registerVolumeKeys();
+    watchWinlandConfig();
+    broadcastWinlandConfig();
   }, 1500);
 }
 
@@ -399,39 +432,41 @@ ipcMain.on('set-ignore-mouse-events', (event, ignore) => {
 
 ipcMain.handle('read-settings', () => readSettings());
 ipcMain.on('write-settings', (event, data) => writeSettings(data));
+ipcMain.handle('get-initial-config', () => readWinlandConfig());
 
 ipcMain.on('open-path', (event, filePath) => {
   if (filePath) {
     shell.openPath(filePath).catch(() => {
-      exec(`explorer.exe "${filePath}"`);
+      execFile('explorer.exe', [filePath]);
     });
   }
 });
 
 ipcMain.on('launch-app', (event, cmd) => {
-  let command = '';
   switch (cmd) {
     case 'browser':
-      command = 'start https://www.google.com';
+      shell.openExternal('https://www.google.com');
       break;
     case 'spotify':
-      command = 'start spotify:';
+      shell.openExternal('spotify:');
       break;
     case 'explorer':
-      command = 'explorer.exe';
+      execFile('explorer.exe', [], (err) => {
+        if (err) console.error('Failed to launch explorer.exe:', err);
+      });
       break;
     case 'terminal':
-      command = 'start cmd.exe';
+      execFile('cmd.exe', [], { detached: true }, (err) => {
+        if (err) console.error('Failed to launch cmd.exe:', err);
+      });
       break;
     case 'settings':
-      command = 'start ms-settings:';
+      shell.openExternal('ms-settings:');
       break;
     default:
-      command = `start ${cmd}`;
+      // Unrecognized command — do not shell-exec arbitrary renderer input.
+      console.warn('Ignored unrecognized launch-app command:', cmd);
   }
-  exec(command, (err) => {
-    if (err) console.error('Failed to launch:', command, err);
-  });
 });
 
 // ── App Lifecycle ──────────────────────────────────────────────────────────
@@ -450,4 +485,5 @@ app.on('will-quit', () => {
   if (pollerInterval) clearInterval(pollerInterval);
   if (batteryInterval) clearInterval(batteryInterval);
   if (fullscreenInterval) clearInterval(fullscreenInterval);
+  fs.unwatchFile(WINLAND_THEME_PATH);
 });

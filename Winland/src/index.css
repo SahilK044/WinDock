@@ -135,6 +135,13 @@ button:active {
   z-index: 0;
 }
 
+/* Secondary label color (Apple's dark-mode secondary-label convention).
+   Dark is the default theme, so this is the base rule; the light-theme
+   override below already assumes this class dims text on its own. */
+.widget-subtitle {
+  color: rgba(255, 255, 255, 0.55);
+}
+
 /* Light Theme Mode Reactivity */
 .island-capsule.theme-light::before {
   background: rgba(255, 255, 255, 0.94) !important;

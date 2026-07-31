@@ -956,6 +956,36 @@ namespace MacStyleDock
 
 	}
 
+	// Tracks helper/child processes WinDock spawns (Weather, Winland) so they can be
+	// terminated when WinDock exits instead of being left running in the background.
+	public static class ChildProcessTracker
+	{
+		private static readonly List<Process> _tracked = new List<Process> ();
+		private static readonly object _lock = new object ();
+
+		public static void Track (Process p)
+		{
+			if (p == null) return;
+			lock (_lock) {
+				_tracked.Add (p);
+			}
+		}
+
+		public static void KillAllTracked ()
+		{
+			lock (_lock) {
+				foreach (Process p in _tracked) {
+					try {
+						if (p != null && !p.HasExited) {
+							p.Kill ();
+						}
+					} catch { }
+				}
+				_tracked.Clear ();
+			}
+		}
+	}
+
 	public class Program
 
 	{
@@ -964,6 +994,10 @@ namespace MacStyleDock
 
 		public static void Main ()
 		{
+			AppDomain.CurrentDomain.ProcessExit += (s, e) => {
+				ChildProcessTracker.KillAllTracked ();
+			};
+
 			AppDomain.CurrentDomain.UnhandledException += (s, e) => {
 				try { File.WriteAllText (System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "startup_error.log"), e.ExceptionObject.ToString ()); } catch { }
 			};
@@ -12486,6 +12520,7 @@ namespace MacStyleDock
 								// for CPU with the desktop compositor and other apps.
 								if (winlandProcess != null) {
 									winlandProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
+									ChildProcessTracker.Track (winlandProcess);
 								}
 							} catch { }
 						}
@@ -14916,10 +14951,11 @@ namespace MacStyleDock
 				try {
 					string weatherOSExe = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Weather", "WeatherOS.exe");
 					if (File.Exists (weatherOSExe)) {
-						Process.Start (new ProcessStartInfo (weatherOSExe) {
+						Process weatherProc = Process.Start (new ProcessStartInfo (weatherOSExe) {
 							UseShellExecute = true,
 							WorkingDirectory = System.IO.Path.GetDirectoryName (weatherOSExe)
 						});
+						ChildProcessTracker.Track (weatherProc);
 					}
 					return;
 				} catch { }
@@ -24737,10 +24773,11 @@ namespace MacStyleDock
 				try {
 					string weatherOSExe = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Weather", "WeatherOS.exe");
 					if (File.Exists (weatherOSExe)) {
-						Process.Start (new ProcessStartInfo (weatherOSExe) {
+						Process weatherProc = Process.Start (new ProcessStartInfo (weatherOSExe) {
 							UseShellExecute = true,
 							WorkingDirectory = System.IO.Path.GetDirectoryName (weatherOSExe)
 						});
+						ChildProcessTracker.Track (weatherProc);
 					}
 					this.Hide ();
 				} catch {}

@@ -2,29 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Sun, Cloud, CloudRain } from 'lucide-react';
 
 export default function IdleWidget({ weatherConfig }) {
-  const [timeStr, setTimeStr] = useState('');
+  const [now, setNow] = useState(() => new Date());
 
   const unit = (weatherConfig?.weatherUnit === 'F' || weatherConfig?.weatherUnit === 'fahrenheit') ? 'F' : 'C';
   const rawC = weatherConfig?.temperatureC ?? weatherConfig?.temperature;
-  const tempC = (rawC !== undefined && rawC !== null && !isNaN(rawC) && rawC !== 0) ? Number(rawC) : 22;
+  const tempC = (rawC !== undefined && rawC !== null && !isNaN(rawC)) ? Number(rawC) : 22;
   const tempVal = unit === 'F' ? Math.round(tempC * 9 / 5 + 32) : Math.round(tempC);
   const tempStr = `${tempVal}°${unit}`;
 
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const formattedHours = hours % 12 || 12;
-      const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-      setTimeStr(`${formattedHours}:${formattedMinutes} ${ampm}`);
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
+    const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  const displayMinutes = minutes < 10 ? `0${minutes}` : `${minutes}`;
 
   return (
     <div
@@ -41,17 +36,37 @@ export default function IdleWidget({ weatherConfig }) {
         padding: '2px 0',
       }}
     >
-      {/* Time in Middle (macOS Tahoe font) */}
+      {/* Time in Middle — menu-bar-clock style: bold tabular digits, AM/PM demoted to a small tracked suffix */}
       <div
         style={{
-          fontSize: 14,
-          fontWeight: 800,
-          color: 'inherit',
-          letterSpacing: '0.4px',
-          lineHeight: '16px',
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 3,
+          lineHeight: '17px',
         }}
       >
-        {timeStr}
+        <span
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            color: 'inherit',
+            letterSpacing: '-0.2px',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {displayHours}:{displayMinutes}
+        </span>
+        <span
+          className="widget-subtitle"
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.4px',
+            textTransform: 'uppercase',
+          }}
+        >
+          {ampm}
+        </span>
       </div>
 
       {/* Weather Under Time */}
@@ -63,10 +78,10 @@ export default function IdleWidget({ weatherConfig }) {
           display: 'flex',
           alignItems: 'center',
           gap: 4,
-          marginTop: 2,
+          marginTop: 3,
         }}
       >
-        <Sun size={11} color="#f59e0b" />
+        <Sun size={11} color="var(--accent-orange)" />
         <span>{tempStr} Sunny</span>
       </div>
     </div>
