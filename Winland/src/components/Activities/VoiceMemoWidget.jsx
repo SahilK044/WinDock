@@ -100,7 +100,7 @@ export default function VoiceMemoWidget({ isCompact, onStop }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600 }}>48kHz 24-bit AI Noise Reduction</span>
+        <span style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600 }}>48kHz 24-bit HD Noise Reduction</span>
         <div className="glass-btn btn-danger" style={{ width: 34, height: 34 }} onClick={onStop} title="Stop & Save">
           <Square size={14} fill="#fff" />
         </div>

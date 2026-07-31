@@ -81,7 +81,7 @@ export default function Dock({ activeState, setActiveState }) {
     },
     {
       id: 'siri',
-      name: 'Siri & AI',
+      name: 'Voice Commands',
       icon: <Sparkles size={24} color="#fff" />,
       gradient: 'linear-gradient(135deg, #a855f7, #6b21a8)',
       triggerState: 'expanded-siri',

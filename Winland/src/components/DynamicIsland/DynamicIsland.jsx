@@ -194,6 +194,11 @@ export default function DynamicIsland({
   const tRef                  = useRef(0);
   const volumeDismiss         = useRef(null);
   const bluetoothDismiss      = useRef(null);
+  // Remembers what the island was showing (e.g. expanded-lyrics) right before a
+  // transient overlay (bluetooth / battery / volume) interrupted it, so we can
+  // resume that view instead of always dropping back to the compact player -
+  // this was why the lyrics tab kept appearing to "auto-close".
+  const preOverlayStateRef    = useRef(null);
   const prevCoverRef          = useRef(null);
   const ghostTimerRef         = useRef(null);
   const trackInfoRef          = useRef(trackInfo);
@@ -393,34 +398,59 @@ export default function DynamicIsland({
 
     const cleanSpotify = window.electronAPI.onSystemMediaUpdate(updateTrackData);
 
+    // States that are transient "popovers" over whatever the island was already
+    // showing. Used to remember/restore the underlying view (e.g. expanded-lyrics)
+    // instead of always snapping back to the compact player when they dismiss.
+    const isOverlayState = (s) => s === 'expanded-battery' || s === 'volume-osd' || s === 'expanded-bluetooth';
+    const resumeFromOverlay = () => {
+      const resumeState = preOverlayStateRef.current;
+      preOverlayStateRef.current = null;
+      if (resumeState === 'expanded-lyrics' || resumeState === 'expanded-music') return resumeState;
+      return trackInfoRef.current.title ? 'compact-music' : 'idle';
+    };
+
     const cleanBattery = window.electronAPI.onBatteryUpdate(({ pct, charging, minsLeft, changed }) => {
       setBattery({ pct, charging, minsLeft });
       if (changed && (pct <= 20 || charging)) {
-        setActiveState('expanded-battery');
-        setTimeout(() => setActiveState(trackInfoRef.current.title ? 'compact-music' : 'idle'), 5000);
+        setActiveState((prev) => {
+          if (!isOverlayState(prev)) preOverlayStateRef.current = prev;
+          return 'expanded-battery';
+        });
+        setTimeout(() => setActiveState((prev) => prev === 'expanded-battery' ? resumeFromOverlay() : prev), 5000);
       }
     });
 
     const cleanVolume = window.electronAPI.onVolumeUpdate(({ vol }) => {
       setVolume(vol);
-      setActiveState('volume-osd');
+      setActiveState((prev) => {
+        if (!isOverlayState(prev)) preOverlayStateRef.current = prev;
+        return 'volume-osd';
+      });
       clearTimeout(volumeDismiss.current);
-      volumeDismiss.current = setTimeout(() => setActiveState(trackInfoRef.current.title ? 'compact-music' : 'idle'), 2000);
+      volumeDismiss.current = setTimeout(() => setActiveState((prev) => prev === 'volume-osd' ? resumeFromOverlay() : prev), 2000);
     });
+
+    if (window.electronAPI?.getBluetoothState) {
+      window.electronAPI.getBluetoothState().then((data) => {
+        if (data && data.deviceName) {
+          setBluetoothData(data);
+        }
+      }).catch(() => {});
+    }
 
     const cleanBT = window.electronAPI.onBluetoothUpdate
       ? window.electronAPI.onBluetoothUpdate((data) => {
           setBluetoothData(data);
-          if (!data.isInitial) {
+          if (data && data.deviceName && !data.isInitial) {
             soundEngine.playChime();
-            setActiveState('expanded-bluetooth');
-            // Cancel any pending dismiss from a previous connect/disconnect event so a
-            // second event arriving mid-display gets its own full 4.5s, instead of being
-            // cut short by the earlier event's timer.
+            setActiveState((prev) => {
+              if (!isOverlayState(prev)) preOverlayStateRef.current = prev;
+              return 'expanded-bluetooth';
+            });
             clearTimeout(bluetoothDismiss.current);
             bluetoothDismiss.current = setTimeout(() => {
-              setActiveState((prev) => prev === 'expanded-bluetooth' ? (trackInfoRef.current.title ? 'compact-music' : 'idle') : prev);
-            }, 4500);
+              setActiveState((prev) => prev === 'expanded-bluetooth' ? resumeFromOverlay() : prev);
+            }, 6200);
           }
         })
       : () => {};
