@@ -195,6 +195,8 @@ button:active {
 }
 
 .island-capsule.theme-light .lyric-row.is-active .lyric-text {
+  background-image: none !important;
+  -webkit-text-fill-color: #0f172a !important;
   color: #0f172a !important;
   text-shadow: 0 0 10px rgba(15, 23, 42, 0.2) !important;
   animation: none !important;
@@ -613,8 +615,19 @@ button:active {
 }
 
 .lyric-row.is-active .lyric-text {
-  color: #ffffff;
   font-weight: 700;
+  /* Karaoke word-wipe: sung portion (left of --lyric-fill) is solid white,
+     the rest stays dim, and the browser compositor animates the boundary
+     between ticks since --lyric-fill is a registered animatable <percentage>. */
+  background-image: linear-gradient(
+    90deg,
+    #ffffff var(--lyric-fill, 0%),
+    rgba(255, 255, 255, 0.45) var(--lyric-fill, 0%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #ffffff;
   animation: lyricPulseGlow 3s infinite ease-in-out;
 }
 

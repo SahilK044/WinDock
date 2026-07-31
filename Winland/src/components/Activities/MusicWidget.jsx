@@ -415,23 +415,6 @@ export default function MusicWidget({
 }) {
   const { title, artist, album, coverUrl, isPlaying = false, progressMs = 0, durationMs = 0 } = trackInfo;
 
-  /* ─── EXPANDED SYNCED LYRICS VIEW ─── */
-  if (isLyricsView) {
-    return (
-      <SyncedLyricsView
-        title={title}
-        artist={artist}
-        coverUrl={coverUrl}
-        progressMs={progressMs}
-        isPlaying={isPlaying}
-        onSeek={onSeek}
-        onClose={onToggleLyrics}
-        eqColor={eqColor}
-        eqGlow={eqGlow}
-      />
-    );
-  }
-
   const [time, setTime] = useState(new Date());
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgressMs, setDragProgressMs] = useState(0);
@@ -478,6 +461,26 @@ export default function MusicWidget({
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  /* ─── EXPANDED SYNCED LYRICS VIEW ───
+     Must come after every hook above (Rules of Hooks: an early return can't
+     precede a hook call, or the hook count changes between renders and React
+     throws as soon as isLyricsView flips). */
+  if (isLyricsView) {
+    return (
+      <SyncedLyricsView
+        title={title}
+        artist={artist}
+        coverUrl={coverUrl}
+        progressMs={progressMs}
+        isPlaying={isPlaying}
+        onSeek={onSeek}
+        onClose={onToggleLyrics}
+        eqColor={eqColor}
+        eqGlow={eqGlow}
+      />
+    );
+  }
 
   const activeDisplayMs = isDragging ? dragProgressMs : realtimeMs;
   const pct = durationMs > 0 ? Math.min(100, Math.max(0, (activeDisplayMs / durationMs) * 100)) : 0;

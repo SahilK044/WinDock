@@ -14,6 +14,10 @@ let lastBatteryLevel = -1;
 let lastChargingState = null;
 let pollerInterval = null;
 let batteryInterval = null;
+let bluetoothInterval = null;
+// null = not polled yet (next successful poll is the "initial" snapshot, no
+// connect/disconnect notification should fire for it). Map<instanceId, {name, battery}>.
+let lastBluetoothDevices = null;
 
 // ── Settings ──────────────────────────────────────────────────────────────
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
@@ -162,6 +166,7 @@ function createWindow() {
     startSpotifyPoller();
     startBatteryPoller();
     startFullscreenPoller();
+    startBluetoothPoller();
     registerVolumeKeys();
     watchWinlandConfig();
     broadcastWinlandConfig();
@@ -281,6 +286,98 @@ function startBatteryPoller() {
   if (batteryInterval) clearInterval(batteryInterval);
   pollBattery();
   batteryInterval = setInterval(pollBattery, 30000);
+}
+
+// ── Bluetooth Connect/Disconnect Poller ─────────────────────────────────────
+// Get-PnpDevice reports every Bluetooth PnP node (radio, RFCOMM channels,
+// HID, audio, etc.) - we filter down to the handful that represent an actual
+// paired accessory so the adapter itself never shows up as a "device".
+const PS1_BLUETOOTH = path.join(os.tmpdir(), 'winland_bluetooth_poll.ps1');
+fs.writeFileSync(PS1_BLUETOOTH, [
+  '$devices = Get-PnpDevice -Class Bluetooth -PresentOnly -ErrorAction SilentlyContinue |',
+  "  Where-Object { $_.Status -eq 'OK' -and $_.FriendlyName -and $_.FriendlyName -notmatch 'Bluetooth (Radio|Enumerator|Adapter|Peripheral Device)|Microsoft Bluetooth|Generic Bluetooth|RFCOMM' }",
+  'foreach ($d in $devices) {',
+  '  $bat = -1',
+  '  try {',
+  "    $prop = Get-PnpDeviceProperty -InstanceId $d.InstanceId -KeyName '{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2' -ErrorAction SilentlyContinue",
+  '    if ($prop -and $null -ne $prop.Data) { $bat = [int]$prop.Data }',
+  '  } catch {}',
+  "  $name = ($d.FriendlyName -replace '[|]', '/').Trim()",
+  '  Write-Output "$($d.InstanceId)|$name|$bat"',
+  '}',
+].join('\n'), 'utf8');
+
+const PS_BLUETOOTH_CMD = `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${PS1_BLUETOOTH}"`;
+
+function parseBluetoothOutput(stdout) {
+  const devices = new Map();
+  const lines = (stdout || '').split('\n');
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const parts = line.split('|');
+    if (parts.length < 2 || !parts[0]) continue;
+    const id = parts[0];
+    const name = (parts[1] || 'Bluetooth Device').trim();
+    const batteryRaw = parseInt(parts[2], 10);
+    const battery = (!isNaN(batteryRaw) && batteryRaw >= 0 && batteryRaw <= 100) ? batteryRaw : null;
+    devices.set(id, { name, battery });
+  }
+  return devices;
+}
+
+function pollBluetooth() {
+  if (!mainWindow || !mainWindow.webContents) return;
+
+  exec(PS_BLUETOOTH_CMD, { timeout: 6000, maxBuffer: 1024 * 512 }, (err, stdout) => {
+    if (!mainWindow || !mainWindow.webContents) return;
+
+    const current = parseBluetoothOutput(stdout);
+    const isInitial = lastBluetoothDevices === null;
+    const previous = lastBluetoothDevices || new Map();
+
+    // Newly connected devices: present now, weren't present on the last poll.
+    for (const [id, info] of current) {
+      if (!previous.has(id)) {
+        lastBluetoothDevices = current;
+        mainWindow.webContents.send('bluetooth-update', {
+          deviceName: info.name,
+          batteryPct: info.battery,
+          isCharging: false,
+          leftPct: null,
+          rightPct: null,
+          connectionState: 'connected',
+          isInitial,
+        });
+        return; // one event per tick keeps rapid multi-device changes from racing each other
+      }
+    }
+
+    // Disconnected devices: were present last poll, are gone now.
+    for (const [id, info] of previous) {
+      if (!current.has(id)) {
+        lastBluetoothDevices = current;
+        mainWindow.webContents.send('bluetooth-update', {
+          deviceName: info.name,
+          batteryPct: info.battery,
+          isCharging: false,
+          leftPct: null,
+          rightPct: null,
+          connectionState: 'disconnected',
+          isInitial: false,
+        });
+        return;
+      }
+    }
+
+    lastBluetoothDevices = current;
+  });
+}
+
+function startBluetoothPoller() {
+  if (bluetoothInterval) clearInterval(bluetoothInterval);
+  pollBluetooth();
+  bluetoothInterval = setInterval(pollBluetooth, 4000);
 }
 
 // ── Fullscreen App Detector (macOS Tahoe Auto-Hide) ─────────────────────────
@@ -485,5 +582,6 @@ app.on('will-quit', () => {
   if (pollerInterval) clearInterval(pollerInterval);
   if (batteryInterval) clearInterval(batteryInterval);
   if (fullscreenInterval) clearInterval(fullscreenInterval);
+  if (bluetoothInterval) clearInterval(bluetoothInterval);
   fs.unwatchFile(WINLAND_THEME_PATH);
 });

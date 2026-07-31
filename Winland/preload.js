@@ -42,6 +42,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('volume-update', handler);
   },
 
+  // Bluetooth connect/disconnect updates
+  onBluetoothUpdate: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('bluetooth-update', handler);
+    return () => ipcRenderer.removeListener('bluetooth-update', handler);
+  },
+
   // Settings persistence
   readSettings: () => ipcRenderer.invoke('read-settings'),
   writeSettings: (data) => ipcRenderer.send('write-settings', data),

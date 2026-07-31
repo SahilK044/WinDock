@@ -193,6 +193,7 @@ export default function DynamicIsland({
   const rafRef                = useRef(null);
   const tRef                  = useRef(0);
   const volumeDismiss         = useRef(null);
+  const bluetoothDismiss      = useRef(null);
   const prevCoverRef          = useRef(null);
   const ghostTimerRef         = useRef(null);
   const trackInfoRef          = useRef(trackInfo);
@@ -413,14 +414,18 @@ export default function DynamicIsland({
           if (!data.isInitial) {
             soundEngine.playChime();
             setActiveState('expanded-bluetooth');
-            setTimeout(() => {
+            // Cancel any pending dismiss from a previous connect/disconnect event so a
+            // second event arriving mid-display gets its own full 4.5s, instead of being
+            // cut short by the earlier event's timer.
+            clearTimeout(bluetoothDismiss.current);
+            bluetoothDismiss.current = setTimeout(() => {
               setActiveState((prev) => prev === 'expanded-bluetooth' ? (trackInfoRef.current.title ? 'compact-music' : 'idle') : prev);
             }, 4500);
           }
         })
       : () => {};
 
-    return () => { cleanFS(); cleanSpotify(); cleanBattery(); cleanVolume(); cleanBT(); };
+    return () => { cleanFS(); cleanSpotify(); cleanBattery(); cleanVolume(); cleanBT(); clearTimeout(bluetoothDismiss.current); };
   }, []);
 
   const gainRef = useRef(0);

@@ -5319,7 +5319,15 @@ namespace MacStyleDock
 					+ "}";
 
 				string tempThemePath = System.IO.Path.Combine (System.IO.Path.GetTempPath (), "winland_theme.json");
-				System.IO.File.WriteAllText (tempThemePath, themeJson);
+				// Write-then-rename so Winland's fs.watchFile poller (which reads on any mtime
+				// change) can never observe a partially-written file mid-write.
+				string stagingPath = tempThemePath + ".tmp";
+				System.IO.File.WriteAllText (stagingPath, themeJson);
+				if (System.IO.File.Exists (tempThemePath)) {
+					System.IO.File.Replace (stagingPath, tempThemePath, null);
+				} else {
+					System.IO.File.Move (stagingPath, tempThemePath);
+				}
 			} catch { }
 		}
 
@@ -12552,6 +12560,30 @@ namespace MacStyleDock
 
 		private void SetWinlandVisibility (bool visible)
 		{
+			// Winland runs as a separate process/window (frameless, skipTaskbar), so it can't
+			// be shown/hidden the way the dock's own WPF window is - it needs a real Win32
+			// ShowWindow call against its hwnd. This was previously a no-op, so HideOnFullscreen
+			// never actually hid/restored the Winland window at the OS level (Winland's own
+			// fullscreen poller fades it out via CSS independently, which is why the symptom
+			// was easy to miss, but the window itself - and its compositor/GPU cost - stayed alive).
+			try {
+				IntPtr winlandHwnd = FindWindow (null, "WinLand");
+				if (winlandHwnd == IntPtr.Zero) {
+					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("winland").Concat (System.Diagnostics.Process.GetProcessesByName ("WinLand"))) {
+						using (proc) {
+							if (proc.MainWindowHandle != IntPtr.Zero) {
+								winlandHwnd = proc.MainWindowHandle;
+								break;
+							}
+						}
+					}
+				}
+				if (winlandHwnd != IntPtr.Zero) {
+					// SW_HIDE = 0, SW_SHOWNOACTIVATE = 4 (restores visibility without stealing
+					// focus from whatever the user is currently working in).
+					ShowWindow (winlandHwnd, visible ? 4 : 0);
+				}
+			} catch { }
 		}
 	}
 
