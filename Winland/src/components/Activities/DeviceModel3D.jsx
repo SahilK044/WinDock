@@ -400,17 +400,48 @@ export default function DeviceModel3D({
                 targetOpen = clamp01(t * 1.2);
               }
             } else if (styleKey === 'float') {
-              // Infinite, silky-smooth float & slow individual 3D Y-axis spins
-              targetOpen = loop ? 1.0 : clamp01(t * 1.2);
-              floatProgress = loop ? clamp01(elapsed / 0.8) : clamp01(t * 1.2);
-
-              // Slow, luxurious individual Y-axis spins (Left CCW, Right CW)
-              leftSpin = elapsed * 0.95;
-              rightSpin = -elapsed * 0.95;
-
-              // Gentle, fluid levitation wave
-              budWaveY = Math.sin(elapsed * 1.8) * 0.07;
-              budWaveZ = Math.cos(elapsed * 1.4) * 0.04;
+              if (loop && !isDisconnected) {
+                // 6.0s Ultra-Smooth Dual Earbud Float, Slow Spin & Docking Return Sequence:
+                // 0.0s - 1.2s: Lid opens, earbuds smoothly float up out of case slots
+                // 1.2s - 4.2s: Earbuds levitate in mid-air & spin slowly on individual Y-axes
+                // 4.2s - 5.4s: Earbuds slowly glide back down into slots, lid closes shut
+                // 5.4s - 6.0s: Closed case rests calmly before seamlessly replaying
+                const cycleTime = elapsed % 6.0;
+                if (cycleTime < 1.2) {
+                  const progress = easeInOutCubic(cycleTime / 1.2);
+                  targetOpen = progress;
+                  floatProgress = progress;
+                  leftSpin = progress * 0.3;
+                  rightSpin = -progress * 0.3;
+                } else if (cycleTime < 4.2) {
+                  targetOpen = 1.0;
+                  floatProgress = 1.0;
+                  const spinT = cycleTime - 1.2;
+                  leftSpin = 0.3 + spinT * 0.65;         // slow, silky counter-clockwise spin
+                  rightSpin = -(0.3 + spinT * 0.65);      // slow, silky clockwise spin
+                  budWaveY = Math.sin(spinT * 0.9) * 0.035; // calm, gentle vertical breathing
+                  budWaveZ = Math.cos(spinT * 0.7) * 0.02;  // subtle depth float
+                } else if (cycleTime < 5.4) {
+                  const returnT = easeInOutCubic((cycleTime - 4.2) / 1.2);
+                  targetOpen = 1.0 - returnT;
+                  floatProgress = 1.0 - returnT;
+                  leftSpin = (1 - returnT) * (0.3 + 3.0 * 0.65);
+                  rightSpin = -(1 - returnT) * (0.3 + 3.0 * 0.65);
+                } else {
+                  targetOpen = 0.0;
+                  floatProgress = 0.0;
+                  leftSpin = 0.0;
+                  rightSpin = 0.0;
+                }
+              } else {
+                targetOpen = clamp01(t * 1.2);
+                floatProgress = clamp01(t * 1.2);
+                if (t >= 1) {
+                  leftSpin = elapsed * 0.65;
+                  rightSpin = -elapsed * 0.65;
+                  budWaveY = Math.sin(elapsed * 0.9) * 0.035;
+                }
+              }
             }
 
             openProgress += (targetOpen - openProgress) * Math.min(dt * 6.0, 1);
