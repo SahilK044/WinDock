@@ -793,16 +793,25 @@ try {
   fs.writeFileSync(VBS_MEDIA, 'Set w = CreateObject("WScript.Shell")\nw.SendKeys Chr(WScript.Arguments(0))\n', 'utf8');
 } catch {}
 
+function forceRefreshMediaInfo() {
+  isPollingSpotify = false;
+  lastSpotifyTrack = '';
+  const delays = [150, 400, 800, 1400, 2200];
+  delays.forEach((delay) => {
+    setTimeout(() => {
+      isPollingSpotify = false;
+      pollSpotifyTitle();
+    }, delay);
+  });
+}
+
 ipcMain.on('media-control', (event, action) => {
   if (typeof action === 'object' && action.action === 'seek') {
     const exePath = getSpotifyExePath();
     const posMs = action.posMs || 0;
     if (fs.existsSync(exePath)) {
-      // Same helper, same ~3.3s startup cost — 3000ms would kill the seek
-      // before it applied. (posMs is a rounded integer, so no shell-escaping
-      // concern despite the string form.)
       exec(`"${exePath}" seek ${Math.round(posMs)}`, { timeout: 8000 }, () => {
-        setTimeout(pollSpotifyTitle, 200);
+        forceRefreshMediaInfo();
       });
     }
     return;
@@ -813,8 +822,7 @@ ipcMain.on('media-control', (event, action) => {
   if (action === 'previous') charCode = 177;
 
   exec(`cscript //nologo "${VBS_MEDIA}" ${charCode}`, { timeout: 2000 }, () => {
-    setTimeout(pollSpotifyTitle, 200);
-    setTimeout(pollSpotifyTitle, 800);
+    forceRefreshMediaInfo();
   });
 });
 

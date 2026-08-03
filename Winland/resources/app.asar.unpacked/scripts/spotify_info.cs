@@ -41,18 +41,47 @@ namespace WinLandMedia {
                     GlobalSystemMediaTransportControlsSession session = null;
 
                     if (sessions != null) {
-                        // Priority 1: Currently Playing Session (Spotify / Active Media)
+                        // Priority 1: Active/Playing Spotify Session
                         foreach (var s in sessions) {
                             try {
-                                var pb = s.GetPlaybackInfo();
-                                if (pb != null && pb.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) {
-                                    session = s;
-                                    break;
+                                string appId = (s.SourceAppUserModelId ?? "").ToLower();
+                                if (appId.Contains("spotify")) {
+                                    var pb = s.GetPlaybackInfo();
+                                    if (pb != null && pb.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) {
+                                        session = s;
+                                        break;
+                                    }
                                 }
                             } catch {}
                         }
 
-                        // Priority 2: Session with timeline bounds if nothing is playing
+                        // Priority 2: Any Playing Session
+                        if (session == null) {
+                            foreach (var s in sessions) {
+                                try {
+                                    var pb = s.GetPlaybackInfo();
+                                    if (pb != null && pb.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) {
+                                        session = s;
+                                        break;
+                                    }
+                                } catch {}
+                            }
+                        }
+
+                        // Priority 3: Spotify Session (even if paused or updating)
+                        if (session == null) {
+                            foreach (var s in sessions) {
+                                try {
+                                    string appId = (s.SourceAppUserModelId ?? "").ToLower();
+                                    if (appId.Contains("spotify")) {
+                                        session = s;
+                                        break;
+                                    }
+                                } catch {}
+                            }
+                        }
+
+                        // Priority 4: Session with timeline bounds if nothing is playing
                         if (session == null) {
                             foreach (var s in sessions) {
                                 try {
