@@ -273,7 +273,7 @@ export default function Speaker3D({ size = 44, isAnimated = true, isDisconnected
         }
       });
       renderer.dispose();
-      if (container && renderer.domElement) {
+      if (container && renderer.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
     };

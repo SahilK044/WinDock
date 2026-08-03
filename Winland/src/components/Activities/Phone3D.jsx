@@ -1,62 +1,56 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { parseDeviceArchetype, DEVICE_COLOR_VARIANTS } from '../../data/deviceCatalog';
 
 /**
- * Phone3D Component - Dynamic Device Model Adaptation
- * Dynamically builds 3D phone geometry based on deviceName:
- * 1. Samsung Galaxy S24 / S23 / Ultra (`samsung_ultra`):
- *    - Sharp boxy titanium frame body
- *    - Centered Infinity-O front camera punch-hole dot
- *    - 5 separate floating metallic camera lens rings on rear glass (zero square bump)
- * 2. iPhone 15 Pro / 16 Pro / 17 Pro / Pro Max (`iphone_pro`):
- *    - Curved titanium frame body
- *    - Top center Dynamic Island pill cutout with glowing cyan/red halo
- *    - Triangular 3-lens layout on raised camera plateau
- * 3. iPhone 15 / 16 / 17 (`iphone_base`):
- *    - Curved aluminum frame body
- *    - Top center Dynamic Island pill cutout
- *    - Vertical 2-lens camera island
+ * Phone3D Component - Dynamic Device & Form Factor 3D Renderer
+ * Supports:
+ * 1. Form Factors:
+ *    - `bar`: Flagship bar phone (S24 Ultra sharp titanium / iPhone Pro curved frame)
+ *    - `fold`: Book-style dual-screen foldable with central hinge unfold animation (0° to 180°)
+ *    - `flip`: Clamshell square phone with top screen flip animation (0° to 110°)
+ * 2. Color Variants: Space Grey (#3a3a3c), Ceramic White (#f5f5f7), Onyx Black (#121212)
+ * 3. Custom Pulse Glow Rings & Custom Animation Styles
  */
-export default function Phone3D({ size = 44, isAnimated = true, isDisconnected = false, deviceName = '' }) {
+export default function Phone3D({
+  size = 44,
+  isAnimated = true,
+  isDisconnected = false,
+  deviceName = '',
+  colorVariant = 'space-grey',
+  pulseColorHex = '#00f0ff',
+  animationStyle = 'amoled',
+}) {
   const containerRef = useRef(null);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // ── 1. Detect Phone Archetype from deviceName ─────────────────────────
-    const nameLower = (deviceName || '').toLowerCase();
+    // ── 1. Parse Archetype & Form Factor ────────────────────────────────────
+    const archetype = parseDeviceArchetype(deviceName);
+    const formFactor = archetype.formFactor; // 'bar' | 'fold' | 'flip'
+    const colorInfo = DEVICE_COLOR_VARIANTS[colorVariant] || DEVICE_COLOR_VARIANTS['space-grey'];
 
-    let phoneType = 'iphone_pro'; // Default flagship archetype
-    if (
-      nameLower.includes('s24') ||
-      nameLower.includes('s23') ||
-      nameLower.includes('s25') ||
-      nameLower.includes('ultra') ||
-      nameLower.includes('galaxy') ||
-      nameLower.includes('samsung')
-    ) {
+    const nameLower = (deviceName || '').toLowerCase();
+    let phoneType = 'iphone_pro';
+    if (nameLower.includes('s24') || nameLower.includes('s23') || nameLower.includes('s25') || nameLower.includes('galaxy') || nameLower.includes('ultra')) {
       phoneType = 'samsung_ultra';
-    } else if (
-      nameLower.includes('iphone') &&
-      (nameLower.includes('pro') || nameLower.includes('max'))
-    ) {
+    } else if (nameLower.includes('iphone') && (nameLower.includes('pro') || nameLower.includes('max'))) {
       phoneType = 'iphone_pro';
     } else if (nameLower.includes('iphone')) {
       phoneType = 'iphone_base';
     }
 
-    // ── 2. High-DPI Anti-Aliased WebGL Scene Setup ────────────────────────
+    // ── 2. High-DPI WebGL Scene Setup ─────────────────────────────────────
     const scene = new THREE.Scene();
-
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-    camera.position.set(0, 0, 3.2);
+    camera.position.set(0, -0.08, 3.6);
 
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
       antialias: true,
       powerPreference: 'high-performance',
-      precision: 'highp',
     });
 
     const dpr = Math.max(window.devicePixelRatio || 1, 2);
@@ -69,10 +63,9 @@ export default function Phone3D({ size = 44, isAnimated = true, isDisconnected =
     canvas.style.width = `${size}px`;
     canvas.style.height = `${size}px`;
     canvas.style.display = 'block';
-
     container.appendChild(canvas);
 
-    // ── 3. Studio Lighting Setup ────────────────────────────────────────────
+    // ── 3. Lighting Setup ──────────────────────────────────────────────────
     const ambientLight = new THREE.AmbientLight(0xffffff, 3.0);
     scene.add(ambientLight);
 
@@ -80,7 +73,8 @@ export default function Phone3D({ size = 44, isAnimated = true, isDisconnected =
     keyLight.position.set(3.5, 5, 4);
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x00f0ff, 3.2);
+    const pulseCol = new THREE.Color(pulseColorHex);
+    const rimLight = new THREE.DirectionalLight(pulseCol, 3.2);
     rimLight.position.set(-4, -3, -2);
     scene.add(rimLight);
 
@@ -88,39 +82,33 @@ export default function Phone3D({ size = 44, isAnimated = true, isDisconnected =
     fillLight.position.set(-2, 3.5, 2.5);
     scene.add(fillLight);
 
-    // ── 4. Dynamic 3D Smartphone Model Construction ───────────────────────
+    // ── 4. Dynamic 3D Geometry Construction ──────────────────────────────
     const masterGroup = new THREE.Group();
     scene.add(masterGroup);
 
-    // PBR Materials tailored per archetype
+    // Materials based on selected Color Variant
     const titaniumFrameMat = new THREE.MeshPhysicalMaterial({
-      color: phoneType === 'samsung_ultra' ? 0x94a3b8 : 0xcbd5e1, // Darker Titanium for Ultra, Silver for iPhone
+      color: new THREE.Color(colorInfo.metalHex),
       roughness: 0.04,
       metalness: 0.98,
       clearcoat: 1.0,
-      clearcoatRoughness: 0.02,
-      ior: 1.5,
+      clearcoatRoughness: 0.05,
     });
 
     const rearGlassMat = new THREE.MeshPhysicalMaterial({
-      color: phoneType === 'samsung_ultra' ? 0x0f172a : 0x1e293b,
+      color: new THREE.Color(colorInfo.bodyHex),
       roughness: 0.15,
-      metalness: 0.20,
-      clearcoat: 0.9,
+      metalness: 0.8,
     });
 
     const screenGlassMat = new THREE.MeshPhysicalMaterial({
-      color: 0x090d16,
+      color: 0x020617,
       roughness: 0.05,
+      metalness: 0.95,
       clearcoat: 1.0,
     });
 
-    const pillBorderMat = new THREE.MeshStandardMaterial({
-      color: 0x334155,
-      metalness: 0.8,
-      roughness: 0.2,
-    });
-
+    const pillBorderMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
     const pillBodyMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
 
     const cyanGlowMat = new THREE.MeshBasicMaterial({
@@ -414,7 +402,7 @@ export default function Phone3D({ size = 44, isAnimated = true, isDisconnected =
         }
       });
       renderer.dispose();
-      if (container && renderer.domElement) {
+      if (container && renderer.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
     };

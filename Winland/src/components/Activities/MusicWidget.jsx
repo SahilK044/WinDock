@@ -73,7 +73,7 @@ function smoothScrollTo(container, targetTop, duration = 680) {
 }
 
 
-const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, isPlaying = false, onSeek, onClose, eqColor, eqGlow }) => {
+const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, durationMs, isPlaying = false, onSeek, onClose, eqColor, eqGlow }) => {
   const [lyrics, setLyrics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [plainLyrics, setPlainLyrics] = useState('');
@@ -86,7 +86,7 @@ const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, isPlaying = fal
 
   useEffect(() => {
     const drift = Math.abs(progressMs - smoothMs);
-    if (drift > 1200 || !isPlaying) {
+    if (drift > 250 || !isPlaying) {
       syncRef.current = { baseMs: progressMs, baseTime: performance.now() };
       setSmoothMs(progressMs);
     }
@@ -106,6 +106,7 @@ const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, isPlaying = fal
 
   useEffect(() => {
     if (!title) return;
+    let cancelled = false;
     setLoading(true);
     setLyrics([]);
     setPlainLyrics('');
@@ -121,8 +122,17 @@ const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, isPlaying = fal
         const res = await fetch(`https://lrclib.net/api/get?${query}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.syncedLyrics) { setLyrics(parseLrc(data.syncedLyrics)); setLoading(false); return true; }
-          if (data.plainLyrics) { setPlainLyrics(data.plainLyrics); setLoading(false); return true; }
+          if (cancelled) return true;
+          if (data.syncedLyrics && (data.duration > 20 || !data.duration)) {
+            setLyrics(parseLrc(data.syncedLyrics));
+            setLoading(false);
+            return true;
+          }
+          if (data.plainLyrics) {
+            setPlainLyrics(data.plainLyrics);
+            setLoading(false);
+            return true;
+          }
         }
       } catch (e) {}
       return false;
@@ -134,18 +144,30 @@ const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, isPlaying = fal
         const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(q)}`);
         if (res.ok) {
           const results = await res.json();
+          if (cancelled) return;
           if (Array.isArray(results) && results.length > 0) {
-            const best = results.find((r) => r.syncedLyrics) || results[0];
-            if (best.syncedLyrics) setLyrics(parseLrc(best.syncedLyrics));
-            else if (best.plainLyrics) setPlainLyrics(best.plainLyrics);
+            const valid = results.filter((r) => r.syncedLyrics && (r.duration > 20 || !r.duration));
+            const targetDurSec = (durationMs && durationMs > 0) ? durationMs / 1000 : 0;
+
+            let best = null;
+            if (targetDurSec > 0 && valid.length > 0) {
+              best = valid.find((r) => Math.abs(r.duration - targetDurSec) <= 6);
+            }
+            if (!best) {
+              best = valid.find((r) => r.artistName && r.artistName.toLowerCase().includes(cleanArtist.toLowerCase())) || valid[0] || results[0];
+            }
+
+            if (best && best.syncedLyrics) setLyrics(parseLrc(best.syncedLyrics));
+            else if (best && best.plainLyrics) setPlainLyrics(best.plainLyrics);
           }
         }
       } catch (e) {}
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     };
 
-    fetchDirect().then((ok) => { if (!ok) fetchSearch(); });
-  }, [title, artist]);
+    fetchDirect().then((ok) => { if (!ok && !cancelled) fetchSearch(); });
+    return () => { cancelled = true; };
+  }, [title, artist, durationMs]);
 
   // Find active line index using sub-second smoothMs
   let activeIndex = -1;
@@ -437,19 +459,19 @@ export default function MusicWidget({
 
   useEffect(() => {
     const drift = Math.abs(progressMs - realtimeMs);
-    if (drift > 1000 || !isPlaying) {
+    if (drift > 200 || !isPlaying) {
       syncRef.current = { baseMs: progressMs, baseTime: performance.now() };
       setRealtimeMs(progressMs);
     }
   }, [progressMs, isPlaying, title]);
 
   useEffect(() => {
-    if (!isPlaying || durationMs <= 0) return;
+    if (!isPlaying) return;
     let rafId;
     const updateLoop = () => {
       const delta = performance.now() - syncRef.current.baseTime;
       const current = syncRef.current.baseMs + delta;
-      setRealtimeMs(Math.min(current, durationMs));
+      setRealtimeMs(durationMs > 0 ? Math.min(current, durationMs) : current);
       rafId = requestAnimationFrame(updateLoop);
     };
     rafId = requestAnimationFrame(updateLoop);
@@ -472,7 +494,8 @@ export default function MusicWidget({
         title={title}
         artist={artist}
         coverUrl={coverUrl}
-        progressMs={progressMs}
+        progressMs={realtimeMs}
+        durationMs={durationMs}
         isPlaying={isPlaying}
         onSeek={onSeek}
         onClose={onToggleLyrics}
@@ -483,15 +506,16 @@ export default function MusicWidget({
   }
 
   const activeDisplayMs = isDragging ? dragProgressMs : realtimeMs;
-  const pct = durationMs > 0 ? Math.min(100, Math.max(0, (activeDisplayMs / durationMs) * 100)) : 0;
+  const effectiveDurationMs = durationMs > 0 ? durationMs : (realtimeMs > 0 ? Math.max(realtimeMs, 180000) : 180000);
+  const pct = Math.min(100, Math.max(0, (activeDisplayMs / effectiveDurationMs) * 100));
 
   const calcMsFromEvent = (e) => {
-    if (!scrubberRef.current || !durationMs) return 0;
+    if (!scrubberRef.current) return 0;
     const rect = scrubberRef.current.getBoundingClientRect();
     const clickX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     const ratio = clickX / rect.width;
     setDragPosX(clickX);
-    return Math.round(ratio * durationMs);
+    return Math.round(ratio * effectiveDurationMs);
   };
 
   const handleMouseDown = (e) => {
@@ -706,7 +730,7 @@ export default function MusicWidget({
         </div>
         <div className="widget-subtitle" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 4, fontWeight: 600 }}>
           <span>{fmt(activeDisplayMs)}</span>
-          <span>{durationMs > 0 ? fmt(durationMs) : '--:--'}</span>
+          <span>{effectiveDurationMs > 0 ? fmt(effectiveDurationMs) : '--:--'}</span>
         </div>
       </div>
 

@@ -190,80 +190,41 @@ export default function Earbuds3D({ size = 44, isAnimated = true, isDisconnected
       const elapsed = (now - startTime) / 1000;
 
       if (isDisconnected) {
-        // Continuous Disconnect Sequence (Total 5.8s)
-        // 0.0s - 0.8s: Floating earbuds hover in open air while red LED blinks
-        // 0.8s - 1.6s: Case pops up underneath & lid flips BACKWARDS open (+115°)
-        // 1.6s - 3.0s: Floating earbuds perform Reverse 3D Orbit in open air
-        // 3.0s - 3.8s: Earbuds drop into case slots (y = -0.05 relative to caseGroup)
-        // 3.8s - 4.6s: Lid snaps shut tight forward (0°) with ZERO protrusion top or bottom!
-        // 4.6s - 5.8s: SEALED CASE WITH DOCKED EARBUDS GLIDES DOWN OUT OF FRAME!
+        // Cinematic 4.0s Earbud Disconnection Sequence:
+        // 0.0s - 1.2s: Earbuds lower down from floating height back into charging slots (-0.05)
+        // 1.2s - 2.2s: Case lid rotates shut smoothly (lidAngle -> 0)
+        // 2.2s - 4.0s: Closed case tilts & glides down through bottom of island (-2.8)
 
         // 1. Case Y position
-        const tPop = clamp((elapsed - 0.8) / 0.8);
-        const tDrop = clamp((elapsed - 4.6) / 1.2);
-        let caseY = -2.8;
-        if (elapsed >= 0.8 && elapsed < 4.6) {
-          caseY = lerp(-2.8, -0.15, easeOutQuint(tPop));
-        } else if (elapsed >= 4.6) {
-          caseY = lerp(-0.15, -2.8, easeOutQuint(tDrop));
-        }
+        const tCaseDrop = easeOutCubic(clamp((elapsed - 2.2) / 1.5));
+        const caseY = elapsed < 2.2 ? -0.15 : lerp(-0.15, -2.8, tCaseDrop);
         caseGroup.position.y = caseY;
 
-        // 2. Lid Rotation Angle (Flips BACKWARDS into distance: +Math.PI * 0.65)
-        const tLidOpen = clamp((elapsed - 0.8) / 0.8);
-        const tLidClose = clamp((elapsed - 3.8) / 0.8);
-        let lidAngle = 0;
-        if (elapsed >= 0.8 && elapsed < 3.8) {
-          lidAngle = lerp(0, Math.PI * 0.65, easeOutQuint(tLidOpen));
-        } else if (elapsed >= 3.8 && elapsed < 4.6) {
-          lidAngle = lerp(Math.PI * 0.65, 0, easeOutQuint(tLidClose));
-        }
+        // 2. Case Lid Angle
+        const tLidClose = easeOutCubic(clamp((elapsed - 1.2) / 1.0));
+        const lidAngle = elapsed < 1.2 ? Math.PI * 0.65 : lerp(Math.PI * 0.65, 0, tLidClose);
         lidGroup.rotation.x = lidAngle;
 
-        // 3. Earbud Position (Relative to caseGroup)
-        if (elapsed < 1.6) {
-          // Hover in open air above case
-          const hoverY = 0.35 - caseY;
-          leftBud.position.set(-0.35, hoverY + Math.sin(elapsed * 1.6) * 0.04, 0);
-          rightBud.position.set(0.35, hoverY + Math.sin(elapsed * 1.6 + 0.5) * 0.04, 0);
-          leftBud.rotation.set(0.1, 0.12, -0.06);
-          rightBud.rotation.set(0.1, -0.12, 0.06);
-        } else if (elapsed < 3.0) {
-          // Reverse 3D Orbit IN OPEN AIR high above case
-          const tOrbit = clamp((elapsed - 1.6) / 1.4);
-          const orbitEase = easeInOutCubic(tOrbit);
-          const angle = -orbitEase * Math.PI * 2;
-
-          leftBud.position.set(-Math.cos(angle) * 0.35, 0.50, Math.sin(angle) * 0.28);
-          rightBud.position.set(Math.cos(angle) * 0.35, 0.50, -Math.sin(angle) * 0.28);
-
-          leftBud.rotation.y = angle;
-          rightBud.rotation.y = angle;
-          leftBud.rotation.x = 0;
-          leftBud.rotation.z = 0;
-          rightBud.rotation.x = 0;
-          rightBud.rotation.z = 0;
-        } else if (elapsed < 3.8) {
-          // Drop STRAIGHT DOWN into case slots (0.50 -> -0.05 relative to caseGroup)
-          const tSlotDrop = clamp((elapsed - 3.0) / 0.8);
-          const dropEase = easeOutQuint(tSlotDrop);
-          const yPos = lerp(0.50, -0.05, dropEase);
-          const xPosLeft = lerp(-0.35, -0.20, dropEase);
-          const xPosRight = lerp(0.35, 0.20, dropEase);
-
+        // 3. Earbud Docking (0.0s - 1.2s)
+        if (elapsed < 1.2) {
+          const tBudDock = easeOutCubic(clamp(elapsed / 1.2));
+          const yPos = lerp(0.50, -0.05, tBudDock);
+          const xPosLeft = lerp(-0.35, -0.20, tBudDock);
+          const xPosRight = lerp(0.35, 0.20, tBudDock);
           leftBud.position.set(xPosLeft, yPos, 0);
           rightBud.position.set(xPosRight, yPos, 0);
           leftBud.rotation.set(0, 0, 0);
           rightBud.rotation.set(0, 0, 0);
         } else {
-          // Docked inside case slots (Y = -0.05)! 0% sticking out top or bottom!
           leftBud.position.set(-0.20, -0.05, 0);
           rightBud.position.set(0.20, -0.05, 0);
           leftBud.rotation.set(0, 0, 0);
           rightBud.rotation.set(0, 0, 0);
         }
 
-        masterGroup.scale.setScalar(1.25);
+        const scaleT = easeOutCubic(clamp((elapsed - 2.2) / 1.5));
+        masterGroup.scale.setScalar(lerp(1.25, 0.4, scaleT));
+        masterGroup.visible = elapsed < 3.8;
       } else {
         // Continuous Connection Entry Sequence (Total 4.0s)
         // 0.0s - 0.6s: Case pops up from below
@@ -377,7 +338,7 @@ export default function Earbuds3D({ size = 44, isAnimated = true, isDisconnected
         }
       });
       renderer.dispose();
-      if (container && renderer.domElement) {
+      if (container && renderer.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
     };

@@ -20,6 +20,9 @@ namespace WinLandFullScreen {
         static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
         [DllImport("user32.dll")]
+        static extern bool IsZoomed(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
         static extern int GetSystemMetrics(int nIndex);
 
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
@@ -37,10 +40,9 @@ namespace WinLandFullScreen {
                     if (procId != 0) {
                         try {
                             using (var proc = Process.GetProcessById((int)procId)) {
-                                string pname = proc.ProcessName;
-                                if (string.Equals(pname, "windock", StringComparison.OrdinalIgnoreCase) ||
-                                    string.Equals(pname, "winland", StringComparison.OrdinalIgnoreCase) ||
-                                    string.Equals(pname, "WinLand", StringComparison.OrdinalIgnoreCase)) {
+                                string pname = (proc.ProcessName ?? "").ToLower();
+                                // Ignore WinLand's own windows
+                                if (pname.Contains("winland") || pname.Contains("windock")) {
                                     Console.WriteLine("NORMAL");
                                     return;
                                 }
@@ -52,17 +54,24 @@ namespace WinLandFullScreen {
                     GetClassName(hwnd, className, className.Capacity);
                     string cls = className.ToString();
 
-                    // Ignore desktop background / taskbar / shell / launcher windows
+                    // Ignore desktop background / taskbar / shell windows
                     if (cls != "Progman" && cls != "WorkerW" && cls != "Shell_TrayWnd" && cls != "ImmersiveLauncher" && cls != "FolderView") {
+                        // 1. Check if foreground window is MAXIMIZED (IsZoomed)
+                        if (IsZoomed(hwnd)) {
+                            Console.WriteLine("FULLSCREEN");
+                            return;
+                        }
+
+                        // 2. Check if foreground window is FULLSCREEN (covers screen bounds)
                         RECT rect;
                         if (GetWindowRect(hwnd, out rect)) {
                             int screenW = GetSystemMetrics(0); // SM_CXSCREEN
                             int screenH = GetSystemMetrics(1); // SM_CYSCREEN
-                            
+
                             int winW = rect.Right - rect.Left;
                             int winH = rect.Bottom - rect.Top;
 
-                            if (winW >= screenW && winH >= screenH && rect.Left <= 0 && rect.Top <= 0) {
+                            if (rect.Left <= 5 && rect.Top <= 5 && winW >= (screenW - 10) && winH >= (screenH - 10)) {
                                 Console.WriteLine("FULLSCREEN");
                                 return;
                             }

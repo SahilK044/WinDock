@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bluetooth, Zap, Check, AlertTriangle } from 'lucide-react';
 import Headset3D from './Headset3D';
 import Earbuds3D from './Earbuds3D';
 import Speaker3D from './Speaker3D';
 import Phone3D from './Phone3D';
+import DeviceModel3D from './DeviceModel3D';
+import { readDevicePrefs, prefCategoryFor, engineCategoryFor } from '../../data/devicePrefs';
 
 const MAC_FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
@@ -445,6 +447,19 @@ export default function BluetoothWidget({
 
   const category = getDeviceCategory(deviceName, typeStr);
 
+  // The device shown here is the one the user picked in Settings for this
+  // category, with their chosen motion style. Settings lives in another
+  // renderer, so re-read on the relayed update to stay in sync live.
+  const [prefs, setPrefs] = useState(() => readDevicePrefs());
+  useEffect(() => {
+    if (!window.electronAPI?.onDevicePrefsUpdate) return undefined;
+    return window.electronAPI.onDevicePrefsUpdate(() => setPrefs(readDevicePrefs()));
+  }, []);
+
+  const prefCategory = prefCategoryFor(category);
+  const chosenModelId = prefCategory ? prefs.devices[prefCategory] : null;
+  const chosenStyle = prefCategory ? prefs.styles[prefCategory] : null;
+
   let statusColor = '#30d158';
   let accentColor = '#00f0ff';
   let statusText = 'Connected';
@@ -463,6 +478,21 @@ export default function BluetoothWidget({
   }
 
   const render3DIcon = (iconSize = 24) => {
+    // Categories the user can pick a real 3D model for render that model with
+    // their chosen motion style. Mice and keyboards have no model in the
+    // catalog, so they keep their vector icons below.
+    if (prefCategory && chosenModelId) {
+      return (
+        <DeviceModel3D
+          modelId={chosenModelId}
+          category={engineCategoryFor(prefCategory)}
+          styleCategory={prefCategory}
+          animStyle={chosenStyle}
+          size={iconSize}
+          isDisconnected={isDisconnected}
+        />
+      );
+    }
     switch (category) {
       case 'mouse':
         return <MouseIcon size={iconSize} color={accentColor} isAnimated={!isDisconnected} />;
@@ -471,7 +501,17 @@ export default function BluetoothWidget({
       case 'controller':
         return <ControllerIcon size={iconSize} color={accentColor} isAnimated={!isDisconnected} />;
       case 'phone':
-        return <Phone3D size={44} isAnimated={true} isDisconnected={isDisconnected} deviceName={deviceName} />;
+        return (
+          <Phone3D
+            size={44}
+            isAnimated={true}
+            isDisconnected={isDisconnected}
+            deviceName={deviceName}
+            colorVariant={localStorage.getItem('winland_color_variant') || 'space-grey'}
+            pulseColorHex={localStorage.getItem('winland_pulse_color') || '#00f0ff'}
+            animationStyle={prefs?.styles?.phone || 'amoled'}
+          />
+        );
       case 'speaker':
         return <Speaker3D size={44} isAnimated={true} isDisconnected={isDisconnected} />;
       case 'earbuds':
@@ -533,11 +573,15 @@ export default function BluetoothWidget({
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           position: 'relative',
         }}>
-          {render3DIcon(44)}
+          {/* 3D Phone Model (Lifted UP vertically inside the pill above the dot) */}
+          <div style={{ position: 'relative', zIndex: 2, transform: 'translateY(-6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {render3DIcon(44)}
+          </div>
           
-          {/* Pulsing Glowing Status LED Ball (Glows Red then turns off smoothly on disconnect) */}
+          {/* Pulsing Glowing Status LED Dot */}
           <div style={{
-            position: 'absolute', bottom: -2, left: '50%', transform: 'translateX(-50%)',
+            position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 1,
             width: 3, height: 3, borderRadius: '50%',
             background: isDisconnected ? '#ff453a' : accentColor,
             animation: isDisconnected ? 'dotBlinkFadeOff 5.6s ease-out forwards' : 'superPulse 0.85s infinite ease-in-out',
@@ -578,12 +622,18 @@ export default function BluetoothWidget({
         display: 'flex', alignItems: 'center', gap: 8, zIndex: 1, flexShrink: 0,
       }}>
         {isDisconnected ? (
-          <span style={{
-            color: '#ff453a', fontSize: 12, fontWeight: 600,
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '3px 10px', borderRadius: '12px',
+            background: 'rgba(255, 69, 58, 0.14)',
+            border: '1px solid rgba(255, 69, 58, 0.28)',
+            color: '#ff453a', fontSize: 11, fontWeight: 600,
             letterSpacing: '-0.2px', fontFamily: MAC_FONT,
+            backdropFilter: 'blur(8px)',
           }}>
-            Offline
-          </span>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ff453a', boxShadow: '0 0 6px #ff453a' }} />
+            <span>Disconnected</span>
+          </div>
         ) : isLowPower ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: MAC_FONT }}>
             <AlertTriangle size={13} color="#ff9f0a" />

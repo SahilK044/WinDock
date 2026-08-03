@@ -1,13 +1,15 @@
 import React from 'react';
-import { Compass, Folder, Music, Terminal, Globe, Settings, AppWindow } from 'lucide-react';
+import { Folder, Music, Terminal, Globe, Settings, AppWindow, Power } from 'lucide-react';
 
+// Files and Explorer both opened Explorer, so the duplicate is dropped and the
+// slot reused for Exit — a direct way to quit WinLand without Task Manager.
 const PINNED_APPS = [
   { name: 'Browser', icon: <Globe size={18} color="#3b82f6" />, cmd: 'browser' },
   { name: 'Spotify', icon: <Music size={18} color="#10b981" />, cmd: 'spotify' },
   { name: 'Files', icon: <Folder size={18} color="#f59e0b" />, cmd: 'explorer' },
   { name: 'Terminal', icon: <Terminal size={18} color="#8b5cf6" />, cmd: 'terminal' },
-  { name: 'Explorer', icon: <Compass size={18} color="#ec4899" />, cmd: 'explorer' },
   { name: 'Settings', icon: <Settings size={18} color="#64748b" />, cmd: 'settings' },
+  { name: 'Exit', icon: <Power size={18} color="#ef4444" />, cmd: 'exit' },
 ];
 
 export default function LauncherWidget({ onLaunchApp, onClose }) {

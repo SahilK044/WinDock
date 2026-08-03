@@ -15,7 +15,9 @@ import SystemMonitorWidget from '../Activities/SystemMonitorWidget';
 import LauncherWidget from '../Activities/LauncherWidget';
 import ScreenshotWidget from '../Activities/ScreenshotWidget';
 import BluetoothWidget from '../Activities/BluetoothWidget';
+import SettingsWidget from '../Activities/SettingsWidget';
 import { soundEngine } from '../../utils/soundEngine';
+import { fetchHDAlbumArt } from '../../utils/spotifyApi';
 
 const IDLE_TRACK = {
   title: null, artist: null, album: null,
@@ -163,7 +165,17 @@ export default function DynamicIsland({
     rightPct: null,
   });
 
+  const [isFullscreenActive, setIsFullscreenActive] = useState(false);
+
   const isLight = themeMode === 'light';
+
+  useEffect(() => {
+    if (!window.electronAPI?.onFullscreenState) return;
+    const cleanFullscreen = window.electronAPI.onFullscreenState((isFS) => {
+      setIsFullscreenActive(!!isFS);
+    });
+    return () => cleanFullscreen();
+  }, []);
 
   useEffect(() => {
     if (!window.electronAPI?.onThemeUpdate) return;
@@ -221,6 +233,16 @@ export default function DynamicIsland({
     return () => clearTimeout(ghostTimerRef.current);
   }, [activeState]);
 
+  // ── Auto-collapse expanded-music / expanded-lyrics after 8s idle ──────────
+  useEffect(() => {
+    if (activeState === 'expanded-music' || activeState === 'expanded-lyrics') {
+      const collapseTimer = setTimeout(() => {
+        setActiveState(trackInfoRef.current.title ? 'compact-music' : 'idle');
+      }, 8000);
+      return () => clearTimeout(collapseTimer);
+    }
+  }, [activeState]);
+
   // ── Simulated telemetry tick for System Monitor ────────────────────────────
   useEffect(() => {
     const timer = setInterval(() => {
@@ -231,6 +253,25 @@ export default function DynamicIsland({
       });
     }, 2000);
     return () => clearInterval(timer);
+  }, []);
+
+  // ── Gamepad Controller Connection Detector ──────────────────────────────────
+  useEffect(() => {
+    const handleGamepadConnected = (e) => {
+      const gp = e.gamepad;
+      const isPs = gp.id.toLowerCase().includes('dualsense') || gp.id.toLowerCase().includes('playstation') || gp.id.toLowerCase().includes('054c');
+      const name = isPs ? 'DualSense Wireless Controller' : 'Xbox Wireless Controller';
+
+      setNotification({
+        title: `${name} Connected`,
+        subtitle: `Gaming Gamepad • ${gp.buttons?.length || 16} Buttons • Ready`,
+        icon: '🎮',
+      });
+      setActiveState('notification');
+    };
+
+    window.addEventListener('gamepadconnected', handleGamepadConnected);
+    return () => window.removeEventListener('gamepadconnected', handleGamepadConnected);
   }, []);
 
   // ── Accent color extraction when album art changes ────────────────────────
@@ -255,12 +296,19 @@ export default function DynamicIsland({
 
   useEffect(() => {
     let rafId;
+    let last = performance.now();
     const easeColor = () => {
+      const now = performance.now();
+      // Same time-normalization as the visualizer: the colour eases toward its
+      // target at a fixed rate per second, not per frame, so it doesn't snap
+      // twice as fast at 120Hz.
+      const k = 1 - Math.pow(1 - 0.075, Math.min((now - last) / (1000 / 60), 4));
+      last = now;
       setDisplayAccentColor((prev) => {
         const next = {
-          r: prev.r + (accentColor.r - prev.r) * 0.075,
-          g: prev.g + (accentColor.g - prev.g) * 0.075,
-          b: prev.b + (accentColor.b - prev.b) * 0.075,
+          r: prev.r + (accentColor.r - prev.r) * k,
+          g: prev.g + (accentColor.g - prev.g) * k,
+          b: prev.b + (accentColor.b - prev.b) * k,
         };
 
         if (
@@ -339,14 +387,25 @@ export default function DynamicIsland({
     });
 
     if (nativeCoverUrl) return;
-    if (lastFetchedTitleRef.current === cleanTitle) return;
+    if (lastFetchedTitleRef.current === cleanTitle && trackInfoRef.current.coverUrl) return;
     lastFetchedTitleRef.current = cleanTitle;
 
     try {
-      // 1. YouTube Video Thumbnail Resolver
+      // 1. High-Definition Official iTunes Album Art & Duration Resolver (600x600 HD)
+      const iTunesData = await fetchHDAlbumArt(cleanTitle, parsedArtist);
+      if (iTunesData) {
+        setTrackInfo((prev) => ({
+          ...prev,
+          coverUrl: iTunesData.hdUrl || prev.coverUrl,
+          durationMs: (prev.durationMs && prev.durationMs > 0) ? prev.durationMs : (iTunesData.durationMs || prev.durationMs),
+        }));
+        return;
+      }
+
+      // 2. YouTube Video Thumbnail Resolver (Fallback if iTunes has no match)
       try {
         const ytRes = await fetch(
-          `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTitle)}`
+          `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTitle + ' ' + (parsedArtist || ''))}`
         );
         const html = await ytRes.text();
         const idx = html.indexOf('videoId');
@@ -356,45 +415,17 @@ export default function DynamicIsland({
             const ytCover = `https://img.youtube.com/vi/${rawId}/hqdefault.jpg`;
             setTrackInfo((prev) => ({
               ...prev,
-              coverUrl: ytCover,
+              coverUrl: prev.coverUrl || ytCover,
             }));
-            return;
           }
         }
       } catch (e) {}
-
-      // 2. iTunes Music Artwork Resolver Fallback
-      const query = parsedArtist ? `${cleanTitle} ${parsedArtist}` : cleanTitle;
-      const res = await fetch(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=10`
-      );
-      const data = await res.json();
-      const results = data.results || [];
-
-      if (results.length > 0) {
-        const item = results[0];
-        const highResCover = item.artworkUrl100
-          ? item.artworkUrl100.replace('100x100bb', '600x600bb')
-          : null;
-
-        setTrackInfo((prev) => ({
-          ...prev,
-          coverUrl: prev.coverUrl || highResCover,
-          durationMs: prev.durationMs || item.trackTimeMillis,
-        }));
-      }
     } catch (e) {}
   }, []);
-
-  const [autoHidden, setAutoHidden] = useState(false);
 
   // ── IPC listeners (registered once) ──────────────────────────────────────
   useEffect(() => {
     if (!window.electronAPI) return;
-
-    const cleanFS = window.electronAPI.onFullscreenState
-      ? window.electronAPI.onFullscreenState((isFS) => setAutoHidden(isFS))
-      : () => {};
 
     const cleanSpotify = window.electronAPI.onSystemMediaUpdate(updateTrackData);
 
@@ -403,10 +434,13 @@ export default function DynamicIsland({
     // instead of always snapping back to the compact player when they dismiss.
     const isOverlayState = (s) => s === 'expanded-battery' || s === 'volume-osd' || s === 'expanded-bluetooth';
     const resumeFromOverlay = () => {
-      const resumeState = preOverlayStateRef.current;
+      // Return to the actual view that was showing before any overlay interrupted
+      // it (e.g. expanded-lyrics, expanded-shelf, compact-music) instead of always
+      // collapsing to the compact player. Falls back gracefully if nothing was
+      // stored (e.g. on cold start). Guards against recursion by clearing first.
+      const restored = preOverlayStateRef.current;
       preOverlayStateRef.current = null;
-      if (resumeState === 'expanded-lyrics' || resumeState === 'expanded-music') return resumeState;
-      return trackInfoRef.current.title ? 'compact-music' : 'idle';
+      return restored || (trackInfoRef.current.title ? 'compact-music' : 'idle');
     };
 
     const cleanBattery = window.electronAPI.onBatteryUpdate(({ pct, charging, minsLeft, changed }) => {
@@ -455,21 +489,33 @@ export default function DynamicIsland({
         })
       : () => {};
 
-    return () => { cleanFS(); cleanSpotify(); cleanBattery(); cleanVolume(); cleanBT(); clearTimeout(bluetoothDismiss.current); };
+    return () => { cleanSpotify(); cleanBattery(); cleanVolume(); cleanBT(); clearTimeout(bluetoothDismiss.current); };
   }, []);
 
   const gainRef = useRef(0);
 
-  // ── 60fps Equalizer rAF loop (Smooth Gain Decay/Spring) ───────────────────
+  // ── Equalizer rAF loop (Smooth Gain Decay/Spring) ─────────────────────────
+  // Time-normalized: the oscillator phase and the gain spring advance by real
+  // elapsed time, so the bars dance at the same speed whether the display runs
+  // at 60, 120 or 144Hz — a faster refresh just makes the motion smoother. The
+  // original per-frame steps (t += 0.04, gain *= 0.12) were tuned for exactly
+  // 60fps and would have run twice as fast once background throttling was off
+  // on a 120Hz panel.
   useEffect(() => {
-    const loop = () => {
+    let last = performance.now();
+    const loop = (now) => {
+      // "frames" = how many 60fps ticks this frame represents; clamped so a
+      // stall (tab occluded, GC) can't fast-forward the animation on resume.
+      const frames = Math.min((now - last) / (1000 / 60), 4);
+      last = now;
+
       const targetGain = trackInfo.isPlaying ? 1.0 : 0.0;
-      gainRef.current += (targetGain - gainRef.current) * 0.12;
+      gainRef.current += (targetGain - gainRef.current) * (1 - Math.pow(1 - 0.12, frames));
 
       if (gainRef.current < 0.01 && !trackInfo.isPlaying) {
         setBarHeights([3, 3, 3, 3, 3]);
       } else {
-        tRef.current += 0.04;
+        tRef.current += 0.04 * frames;
         setBarHeights(computeBarHeightsWithGain(tRef.current, gainRef.current));
       }
 
@@ -530,6 +576,7 @@ export default function DynamicIsland({
       'expanded-shelf':    'state-expanded-shelf',
       'expanded-sysmon':   'state-expanded-sysmon',
       'expanded-launcher': 'state-expanded-launcher',
+      'expanded-settings': 'state-expanded-settings',
       'expanded-screenshot':'state-expanded-screenshot',
       'expanded-bluetooth':'state-expanded-bluetooth',
     }[activeState] || 'state-idle';
@@ -541,9 +588,10 @@ export default function DynamicIsland({
   // ── Mouse Passthrough Management ──────────────────────────────────────────
   useEffect(() => {
     if (window.electronAPI?.setIgnoreMouseEvents) {
-      window.electronAPI.setIgnoreMouseEvents(true);
+      const isExpanded = activeState.startsWith('expanded-') || activeState === 'volume-osd';
+      window.electronAPI.setIgnoreMouseEvents(!isExpanded);
     }
-  }, []);
+  }, [activeState]);
 
   const handleMouseEnter = () => {
     setIsGhostIdle(false);
@@ -556,6 +604,9 @@ export default function DynamicIsland({
   };
 
   const handleMouseLeave = () => {
+    // DO NOT enable mouse passthrough while an expanded interactive widget is active!
+    if (activeState.startsWith('expanded-') || activeState === 'volume-osd') return;
+
     if (window.electronAPI?.setIgnoreMouseEvents) {
       window.electronAPI.setIgnoreMouseEvents(true);
     }
@@ -590,6 +641,13 @@ export default function DynamicIsland({
   };
 
   const handleLaunchApp = (cmd) => {
+    if (cmd === 'settings') {
+      if (window.electronAPI?.openSettingsWindow) {
+        window.electronAPI.openSettingsWindow();
+      }
+      setActiveState(trackInfo.title ? 'compact-music' : 'idle');
+      return;
+    }
     if (window.electronAPI?.launchApp) {
       window.electronAPI.launchApp(cmd);
     }
@@ -604,6 +662,7 @@ export default function DynamicIsland({
 
   const handleIslandClick = (e) => {
     if (e.defaultPrevented) return;
+    if (activeState === 'expanded-settings') return;
     if (e.target && (e.target.closest('button') || e.target.closest('input') || e.target.closest('svg') || e.target.closest('.interactive-child'))) {
       return;
     }
@@ -625,7 +684,11 @@ export default function DynamicIsland({
   const handlePrev = () => { if (window.electronAPI) window.electronAPI.sendMediaControl('previous'); };
 
   const handleSeek = (newProgressMs) => {
+    userToggleLockRef.current = Date.now();
     setTrackInfo((prev) => ({ ...prev, progressMs: newProgressMs }));
+    if (window.electronAPI) {
+      window.electronAPI.sendMediaControl({ action: 'seek', posMs: newProgressMs });
+    }
   };
 
   const isMusicState = activeState === 'compact-music' || activeState === 'expanded-music' || activeState === 'expanded-lyrics';
@@ -643,9 +706,18 @@ export default function DynamicIsland({
   const showGradient = (activeState === 'expanded-music' || activeState === 'expanded-lyrics') && trackInfo.isPlaying && !!trackInfo.title;
 
   return (
-    <div className="island-anchor" onMouseEnter={handleMouseEnter}>
+    <div
+      className="island-anchor"
+      onMouseEnter={handleMouseEnter}
+      style={{
+        transform: isFullscreenActive ? 'translateY(-120px)' : 'none',
+        opacity: isFullscreenActive ? 0 : (isGhostIdle ? 0.03 : 1),
+        transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease',
+        pointerEvents: isFullscreenActive ? 'none' : 'auto',
+      }}
+    >
       <div
-        className={`island-capsule ${getStateClass()} ${isLight ? 'theme-light' : 'theme-dark'} ${autoHidden ? 'auto-hidden' : ''}`}
+        className={`island-capsule ${getStateClass()} ${isLight ? 'theme-light' : 'theme-dark'}`}
         onClick={handleIslandClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -736,6 +808,12 @@ export default function DynamicIsland({
           {activeState === 'expanded-sysmon' && <SystemMonitorWidget stats={sysStats} />}
           {activeState === 'expanded-launcher' && (
             <LauncherWidget onLaunchApp={handleLaunchApp} onClose={() => setActiveState('idle')} />
+          )}
+          {activeState === 'expanded-settings' && (
+            <SettingsWidget onClose={() => {
+              setActiveState(trackInfo.title ? 'compact-music' : 'idle');
+              if (window.electronAPI?.setIgnoreMouseEvents) window.electronAPI.setIgnoreMouseEvents(true);
+            }} />
           )}
           {activeState === 'expanded-screenshot' && (
             <ScreenshotWidget imageSrc={screenshotData} onDismiss={() => setActiveState('idle')} />

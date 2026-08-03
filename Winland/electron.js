@@ -8,16 +8,44 @@ import os from 'os';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disable-http-cache');
+app.commandLine.appendSwitch('no-sandbox');
+
 let mainWindow;
+let isQuitting = false; // set when the user chooses Exit, so window-all-closed lets us go
 let lastDetectedTitle = '';
 let lastBatteryLevel = -1;
 let lastChargingState = null;
 let pollerInterval = null;
 let batteryInterval = null;
 let bluetoothInterval = null;
+// Guards the Spotify poller — unlike the other pollers it had no in-flight guard,
+// so a slow/missing spotify_info.exe let successive 800ms execs stack up unbounded.
+let isPollingSpotify = false;
+// Identity of the last track sent via the exe path (title|artist|playing). The
+// album-art base64 is large, so it's only shipped over IPC when this changes.
+let lastSpotifyTrack = '';
+let posTracker = {
+  rawPos: 0,             // Baseline position from GSMTC (ms)
+  wallClockAtCapture: 0, // Date.now() when baseline rawPos was established
+  isPlaying: false,      // Previous play state
+  trackKey: '',          // Track title|artist identity
+};
 // null = not polled yet (next successful poll is the "initial" snapshot, no
-// connect/disconnect notification should fire for it). Map<instanceId, {name, battery}>.
+// connect/disconnect notification should fire for it). Map<instanceId, {name, battery}>
+// of devices we've confirmed (and told the UI) are connected.
 let lastBluetoothDevices = null;
+// Map<instanceId, missedPollCount> - devices confirmed-connected but absent from the
+// most recent raw enumeration. Kept as a hook for tuning debounce if needed, but the
+// real source of the spam was failed PowerShell polls being treated as mass
+// disconnects (see the `if (err) return;` below) - that alone fixes it, so a missed
+// device is reported disconnected on the very next real poll, same as before.
+let bluetoothMissingStreaks = new Map();
+// A confirmed-connected device must be absent for this many consecutive real polls
+// before we declare a disconnect. 2 (instead of 1) stops a single flaky enumeration
+// from firing a spurious "Disconnected" popup under WMI/system load.
+const BLUETOOTH_DISCONNECT_CONFIRM_POLLS = 2;
 
 // ── Settings ──────────────────────────────────────────────────────────────
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
@@ -116,7 +144,7 @@ fs.writeFileSync(PS1_BATTERY, [
   '}',
 ].join('\n'), 'utf8');
 
-const PS_BATTERY_CMD = `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${PS1_BATTERY}"`;
+const PS_BATTERY_CMD = `powershell.exe -WindowStyle Hidden -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${PS1_BATTERY}"`;
 
 // ── Window ─────────────────────────────────────────────────────────────────
 function createWindow() {
@@ -126,8 +154,8 @@ function createWindow() {
   // Sized to fit the tallest/widest Dynamic Island state (expanded-lyrics: 390x300,
   // state-notification/expanded-call: 400 wide) plus margin so no state's rounded
   // corners get hard-clipped by the OS window bounds.
-  const windowWidth = 440;
-  const windowHeight = 340;
+  const windowWidth = 470;
+  const windowHeight = 360;
 
   mainWindow = new BrowserWindow({
     title: 'WinLand',
@@ -147,6 +175,13 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // This overlay is always-on-top and never focused, so Chromium's default
+      // background throttling can cap its animation loops well below the
+      // display's refresh rate. Disabling it lets the island, visualizer and
+      // 3D previews run at the monitor's full rate (120/144Hz where available)
+      // instead of being held down. The render loops are time-normalized, so a
+      // higher frame rate makes them smoother, not faster.
+      backgroundThrottling: false,
     },
   });
 
@@ -162,25 +197,122 @@ function createWindow() {
 
   mainWindow.on('closed', () => { mainWindow = null; });
 
+  // Log ALL renderer console messages to file for crash debugging
+  const logPath = path.join(os.tmpdir(), 'winland_renderer.log');
+  fs.writeFileSync(logPath, `=== WinLand Renderer Log ${new Date().toISOString()} ===\n`);
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    const prefix = ['LOG', 'WARN', 'ERROR'][level] || 'LOG';
+    fs.appendFileSync(logPath, `[${prefix}] ${message} (${sourceId}:${line})\n`);
+  });
+
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('RENDERER CRASHED:', details.reason, details.exitCode);
+    // Recover: recreate the window
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createWindow();
+    }
+  });
+
+  mainWindow.webContents.on('crashed', () => {
+    console.error('WEBCONTENTS CRASHED - recovering');
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createWindow();
+    }
+  });
+
+  mainWindow.on('unresponsive', () => {
+    console.error('WINDOW UNRESPONSIVE');
+  });
+
   setTimeout(() => {
     startSpotifyPoller();
     startBatteryPoller();
-    startFullscreenPoller();
     startBluetoothPoller();
+    startFullscreenPoller();
     registerVolumeKeys();
     watchWinlandConfig();
     broadcastWinlandConfig();
+
+    // Periodically re-assert alwaysOnTop every 5s so Windows never pushes us behind other apps
+    setInterval(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+      }
+    }, 5000);
   }, 1500);
 }
 
+let settingsWindow = null;
+
+function createSettingsWindow() {
+  if (settingsWindow) {
+    settingsWindow.focus();
+    return;
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+  const w = 880;
+  const h = 560;
+
+  settingsWindow = new BrowserWindow({
+    title: 'WinLand Settings',
+    icon: path.join(__dirname, 'build', 'icon.ico'),
+    width: w,
+    height: h,
+    x: Math.round((screenWidth - w) / 2),
+    y: Math.round((screenHeight - h) / 2),
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    resizable: false,
+    hasShadow: true,
+    show: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  settingsWindow.setAlwaysOnTop(true, 'screen-saver');
+
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  if (app.isPackaged) {
+    settingsWindow.loadFile(indexPath, { search: 'route=settings', hash: 'settings' });
+  } else {
+    settingsWindow.loadURL('http://localhost:5173?route=settings#settings').catch(() => {
+      settingsWindow.loadFile(indexPath, { search: 'route=settings', hash: 'settings' });
+    });
+  }
+
+  settingsWindow.show();
+  settingsWindow.focus();
+
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
+
 function pollSpotifyTitle() {
-  if (!mainWindow || !mainWindow.webContents) return;
+  if (!mainWindow || !mainWindow.webContents || isPollingSpotify) return;
+  isPollingSpotify = true;
+  const done = () => { isPollingSpotify = false; };
 
   const exePath = getSpotifyExePath();
 
   if (fs.existsSync(exePath)) {
-    exec(`"${exePath}"`, { timeout: 3000 }, (err, stdout) => {
-      if (!mainWindow || !mainWindow.webContents) return;
+    // The GSMTC helper reliably takes ~3.3s to return (measured), so a 3000ms
+    // timeout killed EVERY poll before it produced output — the position path
+    // never ran and playback fell back to title-only, freezing progress at
+    // whatever the last lucky poll caught. Give it comfortable margin. The
+    // in-flight guard (isPollingSpotify) already prevents these from stacking,
+    // so a slow exe just means the effective poll cadence is the exe's own
+    // runtime; client-side extrapolation smooths the bar between snapshots.
+    exec(`"${exePath}"`, { timeout: 8000 }, (err, stdout) => {
+      if (!mainWindow || !mainWindow.webContents) { done(); return; }
       const raw = (stdout || '').trim();
       if (raw) {
         let title = raw;
@@ -192,9 +324,10 @@ function pollSpotifyTitle() {
           const parts = raw.split('|');
           const gTitle = parts[0] || '';
           const gArtist = parts[1] || '';
-          posMs = parseInt(parts[2], 10) || 0;
+          const rawPosSnapshotMs = parseInt(parts[2], 10) || 0;
           endMs = parseInt(parts[3], 10) || 0;
           const coverPath = parts[5] || '';
+          const gsmtcTimestamp = parseInt(parts[7], 10) || 0;
           let coverUrl = null;
           if (coverPath && fs.existsSync(coverPath)) {
             try {
@@ -212,28 +345,90 @@ function pollSpotifyTitle() {
           isPlaying = parts[4] === '1';
 
           if (hasTrack) {
-            lastDetectedTitle = `${gTitle} - ${gArtist}`;
+            // ── Monotonic Smooth Position Extrapolation ───────────────────
+            // GSMTC returns periodic Position snapshots. Between snapshots,
+            // we extrapolate smoothly using wall-clock time. We re-baseline
+            // ONLY on track change, play/pause toggle, seek (>3s jump), or startup.
+            const now = Date.now();
+
+            // GSMTC hands back a Position captured at LastUpdatedTime, not at
+            // the moment we asked — the player only pushes a new timeline when
+            // something changes, so the snapshot can be many seconds old. Age
+            // it forward before use, or every reading starts life behind and
+            // the whole extrapolation below inherits that offset. This is what
+            // made progress wrong when WinLand was started mid-song: it
+            // baselined on a stale snapshot and then tracked in parallel to
+            // the real position, permanently behind it.
+            let snapshotAgeMs = 0;
+            if (isPlaying && gsmtcTimestamp > 0) {
+              const age = now - gsmtcTimestamp;
+              // Ignore nonsense (clock skew, or a timestamp we failed to read)
+              // rather than trusting it and jumping somewhere arbitrary.
+              if (age > 0 && age < 60000) snapshotAgeMs = age;
+            }
+            let rawPosMs = rawPosSnapshotMs + snapshotAgeMs;
+            if (endMs > 0 && rawPosMs > endMs) rawPosMs = endMs;
+
+            const trackId = `${gTitle}|${gArtist}`;
+            const isNewTrack = trackId !== posTracker.trackKey;
+            const playStateChanged = isPlaying !== posTracker.isPlaying;
+
+            const expectedPosMs = posTracker.wallClockAtCapture > 0
+              ? posTracker.rawPos + (posTracker.isPlaying ? (now - posTracker.wallClockAtCapture) : 0)
+              : rawPosMs;
+
+            const posJumped = Math.abs(rawPosMs - expectedPosMs) > 3000 || (rawPosMs < posTracker.rawPos - 1500);
+
+            if (isNewTrack || playStateChanged || posJumped || posTracker.wallClockAtCapture === 0) {
+              posTracker = {
+                rawPos: rawPosMs,
+                wallClockAtCapture: now,
+                isPlaying: isPlaying,
+                trackKey: trackId,
+              };
+              posMs = rawPosMs;
+            } else {
+              if (isPlaying) {
+                const elapsed = now - posTracker.wallClockAtCapture;
+                posMs = posTracker.rawPos + elapsed;
+              } else {
+                posMs = posTracker.rawPos;
+              }
+            }
+
+            // Clamp to duration
+            if (endMs > 0 && posMs > endMs) posMs = endMs;
+
+            // Track identity — lets us keep the live-progress send every tick while
+            // only shipping the (large) album-art base64 over IPC when the art
+            // actually changes.
+            const trackKey = `${gTitle}|${gArtist}|${isPlaying ? '1' : '0'}`;
+            const trackChanged = trackKey !== lastSpotifyTrack;
+            lastSpotifyTrack = trackKey;
+            if (trackChanged) lastDetectedTitle = `${gTitle} - ${gArtist}`;
             mainWindow.webContents.send('system-media-update', {
               title: gTitle,
               artist: gArtist,
-              posMs,
+              posMs: Math.round(posMs),
               endMs,
               isPlaying,
-              coverUrl,
+              coverUrl: trackChanged ? coverUrl : null,
             });
+            done();
             return;
           }
         }
       }
-      fallbackSpotifyPoll();
+      fallbackSpotifyPoll(done);
     });
   } else {
-    fallbackSpotifyPoll();
+    fallbackSpotifyPoll(done);
   }
 }
 
-function fallbackSpotifyPoll() {
+function fallbackSpotifyPoll(onDone) {
   exec(PS_SPOTIFY_CMD, { timeout: 5000 }, (err, stdout) => {
+    if (onDone) onDone();
     if (!mainWindow || !mainWindow.webContents) return;
     const title = (stdout || '').trim();
     const isPlaying = title.length > 0 && title !== 'Spotify' && title !== 'Spotify Free' && title !== 'Spotify Premium';
@@ -254,15 +449,20 @@ function fallbackSpotifyPoll() {
 
 function startSpotifyPoller() {
   if (pollerInterval) clearInterval(pollerInterval);
+  isPollingSpotify = false;
+  lastSpotifyTrack = '';
   pollSpotifyTitle();
   pollerInterval = setInterval(pollSpotifyTitle, 800);
 }
 
-// ── Battery Poller ──────────────────────────────────────────────────────────
+let isPollingBattery = false;
+
 function pollBattery() {
-  if (!mainWindow || !mainWindow.webContents) return;
+  if (!mainWindow || !mainWindow.webContents || isPollingBattery) return;
+  isPollingBattery = true;
 
   exec(PS_BATTERY_CMD, { timeout: 8000 }, (err, stdout) => {
+    isPollingBattery = false;
     if (!mainWindow || !mainWindow.webContents) return;
     const raw = (stdout || '').trim();
     if (!raw) return;
@@ -289,25 +489,67 @@ function startBatteryPoller() {
 }
 
 // ── Bluetooth Connect/Disconnect Poller ─────────────────────────────────────
-// Get-PnpDevice reports every Bluetooth PnP node (radio, RFCOMM channels,
-// HID, audio, etc.) - we filter down to the handful that represent an actual
-// paired accessory so the adapter itself never shows up as a "device".
+// Get-PnpDevice reports Bluetooth PnP nodes. We filter to actual paired accessories
+// and check DEVPKEY_Device_IsConnected ({83DA63EC-97A6-4640-9453-A630571B6028} 15)
+// to accurately detect real-time connect/disconnect states.
+// Real-time AudioEndpoint Bluetooth Device & Battery Level Detector.
 const PS1_BLUETOOTH = path.join(os.tmpdir(), 'winland_bluetooth_poll.ps1');
 fs.writeFileSync(PS1_BLUETOOTH, [
-  '$devices = Get-PnpDevice -Class Bluetooth -PresentOnly -ErrorAction SilentlyContinue |',
-  "  Where-Object { $_.Status -eq 'OK' -and $_.FriendlyName -and $_.FriendlyName -notmatch 'Bluetooth (Radio|Enumerator|Adapter|Peripheral Device)|Microsoft Bluetooth|Generic Bluetooth|RFCOMM' }",
-  'foreach ($d in $devices) {',
-  '  $bat = -1',
+  '$connected = @{}',
+  '# 1. USB Connected Phones (Class WPD)',
+  '$wpd = Get-PnpDevice -Class WPD -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq "OK" -and $_.FriendlyName }',
+  'foreach ($w in $wpd) {',
+  '  $cleanName = ($w.FriendlyName -replace "\\s*(Avrcp Transport|Hands-Free|AG|HF|Audio).*", "").Trim()',
+  '  if ($cleanName -and $cleanName -notmatch "Enumerator|Service|Protocol|Transport|Attribute|Adapter|Controller|Hub|Root|Interface|Composite|Gateway|Push|Access|Serial|LE|RFCOMM|Intel\\(R\\)|Microsoft|Realtek|Bluetooth") {',
+  '    if (-not $connected.ContainsKey($cleanName)) {',
+  '      $connected[$cleanName] = @{ id = $cleanName; name = $cleanName; bat = -1; type = "phone" }',
+  '    }',
+  '  }',
+  '}',
+  '# 2. Active Audio Endpoints (Earbuds, Headphones, Bluetooth Speakers)',
+  '$audio = Get-PnpDevice -Class AudioEndpoint -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq "OK" -and $_.FriendlyName }',
+  'foreach ($a in $audio) {',
+  '  $name = $a.FriendlyName',
+  '  if ($name -match "Realtek|High Definition Audio|Default|Communications|Stereo Mix|Virtual|Steam|NVIDIA|DisplayAudio|Odyssey|7\\.1 Surround|Microphone") {',
+  '    continue',
+  '  }',
+  '  if ($name -match "^(Headphones|Headset|Speakers)\\s*\\((.*)\\)$") {',
+  '    $clean = $Matches[2].Trim()',
+  '  } else {',
+  '    $clean = $name.Trim()',
+  '  }',
+  '  $clean = ($clean -replace "\\s*(Hands-Free|AG|HF|Stereo|Audio|Avrcp Transport).*", "").Trim()',
+  '  if ($clean -and -not $connected.ContainsKey($clean)) {',
+  '    $connected[$clean] = @{ id = $clean; name = $clean; bat = -1; type = "audio" }',
+  '  }',
+  '}',
+  '# 3. Bluetooth Phones (BTHENUM with IsConnected property)',
+  '$bt = Get-PnpDevice -Class Bluetooth -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq "OK" -and $_.FriendlyName }',
+  'foreach ($b in $bt) {',
+  '  $name = $b.FriendlyName',
+  '  if ($name -match "Enumerator|Service|Protocol|Transport|Attribute|Adapter|Controller|Hub|Root|Interface|Composite|Gateway|Push|Access|Serial|LE|RFCOMM|Intel\\(R\\)|Microsoft|Realtek|Bluetooth|Hands-Free") {',
+  '    continue',
+  '  }',
+  '  $isConn = $false',
   '  try {',
-  "    $prop = Get-PnpDeviceProperty -InstanceId $d.InstanceId -KeyName '{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2' -ErrorAction SilentlyContinue",
-  '    if ($prop -and $null -ne $prop.Data) { $bat = [int]$prop.Data }',
+  '    $prop = Get-PnpDeviceProperty -InstanceId $b.InstanceId -KeyName "{83DA6326-97A6-4088-9453-A630571B6028} 15" -ErrorAction SilentlyContinue',
+  '    if ($prop -and $null -ne $prop.Data) {',
+  '      $isConn = [bool]$prop.Data',
+  '    }',
   '  } catch {}',
-  "  $name = ($d.FriendlyName -replace '[|]', '/').Trim()",
-  '  Write-Output "$($d.InstanceId)|$name|$bat"',
+  '  if ($isConn) {',
+  '    $cleanName = ($name -replace "\\s*(Avrcp Transport|Hands-Free|AG|HF|Audio).*", "").Trim()',
+  '    if ($cleanName -and -not $connected.ContainsKey($cleanName)) {',
+  '      $connected[$cleanName] = @{ id = $cleanName; name = $cleanName; bat = -1; type = "phone" }',
+  '    }',
+  '  }',
+  '}',
+  'foreach ($item in $connected.Values) {',
+  '  Write-Output "$($item.id)|$($item.name)|$($item.bat)|$($item.type)"',
   '}',
 ].join('\n'), 'utf8');
 
-const PS_BLUETOOTH_CMD = `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${PS1_BLUETOOTH}"`;
+const PS_BLUETOOTH_CMD = `powershell.exe -WindowStyle Hidden -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${PS1_BLUETOOTH}"`;
 
 function parseBluetoothOutput(stdout) {
   const devices = new Map();
@@ -321,100 +563,151 @@ function parseBluetoothOutput(stdout) {
     const name = (parts[1] || 'Bluetooth Device').trim();
     const batteryRaw = parseInt(parts[2], 10);
     const battery = (!isNaN(batteryRaw) && batteryRaw >= 0 && batteryRaw <= 100) ? batteryRaw : null;
-    devices.set(id, { name, battery });
+    const typeStr = (parts[3] || 'audio').trim();
+    devices.set(id, { name, battery, typeStr });
   }
   return devices;
 }
 
+let isPollingBluetooth = false;
+
 function pollBluetooth() {
-  if (!mainWindow || !mainWindow.webContents) return;
+  if (!mainWindow || !mainWindow.webContents || isPollingBluetooth) return;
+  isPollingBluetooth = true;
 
   exec(PS_BLUETOOTH_CMD, { timeout: 6000, maxBuffer: 1024 * 512 }, (err, stdout) => {
+    isPollingBluetooth = false;
     if (!mainWindow || !mainWindow.webContents) return;
 
-    const current = parseBluetoothOutput(stdout);
-    const isInitial = lastBluetoothDevices === null;
-    const previous = lastBluetoothDevices || new Map();
+    if (err) {
+      return;
+    }
 
-    // Newly connected devices: present now, weren't present on the last poll.
-    for (const [id, info] of current) {
-      if (!previous.has(id)) {
-        lastBluetoothDevices = current;
+    const raw = parseBluetoothOutput(stdout);
+
+    if (lastBluetoothDevices === null) {
+      // Startup initial scan: populate confirmed devices silently without firing popup notifications
+      lastBluetoothDevices = new Map(raw);
+      return;
+    }
+
+    const confirmed = lastBluetoothDevices;
+
+    // Newly connected devices: present now, weren't confirmed-connected before.
+    for (const [id, info] of raw) {
+      bluetoothMissingStreaks.delete(id); // seen again - cancel any pending disconnect
+      if (!confirmed.has(id)) {
+        confirmed.set(id, info);
+        lastBluetoothDevices = confirmed;
         mainWindow.webContents.send('bluetooth-update', {
           deviceName: info.name,
           batteryPct: info.battery,
           isCharging: false,
           leftPct: null,
           rightPct: null,
+          typeStr: info.typeStr || 'phone',
           connectionState: 'connected',
-          isInitial,
+          isInitial: false,
         });
         return; // one event per tick keeps rapid multi-device changes from racing each other
       }
+      confirmed.set(id, info); // keep name/battery fresh for already-confirmed devices
     }
 
-    // Disconnected devices: were present last poll, are gone now.
-    for (const [id, info] of previous) {
-      if (!current.has(id)) {
-        lastBluetoothDevices = current;
-        mainWindow.webContents.send('bluetooth-update', {
-          deviceName: info.name,
-          batteryPct: info.battery,
-          isCharging: false,
-          leftPct: null,
-          rightPct: null,
-          connectionState: 'disconnected',
-          isInitial: false,
-        });
-        return;
+    // Devices confirmed-connected but missing from this poll: declare a disconnect.
+    for (const [id, info] of confirmed) {
+      if (raw.has(id)) continue;
+
+      const streak = (bluetoothMissingStreaks.get(id) || 0) + 1;
+      if (streak < BLUETOOTH_DISCONNECT_CONFIRM_POLLS) {
+        bluetoothMissingStreaks.set(id, streak);
+        continue;
       }
+
+      bluetoothMissingStreaks.delete(id);
+      confirmed.delete(id);
+      lastBluetoothDevices = confirmed;
+      mainWindow.webContents.send('bluetooth-update', {
+        deviceName: info.name,
+        batteryPct: info.battery,
+        isCharging: false,
+        leftPct: null,
+        rightPct: null,
+        connectionState: 'disconnected',
+        isInitial: false,
+      });
+      return;
     }
 
-    lastBluetoothDevices = current;
+    lastBluetoothDevices = confirmed;
   });
 }
 
+ipcMain.on('trigger-phone-notification', () => {
+  if (!mainWindow || !mainWindow.webContents) return;
+  mainWindow.webContents.send('bluetooth-update', {
+    deviceName: "Sahil's S24 Ultra",
+    batteryPct: 88,
+    isCharging: false,
+    leftPct: null,
+    rightPct: null,
+    typeStr: 'phone',
+    connectionState: 'connected',
+    isInitial: false,
+  });
+});
+
 function startBluetoothPoller() {
   if (bluetoothInterval) clearInterval(bluetoothInterval);
+  lastBluetoothDevices = null;
+  bluetoothMissingStreaks.clear();
+  isPollingBluetooth = false;
   pollBluetooth();
-  bluetoothInterval = setInterval(pollBluetooth, 4000);
+  bluetoothInterval = setInterval(pollBluetooth, 6000);
 }
 
-// ── Fullscreen App Detector (macOS Tahoe Auto-Hide) ─────────────────────────
-function getFullscreenExePath() {
-  if (app.isPackaged) {
-    const unpacked = path.join(process.resourcesPath, 'app.asar.unpacked', 'scripts', 'fullscreen_check.exe');
-    if (fs.existsSync(unpacked)) return unpacked;
-    const resPath = path.join(process.resourcesPath, 'scripts', 'fullscreen_check.exe');
-    if (fs.existsSync(resPath)) return resPath;
-  }
-  return path.join(__dirname, 'scripts', 'fullscreen_check.exe');
-}
+// ── Fullscreen App Detector ─────────────────────────────────────────────────
+const EXE_FULLSCREEN = app.isPackaged
+  ? path.join(process.resourcesPath, 'scripts', 'fullscreen_check.exe')
+  : path.join(__dirname, 'scripts', 'fullscreen_check.exe');
 
-let isFullscreenActive = false;
+let lastFullscreenState = false;
+let isPollingFullscreen = false;
 let fullscreenInterval = null;
 
-function checkFullscreenState() {
-  if (!mainWindow || !mainWindow.webContents) return;
-  const exePath = getFullscreenExePath();
-  if (!fs.existsSync(exePath)) return;
+function pollFullscreen() {
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents || isPollingFullscreen) return;
+  isPollingFullscreen = true;
 
-  exec(`"${exePath}"`, { timeout: 2000 }, (err, stdout) => {
-    if (!mainWindow || !mainWindow.webContents) return;
-    const res = (stdout || '').trim();
-    const isFS = res === 'FULLSCREEN';
+  exec(`"${EXE_FULLSCREEN}"`, { timeout: 2000 }, (err, stdout) => {
+    isPollingFullscreen = false;
+    if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) return;
 
-    if (isFS !== isFullscreenActive) {
-      isFullscreenActive = isFS;
-      mainWindow.webContents.send('fullscreen-state', isFS);
+    const raw = (stdout || '').trim();
+    const isFullscreen = raw === 'FULLSCREEN';
+
+    if (isFullscreen !== lastFullscreenState) {
+      lastFullscreenState = isFullscreen;
+      if (isFullscreen) {
+        mainWindow.webContents.send('fullscreen-state', true);
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed() && lastFullscreenState) {
+            mainWindow.hide();
+          }
+        }, 400);
+      } else {
+        mainWindow.showInactive();
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        mainWindow.webContents.send('fullscreen-state', false);
+      }
     }
   });
 }
 
 function startFullscreenPoller() {
   if (fullscreenInterval) clearInterval(fullscreenInterval);
-  checkFullscreenState();
-  fullscreenInterval = setInterval(checkFullscreenState, 1000);
+  pollFullscreen();
+  fullscreenInterval = setInterval(pollFullscreen, 2000);
 }
 
 const PS1_VOLUME = path.join(os.tmpdir(), 'winland_volume_poll.ps1');
@@ -501,6 +794,20 @@ try {
 } catch {}
 
 ipcMain.on('media-control', (event, action) => {
+  if (typeof action === 'object' && action.action === 'seek') {
+    const exePath = getSpotifyExePath();
+    const posMs = action.posMs || 0;
+    if (fs.existsSync(exePath)) {
+      // Same helper, same ~3.3s startup cost — 3000ms would kill the seek
+      // before it applied. (posMs is a rounded integer, so no shell-escaping
+      // concern despite the string form.)
+      exec(`"${exePath}" seek ${Math.round(posMs)}`, { timeout: 8000 }, () => {
+        setTimeout(pollSpotifyTitle, 200);
+      });
+    }
+    return;
+  }
+
   let charCode = 179; // Play/Pause
   if (action === 'next') charCode = 176;
   if (action === 'previous') charCode = 177;
@@ -511,7 +818,7 @@ ipcMain.on('media-control', (event, action) => {
   });
 });
 
-ipcMain.on('resize-window', (event, { width, height }) => {
+ipcMain.on('resize-window', (_event, { width: _width, height: _height }) => {
   // Fixed window stage: OS window does not resize dynamically.
   // CSS spring animation inside webview handles fluid morphing without DWM sharp rectangle artifacts.
 });
@@ -530,12 +837,49 @@ ipcMain.on('set-ignore-mouse-events', (event, ignore) => {
 ipcMain.handle('read-settings', () => readSettings());
 ipcMain.on('write-settings', (event, data) => writeSettings(data));
 ipcMain.handle('get-initial-config', () => readWinlandConfig());
+ipcMain.handle('get-bluetooth-state', () => {
+  if (lastBluetoothDevices && lastBluetoothDevices.size > 0) {
+    const [, info] = Array.from(lastBluetoothDevices.entries())[0];
+    return {
+      deviceName: info.name,
+      batteryPct: info.battery,
+      isCharging: false,
+      leftPct: null,
+      rightPct: null,
+      connectionState: 'connected',
+      isInitial: false,
+    };
+  }
+  return null;
+});
 
 ipcMain.on('open-path', (event, filePath) => {
   if (filePath) {
     shell.openPath(filePath).catch(() => {
       execFile('explorer.exe', [filePath]);
     });
+  }
+});
+
+// Device / animation preferences live in the Settings window but are consumed
+// by the island, which is a separate renderer. Relay changes so the island
+// updates live instead of only picking them up on next launch.
+ipcMain.on('device-prefs-changed', (event, prefs) => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.webContents !== event.sender && !win.isDestroyed()) {
+      win.webContents.send('device-prefs-update', prefs);
+    }
+  }
+});
+
+ipcMain.on('open-settings-window', () => {
+  createSettingsWindow();
+});
+
+ipcMain.on('close-settings-window', () => {
+  if (settingsWindow) {
+    settingsWindow.close();
+    settingsWindow = null;
   }
 });
 
@@ -558,7 +902,17 @@ ipcMain.on('launch-app', (event, cmd) => {
       });
       break;
     case 'settings':
-      shell.openExternal('ms-settings:');
+      createSettingsWindow();
+      break;
+    case 'exit':
+      // User asked to shut WinLand down from the launcher, so they no longer
+      // have to kill it from Task Manager. app.quit() runs the normal quit
+      // path (will-quit cleanup below). This app keeps itself alive on
+      // window-all-closed to stay resident as an overlay, so as a guarantee we
+      // force-exit shortly after in case that keeps the quit from completing.
+      isQuitting = true;
+      app.quit();
+      setTimeout(() => app.exit(0), 600);
       break;
     default:
       // Unrecognized command — do not shell-exec arbitrary renderer input.
@@ -566,11 +920,71 @@ ipcMain.on('launch-app', (event, cmd) => {
   }
 });
 
-// ── App Lifecycle ──────────────────────────────────────────────────────────
+ipcMain.on('trigger-bluetooth-demo', (event, customDevice) => {
+  if (!mainWindow || !mainWindow.webContents) return;
+  const name = typeof customDevice === 'string' ? customDevice : (customDevice?.deviceName || 'AirPods Pro');
+  mainWindow.webContents.send('bluetooth-update', {
+    deviceName: name,
+    batteryPct: customDevice?.batteryPct ?? 88,
+    isCharging: false,
+    leftPct: customDevice?.leftPct ?? 85,
+    rightPct: customDevice?.rightPct ?? 90,
+    connectionState: 'connected',
+    isInitial: false,
+  });
+});
+
+ipcMain.on('trigger-bluetooth-disconnect', (event, customDevice) => {
+  if (!mainWindow || !mainWindow.webContents) return;
+  const name = typeof customDevice === 'string' ? customDevice : (customDevice?.deviceName || 'AirPods Pro');
+  mainWindow.webContents.send('bluetooth-update', {
+    deviceName: name,
+    batteryPct: null,
+    isCharging: false,
+    leftPct: null,
+    rightPct: null,
+    connectionState: 'disconnected',
+    isInitial: false,
+  });
+});
+
+ipcMain.on('trigger-bluetooth-low-battery', (event, customDevice, pct) => {
+  if (!mainWindow || !mainWindow.webContents) return;
+  const name = typeof customDevice === 'string' ? customDevice : (customDevice?.deviceName || 'AirPods Pro');
+  mainWindow.webContents.send('bluetooth-update', {
+    deviceName: name,
+    batteryPct: pct || 15,
+    isCharging: false,
+    leftPct: 12,
+    rightPct: 15,
+    connectionState: 'low-battery',
+    isInitial: false,
+  });
+});
+
+// ── App Lifecycle & Safety ──────────────────────────────────────────────────
+const mainCrashLog = path.join(os.tmpdir(), 'winland_main_crash.log');
+
+process.on('uncaughtException', (err) => {
+  console.error('WinLand Uncaught Exception:', err);
+  try {
+    fs.appendFileSync(mainCrashLog, `[${new Date().toISOString()}] Uncaught Exception: ${err?.stack || err}\n`);
+  } catch {}
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('WinLand Unhandled Rejection:', reason);
+  try {
+    fs.appendFileSync(mainCrashLog, `[${new Date().toISOString()}] Unhandled Rejection: ${reason?.stack || reason}\n`);
+  } catch {}
+});
+
 app.whenReady().then(createWindow);
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+app.on('window-all-closed', (e) => {
+  // Stay resident as an overlay when the window is merely closed — but not when
+  // the user explicitly chose Exit, or we'd block our own shutdown.
+  if (!isQuitting) e.preventDefault();
 });
 
 app.on('activate', () => {
