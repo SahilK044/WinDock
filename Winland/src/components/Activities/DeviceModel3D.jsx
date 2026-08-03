@@ -265,6 +265,9 @@ export default function DeviceModel3D({
           rig.lidNode.rotation.x = rig.lidAuthoredOpen ? 0 : rig.lidOpenSign * rig.lidOpenAngle;
         }
         master.add(rig.root);
+        clock.start();
+        elapsed = 0;
+        openProgress = isDisconnected ? 1 : 0;
       },
       (err) => { console.warn('island model failed:', modelId, err); setFailed(true); }
     );
@@ -278,7 +281,10 @@ export default function DeviceModel3D({
       const dt = Math.min(clock.getDelta(), 0.05); // ignore frame-hitch spikes
       elapsed += dt;
       // Only loop previews if explicit loop prop is passed (e.g. settings card hover)
-      if (loop && !isDisconnected && elapsed > CYCLE) elapsed = 0;
+      if (loop && !isDisconnected && elapsed > CYCLE) {
+        elapsed = 0;
+        openProgress = 0;
+      }
 
       if (rig) {
         if (isDisconnected) {
