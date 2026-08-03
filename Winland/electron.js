@@ -187,11 +187,12 @@ function createWindow() {
 
   mainWindow.setAlwaysOnTop(true, 'screen-saver');
 
-  if (app.isPackaged) {
-    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+  const localDist = path.join(__dirname, 'dist', 'index.html');
+  if (fs.existsSync(localDist)) {
+    mainWindow.loadFile(localDist);
   } else {
     mainWindow.loadURL('http://localhost:5173').catch(() => {
-      mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+      mainWindow.loadFile(localDist);
     });
   }
 
@@ -280,7 +281,7 @@ function createSettingsWindow() {
   settingsWindow.setAlwaysOnTop(true, 'screen-saver');
 
   const indexPath = path.join(__dirname, 'dist', 'index.html');
-  if (app.isPackaged) {
+  if (fs.existsSync(indexPath)) {
     settingsWindow.loadFile(indexPath, { search: 'route=settings', hash: 'settings' });
   } else {
     settingsWindow.loadURL('http://localhost:5173?route=settings#settings').catch(() => {
