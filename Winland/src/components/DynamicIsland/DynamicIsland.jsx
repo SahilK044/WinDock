@@ -375,11 +375,13 @@ export default function DynamicIsland({
       let updatedProgressMs = (initialPosMs !== undefined && initialPosMs >= 0) ? initialPosMs : prev.progressMs;
       let updatedDurationMs = (initialEndMs !== undefined && initialEndMs > 0) ? initialEndMs : prev.durationMs;
 
+      const trackTitleChanged = prev.title !== cleanTitle;
+
       return {
         ...prev,
         title: cleanTitle,
-        artist: parsedArtist || prev.artist,
-        coverUrl: nativeCoverUrl || prev.coverUrl,
+        artist: parsedArtist || (trackTitleChanged ? '' : prev.artist),
+        coverUrl: nativeCoverUrl ? nativeCoverUrl : (trackTitleChanged ? null : prev.coverUrl),
         isPlaying: targetIsPlaying,
         progressMs: updatedProgressMs,
         durationMs: updatedDurationMs,

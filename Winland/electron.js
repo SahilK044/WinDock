@@ -412,7 +412,7 @@ function pollSpotifyTitle() {
               posMs: Math.round(posMs),
               endMs,
               isPlaying,
-              coverUrl: trackChanged ? coverUrl : null,
+              coverUrl: coverUrl || null,
             });
             done();
             return;
