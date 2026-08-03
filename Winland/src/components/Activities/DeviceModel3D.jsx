@@ -401,12 +401,12 @@ export default function DeviceModel3D({
               }
             } else if (styleKey === 'float') {
               if (loop && !isDisconnected) {
-                // 4.6s Full Cycle:
+                // 5.4s Seamless Full Cycle:
                 // 0.0s - 1.2s: Smooth rise out of case slots (Lid opens 0->1, Earbuds float up 0->1)
                 // 1.2s - 3.2s: Mid-air levitation & slow 3D Y-axis spins (Lid open=1, Earbuds float=1)
                 // 3.2s - 4.4s: Smooth glide back into case slots & lid closes shut (Lid 1->0, Earbuds 1->0)
-                // 4.4s - 4.6s: Rest closed before next cycle
-                const cycleTime = elapsed % 4.6;
+                // 4.4s - 5.4s: Closed case rests fully settled before next cycle
+                const cycleTime = elapsed % 5.4;
                 if (cycleTime < 1.2) {
                   const progress = easeInOutCubic(cycleTime / 1.2);
                   targetOpen = progress;
@@ -425,8 +425,8 @@ export default function DeviceModel3D({
                   const returnT = easeInOutCubic((cycleTime - 3.2) / 1.2);
                   targetOpen = 1.0 - returnT;
                   floatProgress = 1.0 - returnT;
-                  leftSpin = (1.0 - returnT) * (0.3 + 2.0 * 0.75);
-                  rightSpin = -(1.0 - returnT) * (0.3 + 2.0 * 0.75);
+                  leftSpin = 1.8 + returnT * 0.3;
+                  rightSpin = -(1.8 + returnT * 0.3);
                 } else {
                   targetOpen = 0.0;
                   floatProgress = 0.0;
@@ -444,7 +444,7 @@ export default function DeviceModel3D({
               }
             }
 
-            openProgress += (targetOpen - openProgress) * Math.min(dt * 12.0, 1);
+            openProgress += (targetOpen - openProgress) * Math.min(dt * 16.0, 1);
 
             rig.lidNode.rotation.x = rig.lidAuthoredOpen
               ? THREE.MathUtils.lerp(rig.lidClosedAngle, 0, openProgress)
