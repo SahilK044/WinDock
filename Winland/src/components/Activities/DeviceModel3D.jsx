@@ -28,118 +28,167 @@ const easeOutBack = (t) => {
  */
 const MOTION = {
   // ── Phones ──────────────────────────────────────────────────────────────
-  // Each phone style has to be told apart at a glance, so they differ in the
-  // direction they arrive from AND in what they keep doing afterwards — an
-  // earlier pass gave them near-identical idles and they all looked the same.
+  amoled: (s, t, e, loop) => {
+    if (loop) {
+      const cyc = e % 3.0;
+      const k = easeOutCubic(clamp01(cyc / 0.8));
+      s.y = -1.15 + 1.15 * k + Math.sin(e * 2.2) * 0.08;
+      s.scale = 0.55 + 0.45 * k;
+      s.rotY = Math.sin(e * 1.5) * 0.45;
+      s.rotX = Math.sin(e * 1.8) * 0.22;
+    } else {
+      const k = easeOutCubic(t);
+      s.y = -1.15 + 1.15 * k;
+      s.scale = 0.55 + 0.45 * k;
+      s.rotY = Math.sin(e * 1.15) * 0.42 * t;
+      s.rotX = 0.22 * (1 - k) + Math.sin(e * 0.85) * 0.09 * t;
+    }
+  },
 
-  // Rises from below and settles, screen catching the light as it tilts.
-  amoled: (s, t, e) => {
-    const k = easeOutCubic(t);
-    s.y = -1.15 + 1.15 * k;
-    s.scale = 0.55 + 0.45 * k;
-    s.rotY = Math.sin(e * 1.15) * 0.42 * t;
-    s.rotX = 0.22 * (1 - k) + Math.sin(e * 0.85) * 0.09 * t;
+  magsafe: (s, t, e, loop) => {
+    if (loop) {
+      const cyc = e % 2.5;
+      const snap = easeOutBack(clamp01(cyc / 0.7));
+      s.z = -2.2 + 2.0 * snap + Math.sin(e * 3.0) * 0.1;
+      s.scale = 0.38 + 0.56 * snap;
+      s.rotZ = (1 - snap) * -0.45 + Math.sin(e * 28) * 0.02;
+      s.rotY = (1 - snap) * 0.6 + Math.sin(e * 1.5) * 0.15;
+    } else {
+      const snap = easeOutBack(clamp01(t * 1.15));
+      s.z = -2.0 + 1.8 * snap;
+      s.scale = 0.38 + 0.56 * snap;
+      s.rotZ = (1 - snap) * -0.45 + (t >= 1 ? Math.sin(e * 30) * 0.014 : 0);
+      s.rotY = (1 - snap) * 0.6;
+    }
   },
-  // Flies in and snaps flat, then holds a tight magnetic quiver. It stops
-  // short of the camera on purpose — driving z to 0 with an overshooting ease
-  // pushed the phone through the near plane and it filled the whole frame.
-  magsafe: (s, t, e) => {
-    const snap = easeOutBack(clamp01(t * 1.15));
-    s.z = -2.0 + 1.8 * snap;
-    s.scale = 0.38 + 0.56 * snap;
-    s.rotZ = (1 - snap) * -0.45 + (t >= 1 ? Math.sin(e * 30) * 0.014 : 0);
-    s.rotY = (1 - snap) * 0.6;
-  },
-  // Never stops turning: a full vertical showcase rotation.
-  showcase: (s, t, e) => {
-    const k = easeOutCubic(t);
+
+  showcase: (s, t, e, loop) => {
+    const k = loop ? 1 : easeOutCubic(t);
     s.scale = 0.5 + 0.5 * k;
-    s.rotY = e * 2.0;
-    s.y = Math.sin(e * 1.1) * 0.05 * t;
+    s.rotY = e * 2.2;
+    s.y = Math.sin(e * 1.5) * 0.12;
+    s.rotX = Math.sin(e * 1.0) * 0.10;
   },
-  // Comes from far away and keeps drifting through depth.
-  depth: (s, t, e) => {
-    const k = easeOutCubic(t);
-    s.z = -3.4 + 3.4 * k;
-    s.scale = 0.32 + 0.68 * k;
-    s.z += Math.sin(e * 0.75) * 0.5 * t;
-    s.y = Math.sin(e * 0.95) * 0.10 * t;
-    s.rotY = Math.sin(e * 0.6) * 0.5 * t;
+
+  depth: (s, t, e, loop) => {
+    if (loop) {
+      s.z = -1.2 + Math.sin(e * 1.8) * 1.2;
+      s.scale = 0.65 + Math.sin(e * 1.8) * 0.25;
+      s.y = Math.sin(e * 1.4) * 0.18;
+      s.rotY = Math.sin(e * 1.2) * 0.55;
+    } else {
+      const k = easeOutCubic(t);
+      s.z = -3.4 + 3.4 * k + Math.sin(e * 0.75) * 0.5 * t;
+      s.scale = 0.32 + 0.68 * k;
+      s.y = Math.sin(e * 0.95) * 0.10 * t;
+      s.rotY = Math.sin(e * 0.6) * 0.5 * t;
+    }
   },
-  // Unfolds through a half turn like a hinge, then rocks around it.
-  hinge: (s, t, e) => {
-    const open = easeOutCubic(t);
-    s.rotY = -Math.PI * (1 - open) + Math.sin(e * 1.05) * 0.38 * t;
-    s.scale = 0.55 + 0.45 * open;
-    s.y = Math.sin(e * 0.9) * 0.06 * t;
+
+  hinge: (s, t, e, loop) => {
+    if (loop) {
+      const open = 0.5 + 0.5 * Math.sin(e * 1.8);
+      s.rotY = -Math.PI * (1 - open) * 0.5 + Math.sin(e * 1.2) * 0.35;
+      s.scale = 0.75 + 0.25 * open;
+      s.y = Math.sin(e * 1.5) * 0.12;
+      s.rotX = Math.sin(e * 1.0) * 0.15;
+    } else {
+      const open = easeOutCubic(t);
+      s.rotY = -Math.PI * (1 - open) + Math.sin(e * 1.05) * 0.38 * t;
+      s.scale = 0.55 + 0.45 * open;
+      s.y = Math.sin(e * 0.9) * 0.06 * t;
+    }
   },
 
   // ── Controllers ─────────────────────────────────────────────────────────
-  levitate: (s, t, e) => {
-    const k = easeOutCubic(t);
-    s.y = -0.95 + 0.95 * k + Math.sin(e * 1.6) * 0.11 * t;
+  levitate: (s, t, e, loop) => {
+    const k = loop ? 1 : easeOutCubic(t);
+    s.y = (loop ? 0 : -0.95 + 0.95 * k) + Math.sin(e * 1.8) * 0.15;
     s.scale = 0.5 + 0.5 * k;
-    s.rotY = Math.sin(e * 0.95) * 0.5 * t;
-    s.rotZ = Math.sin(e * 24) * 0.012 * t; // haptic rumble
+    s.rotY = Math.sin(e * 1.2) * 0.55;
+    s.rotZ = Math.sin(e * 24) * 0.015;
   },
-  'flip-trigger': (s, t, e) => {
-    const k = easeOutCubic(clamp01(t * 1.05));
-    s.scale = 0.45 + 0.55 * easeOutCubic(t);
-    s.rotX = Math.PI * 2 * k;
-    s.y = Math.sin(e * 1.4) * 0.09 * t;
-    s.rotY = Math.sin(e * 0.85) * 0.35 * t;
+
+  'flip-trigger': (s, t, e, loop) => {
+    if (loop) {
+      s.scale = 0.85;
+      s.rotX = e * 3.0;
+      s.y = Math.sin(e * 1.8) * 0.12;
+      s.rotY = Math.sin(e * 1.2) * 0.4;
+    } else {
+      const k = easeOutCubic(clamp01(t * 1.05));
+      s.scale = 0.45 + 0.55 * easeOutCubic(t);
+      s.rotX = Math.PI * 2 * k;
+      s.y = Math.sin(e * 1.4) * 0.09 * t;
+      s.rotY = Math.sin(e * 0.85) * 0.35 * t;
+    }
   },
 
   // ── Speakers ────────────────────────────────────────────────────────────
-  wave: (s, t, e) => {
-    const k = easeOutCubic(t);
+  wave: (s, t, e, loop) => {
+    const k = loop ? 1 : easeOutCubic(t);
     s.scale = 0.5 + 0.5 * k;
-    s.x = Math.sin(e * 1.7) * 0.30 * t;
-    s.rotY = Math.sin(e * 1.7) * 0.42 * t;
-    s.y = -0.7 + 0.7 * k;
+    s.x = Math.sin(e * 2.2) * 0.35;
+    s.rotY = Math.sin(e * 2.2) * 0.45;
+    s.y = (loop ? 0 : -0.7 + 0.7 * k) + Math.sin(e * 1.5) * 0.08;
   },
-  panoramic: (s, t, e) => {
-    const k = easeOutCubic(t);
+
+  panoramic: (s, t, e, loop) => {
+    const k = loop ? 1 : easeOutCubic(t);
     s.scale = 0.5 + 0.5 * k;
-    s.rotY = e * 1.7;
-    s.y = -0.7 + 0.7 * k;
+    s.rotY = e * 2.2;
+    s.y = (loop ? 0 : -0.7 + 0.7 * k) + Math.sin(e * 1.2) * 0.06;
   },
-  bass: (s, t, e) => {
-    const k = easeOutCubic(t);
-    const thump = Math.pow(Math.abs(Math.sin(e * 2.6)), 4);
-    s.scale = (0.5 + 0.5 * k) * (1 + thump * 0.20 * t);
-    s.y = -0.7 + 0.7 * k - thump * 0.06 * t;
-    s.rotY = Math.sin(e * 0.5) * 0.28 * t;
+
+  bass: (s, t, e, loop) => {
+    const k = loop ? 1 : easeOutCubic(t);
+    const thump = Math.pow(Math.abs(Math.sin(e * 3.2)), 4);
+    s.scale = (0.5 + 0.5 * k) * (1 + thump * 0.25);
+    s.y = (loop ? 0 : -0.7 + 0.7 * k) - thump * 0.08;
+    s.rotY = Math.sin(e * 0.8) * 0.35;
   },
 
   // ── Headphones ──────────────────────────────────────────────────────────
-  spin: (s, t, e) => {
-    const k = easeOutCubic(t);
-    s.y = -0.95 + 0.95 * k + Math.sin(e * 1.25) * 0.07 * t;
+  spin: (s, t, e, loop) => {
+    const k = loop ? 1 : easeOutCubic(t);
+    s.y = (loop ? 0 : -0.95 + 0.95 * k) + Math.sin(e * 1.6) * 0.10;
     s.scale = 0.45 + 0.55 * k;
-    s.rotY = e * 1.9;
+    s.rotY = e * 2.4;
   },
-  expand: (s, t, e) => {
-    const k = easeOutCubic(t);
-    const breathe = 1 + Math.sin(e * 1.9) * 0.13 * t;
+
+  expand: (s, t, e, loop) => {
+    const k = loop ? 1 : easeOutCubic(t);
+    const breathe = 1 + Math.sin(e * 2.2) * 0.16;
     s.scale = (0.45 + 0.55 * k) * breathe;
-    s.rotY = Math.sin(e * 0.95) * 0.62 * t;
-    s.y = -0.8 + 0.8 * k;
+    s.rotY = Math.sin(e * 1.2) * 0.65;
+    s.y = (loop ? 0 : -0.8 + 0.8 * k) + Math.sin(e * 1.5) * 0.08;
   },
 
   // ── Earbuds ─────────────────────────────────────────────────────────────
-  // Both also drive the case rig; see EARBUD_OPEN below.
-  'case-dock': (s, t, e) => {
-    const k = easeOutCubic(t);
-    s.y = -0.85 + 0.85 * k;
-    s.scale = 0.55 + 0.45 * k;
-    s.rotY = Math.sin(e * 0.75) * 0.30 * t;
+  'case-dock': (s, t, e, loop) => {
+    if (loop) {
+      s.scale = 0.85;
+      s.rotY = Math.sin(e * 1.2) * 0.35;
+      s.y = Math.sin(e * 1.5) * 0.08;
+    } else {
+      const k = easeOutCubic(t);
+      s.y = -0.85 + 0.85 * k;
+      s.scale = 0.55 + 0.45 * k;
+      s.rotY = Math.sin(e * 0.75) * 0.30 * t;
+    }
   },
-  float: (s, t, e) => {
-    const k = easeOutCubic(t);
-    s.y = -0.85 + 0.85 * k + Math.sin(e * 1.45) * 0.10 * t;
-    s.scale = 0.55 + 0.45 * k;
-    s.rotY = Math.sin(e * 0.9) * 0.45 * t;
+
+  float: (s, t, e, loop) => {
+    if (loop) {
+      s.scale = 0.85;
+      s.rotY = Math.sin(e * 1.2) * 0.45;
+      s.y = Math.sin(e * 1.8) * 0.12;
+    } else {
+      const k = easeOutCubic(t);
+      s.y = -0.85 + 0.85 * k + Math.sin(e * 1.45) * 0.10 * t;
+      s.scale = 0.55 + 0.45 * k;
+      s.rotY = Math.sin(e * 0.9) * 0.45 * t;
+    }
   },
 };
 
@@ -303,7 +352,7 @@ export default function DeviceModel3D({
           const t = raw;
 
           const pose = { x: 0, y: 0, z: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 1 };
-          motion(pose, t, elapsed);
+          motion(pose, t, elapsed, loop);
 
           const openDrop = category === 'earbud' ? openProgress * rig.openNudgeY : 0;
           master.position.set(pose.x, rig.initialYPos + pose.y - openDrop, pose.z);
@@ -366,6 +415,7 @@ export default function DeviceModel3D({
             const bt = clamp01((openProgress - 0.22) / 0.78);
             const budEase = bt < 0.5 ? 4 * bt * bt * bt : 1 - Math.pow(-2 * bt + 2, 3) / 2;
             const budPop = cfg.budsAuthoredOut ? budEase - 1 : budEase;
+            const floatMult = styleKey === 'float' ? 2.2 : 1.0;
 
             const leftWaveY = budWaveY;
             const rightWaveY = styleKey === 'float' ? -budWaveY : budWaveY;
@@ -376,10 +426,10 @@ export default function DeviceModel3D({
             ]) {
               if (!node) continue;
               node.visible = openProgress > 0.035;
-              node.position[riseKey] = (riseKey === 'y' ? iy : iz) + budPop * rig.budRise + waveY;
+              node.position[riseKey] = (riseKey === 'y' ? iy : iz) + budPop * rig.budRise * floatMult + waveY;
               node.position[secKey] =
-                (secKey === 'y' ? iy : iz) + budPop * rig.budRise * 0.25 * secSign + budWaveZ;
-              node.rotation.z = tilt * openProgress;
+                (secKey === 'y' ? iy : iz) + budPop * rig.budRise * 0.35 * floatMult * secSign + budWaveZ;
+              node.rotation.z = tilt * openProgress + (styleKey === 'float' ? Math.sin(elapsed * 2.5) * 0.15 : 0);
             }
           }
         }
