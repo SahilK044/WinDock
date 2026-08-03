@@ -313,8 +313,48 @@ export default function DeviceModel3D({
 
           // Earbud cases additionally open their lid and lift the buds.
           if (category === 'earbud' && rig.lidNode) {
-            const target = (EARBUD_OPEN[styleKey] ?? 1) * clamp01(t * 1.2);
-            openProgress += (target - openProgress) * Math.min(dt * 3.0, 1);
+            let targetOpen = 1;
+            let budWaveY = 0;
+            let budWaveZ = 0;
+
+            if (styleKey === 'case-dock') {
+              if (loop && !isDisconnected) {
+                // Continuous Lid Flip & Earbud Docking Cycle (4.0s full sequence)
+                // 0.0s - 1.0s: Lid flips open, earbuds pop out & dock up
+                // 1.0s - 2.4s: Earbuds hover in docking pose
+                // 2.4s - 3.5s: Earbuds dock back into case, lid flips shut
+                // 3.5s - 4.0s: Case rests closed before replaying
+                const cycleTime = elapsed % 4.0;
+                if (cycleTime < 1.0) {
+                  targetOpen = easeOutCubic(cycleTime / 1.0);
+                } else if (cycleTime < 2.4) {
+                  targetOpen = 1.0;
+                  budWaveY = Math.sin((cycleTime - 1.0) * 3.2) * 0.06;
+                } else if (cycleTime < 3.5) {
+                  targetOpen = 1.0 - easeOutCubic((cycleTime - 2.4) / 1.1);
+                } else {
+                  targetOpen = 0.0;
+                }
+              } else {
+                targetOpen = clamp01(t * 1.2);
+              }
+            } else if (styleKey === 'float') {
+              if (loop && !isDisconnected) {
+                targetOpen = clamp01(elapsed / 0.8);
+                if (elapsed > 0.8) {
+                  budWaveY = Math.sin(elapsed * 2.8) * 0.14;
+                  budWaveZ = Math.cos(elapsed * 2.2) * 0.08;
+                }
+              } else {
+                targetOpen = clamp01(t * 1.2);
+                if (t >= 1) {
+                  budWaveY = Math.sin(elapsed * 2.8) * 0.12;
+                }
+              }
+            }
+
+            openProgress += (targetOpen - openProgress) * Math.min(dt * 6.0, 1);
+
             rig.lidNode.rotation.x = rig.lidAuthoredOpen
               ? THREE.MathUtils.lerp(rig.lidClosedAngle, 0, openProgress)
               : rig.lidOpenSign * rig.lidOpenAngle * openProgress;
@@ -327,15 +367,18 @@ export default function DeviceModel3D({
             const budEase = bt < 0.5 ? 4 * bt * bt * bt : 1 - Math.pow(-2 * bt + 2, 3) / 2;
             const budPop = cfg.budsAuthoredOut ? budEase - 1 : budEase;
 
-            for (const [node, iy, iz, tilt] of [
-              [rig.budLeftNode, rig.budLeftInitialY, rig.budLeftInitialZ, 0.12],
-              [rig.budRightNode, rig.budRightInitialY, rig.budRightInitialZ, -0.12],
+            const leftWaveY = budWaveY;
+            const rightWaveY = styleKey === 'float' ? -budWaveY : budWaveY;
+
+            for (const [node, iy, iz, tilt, waveY] of [
+              [rig.budLeftNode, rig.budLeftInitialY, rig.budLeftInitialZ, 0.12, leftWaveY],
+              [rig.budRightNode, rig.budRightInitialY, rig.budRightInitialZ, -0.12, rightWaveY],
             ]) {
               if (!node) continue;
               node.visible = openProgress > 0.035;
-              node.position[riseKey] = (riseKey === 'y' ? iy : iz) + budPop * rig.budRise;
+              node.position[riseKey] = (riseKey === 'y' ? iy : iz) + budPop * rig.budRise + waveY;
               node.position[secKey] =
-                (secKey === 'y' ? iy : iz) + budPop * rig.budRise * 0.25 * secSign;
+                (secKey === 'y' ? iy : iz) + budPop * rig.budRise * 0.25 * secSign + budWaveZ;
               node.rotation.z = tilt * openProgress;
             }
           }
