@@ -374,19 +374,19 @@ export default function DeviceModel3D({
 
             if (styleKey === 'case-dock') {
               if (loop && !isDisconnected) {
-                // Continuous Lid Flip & Earbud Docking Cycle (4.0s full sequence)
-                // 0.0s - 1.0s: Lid flips open, earbuds pop out & dock up
-                // 1.0s - 2.4s: Earbuds hover in docking pose
-                // 2.4s - 3.5s: Earbuds dock back into case, lid flips shut
-                // 3.5s - 4.0s: Case rests closed before replaying
-                const cycleTime = elapsed % 4.0;
-                if (cycleTime < 1.0) {
-                  targetOpen = easeOutCubic(cycleTime / 1.0);
-                } else if (cycleTime < 2.4) {
+                // Lid Flip & Earbud Docking Sequence (3.2s cycle)
+                // 0.0s - 0.8s: Lid flips open, earbuds remain seated in docking slots
+                // 0.8s - 1.8s: Case tilts to showcase docked earbuds inside
+                // 1.8s - 2.6s: Earbuds click into slots and lid flips shut
+                // 2.6s - 3.2s: Closed case rests before replaying
+                const cycleTime = elapsed % 3.2;
+                if (cycleTime < 0.8) {
+                  targetOpen = easeOutCubic(cycleTime / 0.8);
+                } else if (cycleTime < 1.8) {
                   targetOpen = 1.0;
-                  budWaveY = Math.sin((cycleTime - 1.0) * 3.2) * 0.06;
-                } else if (cycleTime < 3.5) {
-                  targetOpen = 1.0 - easeOutCubic((cycleTime - 2.4) / 1.1);
+                  budWaveY = Math.sin((cycleTime - 0.8) * 3.5) * 0.015;
+                } else if (cycleTime < 2.6) {
+                  targetOpen = 1.0 - easeOutCubic((cycleTime - 1.8) / 0.8);
                 } else {
                   targetOpen = 0.0;
                 }
@@ -395,15 +395,15 @@ export default function DeviceModel3D({
               }
             } else if (styleKey === 'float') {
               if (loop && !isDisconnected) {
-                targetOpen = clamp01(elapsed / 0.8);
-                if (elapsed > 0.8) {
-                  budWaveY = Math.sin(elapsed * 2.8) * 0.14;
-                  budWaveZ = Math.cos(elapsed * 2.2) * 0.08;
+                targetOpen = clamp01(elapsed / 0.6);
+                if (elapsed > 0.6) {
+                  budWaveY = Math.sin(elapsed * 3.2) * 0.18;
+                  budWaveZ = Math.cos(elapsed * 2.5) * 0.10;
                 }
               } else {
                 targetOpen = clamp01(t * 1.2);
                 if (t >= 1) {
-                  budWaveY = Math.sin(elapsed * 2.8) * 0.12;
+                  budWaveY = Math.sin(elapsed * 3.2) * 0.15;
                 }
               }
             }
@@ -421,10 +421,13 @@ export default function DeviceModel3D({
             const bt = clamp01((openProgress - 0.22) / 0.78);
             const budEase = bt < 0.5 ? 4 * bt * bt * bt : 1 - Math.pow(-2 * bt + 2, 3) / 2;
             const budPop = cfg.budsAuthoredOut ? budEase - 1 : budEase;
-            const floatMult = styleKey === 'float' ? 2.2 : 1.0;
+            
+            // For case-dock: earbuds stay DOCKED inside case slots (0.12x rise max).
+            // For float: earbuds DETACH and float high in mid-air (2.5x rise max).
+            const floatMult = styleKey === 'float' ? 2.5 : 0.12;
 
             const leftWaveY = budWaveY;
-            const rightWaveY = styleKey === 'float' ? -budWaveY : budWaveY;
+            const rightWaveY = styleKey === 'float' ? -budWaveY : budWaveY * 0.5;
 
             for (const [node, iy, iz, tilt, waveY] of [
               [rig.budLeftNode, rig.budLeftInitialY, rig.budLeftInitialZ, 0.12, leftWaveY],
@@ -434,8 +437,8 @@ export default function DeviceModel3D({
               node.visible = openProgress > 0.035;
               node.position[riseKey] = (riseKey === 'y' ? iy : iz) + budPop * rig.budRise * floatMult + waveY;
               node.position[secKey] =
-                (secKey === 'y' ? iy : iz) + budPop * rig.budRise * 0.35 * floatMult * secSign + budWaveZ;
-              node.rotation.z = tilt * openProgress + (styleKey === 'float' ? Math.sin(elapsed * 2.5) * 0.15 : 0);
+                (secKey === 'y' ? iy : iz) + budPop * rig.budRise * (styleKey === 'float' ? 0.35 : 0.05) * floatMult * secSign + budWaveZ;
+              node.rotation.z = tilt * openProgress * (styleKey === 'float' ? 1.0 : 0.2) + (styleKey === 'float' ? Math.sin(elapsed * 2.8) * 0.18 : 0);
             }
           }
         }
