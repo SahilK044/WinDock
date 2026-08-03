@@ -1,32 +1,31 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Media.Control;
 using Windows.Storage.Streams;
 
 namespace WinLandMedia {
     public static class WinRTExtensions {
-        public static T AwaitWinRT<T>(this IAsyncOperation<T> op) {
+        public static T AwaitWinRT<T>(this IAsyncOperation<T> op, int timeoutMs = 1200) {
             if (op == null) return default(T);
-            int waited = 0;
-            while (op.Status == AsyncStatus.Started && waited < 2500) {
-                Thread.Sleep(10);
-                waited += 10;
-            }
-            if (op.Status == AsyncStatus.Completed) {
-                return op.GetResults();
-            }
+            try {
+                var task = System.WindowsRuntimeSystemExtensions.AsTask(op);
+                if (task.Wait(timeoutMs)) {
+                    return task.Result;
+                }
+            } catch {}
             return default(T);
         }
 
-        public static void AwaitAction(this IAsyncAction op) {
+        public static void AwaitAction(this IAsyncAction op, int timeoutMs = 1200) {
             if (op == null) return;
-            int waited = 0;
-            while (op.Status == AsyncStatus.Started && waited < 2500) {
-                Thread.Sleep(10);
-                waited += 10;
-            }
+            try {
+                var task = System.WindowsRuntimeSystemExtensions.AsTask(op);
+                task.Wait(timeoutMs);
+            } catch {}
         }
     }
 
@@ -35,7 +34,24 @@ namespace WinLandMedia {
         static void Main(string[] args) {
             try {
                 Console.OutputEncoding = System.Text.Encoding.UTF8;
-                var mgr = GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AwaitWinRT();
+
+                // Check if seeking requested
+                if (args != null && args.Length >= 2 && args[0] == "seek") {
+                    long targetMs = 0;
+                    if (long.TryParse(args[1], out targetMs)) {
+                        var m = GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AwaitWinRT(1000);
+                        if (m != null) {
+                            var s = m.GetCurrentSession();
+                            if (s != null) {
+                                s.TryChangePlaybackPositionAsync(targetMs * 10000).AwaitWinRT(1000);
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                // 1. Fast WinRT GSMTC session fetch (1200ms max timeout using .NET Task Wait)
+                var mgr = GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AwaitWinRT(1200);
                 if (mgr != null) {
                     var sessions = mgr.GetSessions();
                     GlobalSystemMediaTransportControlsSession session = null;
@@ -100,16 +116,7 @@ namespace WinLandMedia {
                     }
 
                     if (session != null) {
-                        // Check if seeking requested
-                        if (args != null && args.Length >= 2 && args[0] == "seek") {
-                            long targetMs = 0;
-                            if (long.TryParse(args[1], out targetMs)) {
-                                session.TryChangePlaybackPositionAsync(targetMs * 10000).AwaitWinRT();
-                            }
-                            return;
-                        }
-
-                        var props = session.TryGetMediaPropertiesAsync().AwaitWinRT();
+                        var props = session.TryGetMediaPropertiesAsync().AwaitWinRT(800);
                         var timeline = session.GetTimelineProperties();
                         var playback = session.GetPlaybackInfo();
 
@@ -130,8 +137,6 @@ namespace WinLandMedia {
                             posMs = (long)timeline.Position.TotalMilliseconds;
                             endMs = (long)timeline.EndTime.TotalMilliseconds;
 
-                            // Output raw LastUpdatedTime as Unix-ms so Node.js
-                            // can do its own stateful wall-clock extrapolation.
                             try {
                                 lastUpdMs = timeline.LastUpdatedTime.ToUniversalTime().ToUnixTimeMilliseconds();
                             } catch {}
@@ -147,12 +152,12 @@ namespace WinLandMedia {
                         // Extract native thumbnail for ALL media sessions if available
                         if (props != null && props.Thumbnail != null) {
                             try {
-                                var stream = props.Thumbnail.OpenReadAsync().AwaitWinRT();
+                                var stream = props.Thumbnail.OpenReadAsync().AwaitWinRT(800);
                                 if (stream != null && stream.Size > 0) {
                                     string tempPath = Path.Combine(Path.GetTempPath(), "winland_cover.jpg");
                                     var reader = new DataReader(stream.GetInputStreamAt(0));
                                     var bytes = new byte[stream.Size];
-                                    reader.LoadAsync((uint)stream.Size).AwaitWinRT();
+                                    reader.LoadAsync((uint)stream.Size).AwaitWinRT(800);
                                     reader.ReadBytes(bytes);
                                     
                                     bool needWrite = true;
@@ -185,6 +190,23 @@ namespace WinLandMedia {
                         }
                     }
                 }
+
+                // 2. Fast Win32 Process Window Title Fallback (Instant 0ms query for Spotify)
+                try {
+                    var procs = Process.GetProcessesByName("Spotify");
+                    foreach (var p in procs) {
+                        try {
+                            string wTitle = p.MainWindowTitle;
+                            if (!string.IsNullOrEmpty(wTitle) && wTitle != "Spotify" && wTitle != "Spotify Free" && wTitle != "Spotify Premium") {
+                                string[] parts = wTitle.Split(new string[] { " - " }, StringSplitOptions.None);
+                                string artist = parts.Length > 1 ? parts[0].Trim() : "";
+                                string title = parts.Length > 1 ? string.Join(" - ", parts, 1, parts.Length - 1).Trim() : parts[0].Trim();
+                                Console.WriteLine(title + "|" + artist + "|0|0|1||app|0");
+                                return;
+                            }
+                        } catch {}
+                    }
+                } catch {}
             } catch {}
             Console.WriteLine("");
         }
