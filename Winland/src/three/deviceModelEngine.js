@@ -318,6 +318,7 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
       if (!cloned) {
         cloned = src.clone();
         cloned.color = src.color.clone().lerp(tint, 0.5);
+        cloned.__isCloned = true;
         seen.set(src.uuid, cloned);
       }
       child.material = cloned;
@@ -481,10 +482,14 @@ export function addStudioLights(scene, renderer) {
 
   if (renderer) {
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const env = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    const roomEnv = new RoomEnvironment();
+    const env = pmrem.fromScene(roomEnv, 0.04);
     scene.environment = env.texture;
     pmrem.dispose();
-    return () => env.texture.dispose();
+    roomEnv.dispose();
+    return () => {
+      if (env && env.texture) env.texture.dispose();
+    };
   }
   return () => {};
 }

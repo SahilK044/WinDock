@@ -175,7 +175,7 @@ export default function Canvas3DCard({
         masterGroup.rotation.y = spinY;
         masterGroup.rotation.x = THREE.MathUtils.lerp(
           masterGroup.rotation.x,
-          isHov ? Math.sin(spinY * 0.5) * 0.08 : masterGroup.rotation.x,
+          isHov ? Math.sin(spinY * 0.5) * 0.08 : 0,
           0.06
         );
       } else if (category === 'earbud') {
@@ -297,20 +297,15 @@ export default function Canvas3DCard({
     return () => {
       isDisposed = true;
       cancelAnimationFrame(animId);
-      // Geometry and materials belong to the cached master this card cloned
-      // from, and other cards (and later mounts) still clone from it — so they
-      // are deliberately NOT disposed here. Only what this card owns outright,
-      // the renderer and its context, is released.
+      scene.traverse((child) => {
+        if (child.isMesh && child.material && child.material.__isCloned) {
+          child.material.dispose();
+        }
+      });
       disposeEnv();
       renderer.dispose();
-      // dispose() frees GPU resources but NOT the WebGL context itself, which
-      // is only reclaimed whenever the browser gets around to GC'ing it. Each
-      // card owns a context and a tab switch mounts a dozen more, so without an
-      // explicit release we blow past the ~16-context browser cap: Chromium
-      // then kills the OLDEST live context to make room, silently freezing
-      // whichever cards happen to still be on screen.
       renderer.forceContextLoss();
-      if (container.contains(canvas)) container.removeChild(canvas);
+      if (canvas.parentNode === container) container.removeChild(canvas);
     };
   }, [modelId, category, formFactor, brand, colorHex, isVisible]);
 

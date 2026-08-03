@@ -348,11 +348,15 @@ export default function DeviceModel3D({
     return () => {
       disposed = true;
       cancelAnimationFrame(animId);
-      // Geometry/materials belong to the shared cache — see deviceModelEngine.
+      scene.traverse((child) => {
+        if (child.isMesh && child.material && child.material.__isCloned) {
+          child.material.dispose();
+        }
+      });
       disposeEnv();
       renderer.dispose();
       renderer.forceContextLoss();
-      if (container.contains(canvas)) container.removeChild(canvas);
+      if (canvas.parentNode === container) container.removeChild(canvas);
     };
   }, [modelId, category, styleCategory, animStyle, size, isDisconnected, loop, fit]);
 
