@@ -372,6 +372,10 @@ export default function DeviceModel3D({
             let budWaveY = 0;
             let budWaveZ = 0;
 
+            let leftSpin = 0;
+            let rightSpin = 0;
+            let floatProgress = 0;
+
             if (styleKey === 'case-dock') {
               if (loop && !isDisconnected) {
                 // Lid Flip & Earbud Docking Sequence (3.2s cycle)
@@ -395,15 +399,45 @@ export default function DeviceModel3D({
               }
             } else if (styleKey === 'float') {
               if (loop && !isDisconnected) {
-                targetOpen = clamp01(elapsed / 0.6);
-                if (elapsed > 0.6) {
-                  budWaveY = Math.sin(elapsed * 3.2) * 0.18;
-                  budWaveZ = Math.cos(elapsed * 2.5) * 0.10;
+                // 4.5s Ultra-Smooth Dual Earbud Float & Slow Individual 3D Spin Sequence:
+                // 0.0s - 1.0s: Lid opens, earbuds smoothly float up out of case
+                // 1.0s - 3.2s: Earbuds levitate high in mid-air & spin slowly on individual Y-axes
+                // 3.2s - 4.2s: Earbuds slowly glide back down & dock into slots, lid closes shut
+                // 4.2s - 4.5s: Closed case rests before replaying
+                const cycleTime = elapsed % 4.5;
+                if (cycleTime < 1.0) {
+                  const progress = easeInOutCubic(cycleTime / 1.0);
+                  targetOpen = progress;
+                  floatProgress = progress;
+                  leftSpin = progress * 0.4;
+                  rightSpin = -progress * 0.4;
+                } else if (cycleTime < 3.2) {
+                  targetOpen = 1.0;
+                  floatProgress = 1.0;
+                  const spinT = cycleTime - 1.0;
+                  leftSpin = 0.4 + spinT * 1.35;         // slow smooth counter-clockwise 3D spin
+                  rightSpin = -(0.4 + spinT * 1.35);      // slow smooth clockwise 3D spin
+                  budWaveY = Math.sin(spinT * 2.0) * 0.08; // smooth gentle vertical wave
+                  budWaveZ = Math.cos(spinT * 1.6) * 0.05; // subtle depth float
+                } else if (cycleTime < 4.2) {
+                  const returnT = easeInOutCubic((cycleTime - 3.2) / 1.0);
+                  targetOpen = 1.0 - returnT;
+                  floatProgress = 1.0 - returnT;
+                  leftSpin = (1 - returnT) * (0.4 + 2.2 * 1.35);
+                  rightSpin = -(1 - returnT) * (0.4 + 2.2 * 1.35);
+                } else {
+                  targetOpen = 0;
+                  floatProgress = 0;
+                  leftSpin = 0;
+                  rightSpin = 0;
                 }
               } else {
                 targetOpen = clamp01(t * 1.2);
+                floatProgress = clamp01(t * 1.2);
                 if (t >= 1) {
-                  budWaveY = Math.sin(elapsed * 3.2) * 0.15;
+                  leftSpin = elapsed * 1.0;
+                  rightSpin = -elapsed * 1.0;
+                  budWaveY = Math.sin(elapsed * 2.5) * 0.08;
                 }
               }
             }
@@ -421,24 +455,27 @@ export default function DeviceModel3D({
             const bt = clamp01((openProgress - 0.22) / 0.78);
             const budEase = bt < 0.5 ? 4 * bt * bt * bt : 1 - Math.pow(-2 * bt + 2, 3) / 2;
             const budPop = cfg.budsAuthoredOut ? budEase - 1 : budEase;
-            
+
             // For case-dock: earbuds stay DOCKED inside case slots (0.12x rise max).
             // For float: earbuds DETACH and float high in mid-air (2.5x rise max).
-            const floatMult = styleKey === 'float' ? 2.5 : 0.12;
+            const floatMult = styleKey === 'float' ? (loop ? floatProgress * 2.5 : 2.5) : 0.12;
 
             const leftWaveY = budWaveY;
             const rightWaveY = styleKey === 'float' ? -budWaveY : budWaveY * 0.5;
 
-            for (const [node, iy, iz, tilt, waveY] of [
-              [rig.budLeftNode, rig.budLeftInitialY, rig.budLeftInitialZ, 0.12, leftWaveY],
-              [rig.budRightNode, rig.budRightInitialY, rig.budRightInitialZ, -0.12, rightWaveY],
+            for (const [node, iy, iz, tilt, waveY, spinAngle] of [
+              [rig.budLeftNode, rig.budLeftInitialY, rig.budLeftInitialZ, 0.12, leftWaveY, leftSpin],
+              [rig.budRightNode, rig.budRightInitialY, rig.budRightInitialZ, -0.12, rightWaveY, rightSpin],
             ]) {
               if (!node) continue;
               node.visible = openProgress > 0.035;
               node.position[riseKey] = (riseKey === 'y' ? iy : iz) + budPop * rig.budRise * floatMult + waveY;
               node.position[secKey] =
                 (secKey === 'y' ? iy : iz) + budPop * rig.budRise * (styleKey === 'float' ? 0.35 : 0.05) * floatMult * secSign + budWaveZ;
-              node.rotation.z = tilt * openProgress * (styleKey === 'float' ? 1.0 : 0.2) + (styleKey === 'float' ? Math.sin(elapsed * 2.8) * 0.18 : 0);
+              node.rotation.z = tilt * openProgress * (styleKey === 'float' ? 1.0 : 0.2) + (styleKey === 'float' ? Math.sin(elapsed * 2.5) * 0.12 : 0);
+              if (styleKey === 'float') {
+                node.rotation.y = spinAngle;
+              }
             }
           }
         }
