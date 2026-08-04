@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, Plus, Timer as TimerIcon, Bell } from 'lucide-react';
+import { Play, Pause, RotateCcw, Plus, Timer as TimerIcon } from 'lucide-react';
 import { soundEngine } from '../../utils/soundEngine';
 
-export default function TimerWidget({ isExpanded, isCompact, isSplit, onExpand }) {
+export default function TimerWidget({ isCompact, isSplit, onExpand }) {
   const [totalSeconds, setTotalSeconds] = useState(300); // 5 mins
   const [secondsLeft, setSecondsLeft] = useState(300);
   const [isRunning, setIsRunning] = useState(true);
@@ -52,8 +52,8 @@ export default function TimerWidget({ isExpanded, isCompact, isSplit, onExpand }
   if (isSplit) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <TimerIcon size={14} color="#f59e0b" />
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', fontFamily: 'monospace' }}>
+        <TimerIcon size={14} color="var(--warn)" />
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--warn)', fontVariantNumeric: 'tabular-nums' }}>
           {formatTime(secondsLeft)}
         </span>
       </div>
@@ -73,16 +73,16 @@ export default function TimerWidget({ isExpanded, isCompact, isSplit, onExpand }
               width: 22,
               height: 22,
               borderRadius: '50%',
-              background: 'rgba(245, 158, 11, 0.2)',
-              border: '1px solid rgba(245, 158, 11, 0.5)',
+              background: 'rgba(255, 159, 10, 0.16)',
+              border: '1px solid rgba(255, 159, 10, 0.45)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <TimerIcon size={12} color="#f59e0b" />
+            <TimerIcon size={12} color="var(--warn)" />
           </div>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', fontFamily: 'monospace' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--warn)', fontVariantNumeric: 'tabular-nums' }}>
             {formatTime(secondsLeft)}
           </span>
         </div>
@@ -103,11 +103,11 @@ export default function TimerWidget({ isExpanded, isCompact, isSplit, onExpand }
               width: 38,
               height: 38,
               borderRadius: 12,
-              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              background: 'linear-gradient(135deg, #ff9f0a, #ff9f0a)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 6px 15px rgba(245, 158, 11, 0.3)',
+              boxShadow: '0 6px 15px rgba(255, 159, 10, 0.28)',
             }}
           >
             <TimerIcon size={20} color="#fff" />
@@ -135,9 +135,9 @@ export default function TimerWidget({ isExpanded, isCompact, isSplit, onExpand }
             fontSize: 38,
             fontWeight: 800,
             letterSpacing: -1,
-            fontFamily: 'monospace',
-            color: isRunning ? '#f59e0b' : '#ffffff',
-            textShadow: isRunning ? '0 0 20px rgba(245, 158, 11, 0.4)' : 'none',
+            fontVariantNumeric: 'tabular-nums',
+            color: isRunning ? 'var(--warn)' : '#ffffff',
+            textShadow: isRunning ? '0 0 20px rgba(255, 159, 10, 0.35)' : 'none',
           }}
         >
           {formatTime(secondsLeft)}
@@ -150,7 +150,7 @@ export default function TimerWidget({ isExpanded, isCompact, isSplit, onExpand }
           className="progress-fill"
           style={{
             width: `${progressPercent}%`,
-            background: 'linear-gradient(90deg, #f59e0b, #ef4444)',
+            background: 'linear-gradient(90deg, #ff9f0a, #ff9f0a)',
           }}
         />
       </div>

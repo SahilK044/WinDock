@@ -26,7 +26,7 @@ export async function fetchHDAlbumArt(title, artist) {
         return result;
       }
     }
-  } catch (e) {}
+  } catch {}
 
   artworkCache.set(cacheKey, null);
   return null;
@@ -90,7 +90,7 @@ class SpotifyService {
         method: 'PUT',
         headers: { Authorization: `Bearer ${this.accessToken}` },
       });
-    } catch (e) {}
+    } catch {}
   }
 
   async pause() {
@@ -100,7 +100,7 @@ class SpotifyService {
         method: 'PUT',
         headers: { Authorization: `Bearer ${this.accessToken}` },
       });
-    } catch (e) {}
+    } catch {}
   }
 
   async next() {
@@ -110,7 +110,7 @@ class SpotifyService {
         method: 'POST',
         headers: { Authorization: `Bearer ${this.accessToken}` },
       });
-    } catch (e) {}
+    } catch {}
   }
 
   async previous() {
@@ -120,7 +120,7 @@ class SpotifyService {
         method: 'POST',
         headers: { Authorization: `Bearer ${this.accessToken}` },
       });
-    } catch (e) {}
+    } catch {}
   }
 
   async seek(positionMs) {
@@ -130,7 +130,7 @@ class SpotifyService {
         method: 'PUT',
         headers: { Authorization: `Bearer ${this.accessToken}` },
       });
-    } catch (e) {}
+    } catch {}
   }
 }
 

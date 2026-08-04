@@ -1,42 +1,39 @@
 import React from 'react';
 import { Folder, Music, Terminal, Globe, Settings, AppWindow, Power } from 'lucide-react';
 
-// Files and Explorer both opened Explorer, so the duplicate is dropped and the
-// slot reused for Exit — a direct way to quit WinLand without Task Manager.
+// App glyphs keep their identity colours (they're content, not chrome);
+// everything structural stays graphite.
 const PINNED_APPS = [
-  { name: 'Browser', icon: <Globe size={18} color="#3b82f6" />, cmd: 'browser' },
-  { name: 'Spotify', icon: <Music size={18} color="#10b981" />, cmd: 'spotify' },
-  { name: 'Files', icon: <Folder size={18} color="#f59e0b" />, cmd: 'explorer' },
-  { name: 'Terminal', icon: <Terminal size={18} color="#8b5cf6" />, cmd: 'terminal' },
-  { name: 'Settings', icon: <Settings size={18} color="#64748b" />, cmd: 'settings' },
-  { name: 'Exit', icon: <Power size={18} color="#ef4444" />, cmd: 'exit' },
+  { name: 'Browser', icon: <Globe size={18} color="#0a84ff" />, cmd: 'browser' },
+  { name: 'Spotify', icon: <Music size={18} color="#30d158" />, cmd: 'spotify' },
+  { name: 'Files', icon: <Folder size={18} color="#ffd60a" />, cmd: 'explorer' },
+  { name: 'Terminal', icon: <Terminal size={18} color="#e5e5ea" />, cmd: 'terminal' },
+  { name: 'Settings', icon: <Settings size={18} color="#98989d" />, cmd: 'settings' },
+  { name: 'Exit', icon: <Power size={18} color="#ff453a" />, cmd: 'exit' },
 ];
 
-export default function LauncherWidget({ onLaunchApp, onClose }) {
+export default function LauncherWidget({ onLaunchApp }) {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '12px 14px', boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(59, 130, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AppWindow size={14} color="#3b82f6" />
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>Quick Launcher</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--stroke)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <AppWindow size={14} color="var(--text-1)" />
         </div>
-        <span style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600 }}>Click to Launch</span>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Launcher</div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, flex: 1 }}>
-        {PINNED_APPS.map((app, idx) => (
+        {PINNED_APPS.map((app) => (
           <button
-            key={idx}
+            key={app.cmd}
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
               onLaunchApp?.(app.cmd);
             }}
             style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'var(--surface)',
+              border: '1px solid var(--stroke)',
               borderRadius: 10,
               display: 'flex',
               flexDirection: 'column',
@@ -45,11 +42,13 @@ export default function LauncherWidget({ onLaunchApp, onClose }) {
               gap: 4,
               cursor: 'pointer',
               padding: '8px 4px',
-              transition: 'all 0.2s ease',
+              transition: 'background 0.18s ease, border-color 0.18s ease',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface)'; }}
           >
             {app.icon}
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{app.name}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-1)' }}>{app.name}</span>
           </button>
         ))}
       </div>

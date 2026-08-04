@@ -48,7 +48,7 @@ export default function Headset3D({ size = 44, isAnimated = true, isDisconnected
     keyLight.position.set(3, 5, 4);
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x00f0ff, 2.5);
+    const rimLight = new THREE.DirectionalLight(0xffffff, 2.5);
     rimLight.position.set(-4, -3, -2);
     scene.add(rimLight);
 

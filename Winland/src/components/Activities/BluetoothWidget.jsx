@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bluetooth, Zap, Check, AlertTriangle } from 'lucide-react';
+import { Zap, AlertTriangle } from 'lucide-react';
 import Headset3D from './Headset3D';
 import Earbuds3D from './Earbuds3D';
 import Speaker3D from './Speaker3D';
@@ -99,17 +99,17 @@ const ANIMATION_STYLES = `
   0% {
     transform: translateX(-50%) scale(1);
     opacity: 0.9;
-    box-shadow: 0 0 3px var(--pulse-color, #00f0ff), 0 0 8px var(--pulse-color, #00f0ff), 0 0 12px var(--pulse-glow, rgba(0, 240, 255, 0.9));
+    box-shadow: 0 0 3px var(--pulse-color, #30d158), 0 0 8px var(--pulse-color, #30d158), 0 0 12px var(--pulse-glow, rgba(48, 209, 88, 0.9));
   }
   50% {
     transform: translateX(-50%) scale(1.5);
     opacity: 0.5;
-    box-shadow: 0 0 6px var(--pulse-color, #00f0ff), 0 0 14px var(--pulse-color, #00f0ff), 0 0 20px var(--pulse-glow, rgba(0, 240, 255, 1));
+    box-shadow: 0 0 6px var(--pulse-color, #30d158), 0 0 14px var(--pulse-color, #30d158), 0 0 20px var(--pulse-glow, rgba(48, 209, 88, 1));
   }
   100% {
     transform: translateX(-50%) scale(1);
     opacity: 0.9;
-    box-shadow: 0 0 3px var(--pulse-color, #00f0ff), 0 0 8px var(--pulse-color, #00f0ff), 0 0 12px var(--pulse-glow, rgba(0, 240, 255, 0.9));
+    box-shadow: 0 0 3px var(--pulse-color, #30d158), 0 0 8px var(--pulse-color, #30d158), 0 0 12px var(--pulse-glow, rgba(48, 209, 88, 0.9));
   }
 }
 
@@ -159,149 +159,9 @@ const ANIMATION_STYLES = `
 }
 `;
 
-// ── 3D Device Vector Graphics ───────────────────────────────────────────────
-
-// 1. Pristine 3D Wireless Earbuds Charging Case & Floating Buds
-function EarphoneIcon({ size = 26, color = '#00f0ff', isAnimated = true }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="earbudGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="100%" stopColor={color} />
-        </linearGradient>
-        <linearGradient id="caseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="rgba(255, 255, 255, 0.28)" />
-          <stop offset="100%" stopColor="rgba(255, 255, 255, 0.09)" />
-        </linearGradient>
-      </defs>
-
-      <rect x="5.5" y="11.5" width="17" height="13" rx="4.5" fill="url(#caseGrad)" stroke="rgba(255, 255, 255, 0.35)" strokeWidth="0.8" />
-      <rect x="7" y="12.5" width="14" height="3.5" rx="1.75" fill="rgba(0, 0, 0, 0.3)" />
-      
-      <circle cx="14" cy="18.5" r="0.85" fill={color === '#ff453a' ? '#ff453a' : '#30d158'} />
-
-      <g style={isAnimated ? {
-        animation: 'caseLidOpen 2.8s cubic-bezier(0.34, 1.56, 0.64, 1) infinite alternate',
-        transformOrigin: '14px 11.5px',
-      } : { transform: 'rotateX(-115deg) translateY(-3.5px)', transformOrigin: '14px 11.5px' }}>
-        <path d="M5.5 11.5C5.5 8.5 8.5 6.5 14 6.5C19.5 6.5 22.5 8.5 22.5 11.5H5.5Z" fill="url(#caseGrad)" stroke="rgba(255, 255, 255, 0.35)" strokeWidth="0.8" />
-      </g>
-
-      <g style={isAnimated ? {
-        animation: 'leftPopOut 2.8s cubic-bezier(0.34, 1.56, 0.64, 1) infinite alternate',
-        transformOrigin: '9.5px 8px',
-      } : {}}>
-        <path d="M9.8 4C8.2 4 6.8 5.4 6.8 7C6.8 8.6 7.9 9.8 9.4 10.2V9.4C9.4 8.4 10.2 7.6 11.2 7.6H11.6V6.6C11.6 5.2 10.8 4 9.8 4Z" fill="url(#earbudGrad)" />
-        <path d="M6.2 6.6C5.7 7 5.7 7.6 6.2 8L7.4 7.3L6.2 6.6Z" fill="#ffffff" opacity="0.95" />
-        <rect x="9.4" y="9.4" width="2.2" height="7.2" rx="1.1" fill="url(#earbudGrad)" />
-        <rect x="9.4" y="15.4" width="2.2" height="1.2" rx="0.6" fill="#ffffff" />
-      </g>
-
-      <g style={isAnimated ? {
-        animation: 'rightPopOut 2.8s cubic-bezier(0.34, 1.56, 0.64, 1) infinite alternate',
-        transformOrigin: '17.5px 8px',
-      } : {}}>
-        <path d="M17.4 4C19 4 20.4 5.4 20.4 7C20.4 8.6 19.3 9.8 17.8 10.2V9.4C17.8 8.4 17 7.6 16 7.6H15.6V6.6C15.6 5.2 16.4 4 17.4 4Z" fill="url(#earbudGrad)" />
-        <path d="M21 6.6C21.5 7 21.5 7.6 21 8L19.8 7.3L21 6.6Z" fill="#ffffff" opacity="0.95" />
-        <rect x="15.6" y="9.4" width="2.2" height="7.2" rx="1.1" fill="url(#earbudGrad)" />
-        <rect x="15.6" y="15.4" width="2.2" height="1.2" rx="0.6" fill="#ffffff" />
-      </g>
-    </svg>
-  );
-}
-
-// 2. 3D Over-Ear Headphones Vector Graphic
-function HeadphonesIcon({ size = 28, color = '#ffffff', isAnimated = true, isDisconnected = false }) {
-  const animStyle = isDisconnected ? {
-    animation: 'headphonesDisconnectAnim 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards',
-    transformStyle: 'preserve-3d',
-    perspective: '500px',
-  } : isAnimated ? {
-    animation: 'headphonesConnectAnim 5.2s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate',
-    transformStyle: 'preserve-3d',
-    perspective: '500px',
-  } : {};
-
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" style={animStyle}>
-      <defs>
-        <linearGradient id="headbandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="rgba(255,255,255,0.6)" />
-          <stop offset="50%" stopColor="#ffffff" />
-          <stop offset="100%" stopColor="rgba(255,255,255,0.6)" />
-        </linearGradient>
-        <linearGradient id="cupGradWhite" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="100%" stopColor="#e2e8f0" />
-        </linearGradient>
-      </defs>
-
-      <path d="M5 14C5 9.02745 9.02745 5 14 5C18.9725 5 23 9.02745 23 14" stroke="url(#headbandGrad)" strokeWidth="2.4" strokeLinecap="round" />
-      <path d="M7 13.5C7 9.63401 10.134 6.5 14 6.5C17.866 6.5 21 9.63401 21 13.5" stroke="rgba(255,255,255,0.3)" strokeWidth="0.9" strokeLinecap="round" />
-
-      {/* Left Earcup - Pure White Metallic */}
-      <rect x="3.5" y="12.5" width="4.8" height="9.5" rx="2.4" fill="url(#cupGradWhite)" stroke="rgba(255,255,255,0.85)" strokeWidth="0.8" />
-      <rect x="6.8" y="14" width="1.2" height="6.5" rx="0.6" fill="rgba(0,0,0,0.35)" />
-      <circle cx="5.9" cy="17.25" r="0.8" fill="#ffffff" />
-
-      {/* Right Earcup - Pure White Metallic */}
-      <rect x="19.7" y="12.5" width="4.8" height="9.5" rx="2.4" fill="url(#cupGradWhite)" stroke="rgba(255,255,255,0.85)" strokeWidth="0.8" />
-      <rect x="20" y="14" width="1.2" height="6.5" rx="0.6" fill="rgba(0,0,0,0.35)" />
-      <circle cx="22.1" cy="17.25" r="0.8" fill="#ffffff" />
-    </svg>
-  );
-}
-
-// 3. 3D Glass Smartphone Vector Graphic
-function PhoneIcon({ size = 26, color = '#00f0ff', isAnimated = true }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style={isAnimated ? { animation: 'phoneTilt 3s infinite ease-in-out' } : {}}
-    >
-      <defs>
-        <linearGradient id="phoneBody" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="rgba(255, 255, 255, 0.4)" />
-          <stop offset="100%" stopColor="rgba(255, 255, 255, 0.12)" />
-        </linearGradient>
-        <linearGradient id="phoneScreen" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="rgba(10,10,15,0.85)" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.45" />
-        </linearGradient>
-      </defs>
-
-      <rect x="7.5" y="3.5" width="13" height="21" rx="3" fill="url(#phoneBody)" stroke="rgba(255,255,255,0.5)" strokeWidth="0.9" />
-      <rect x="8.8" y="5" width="10.4" height="18" rx="1.8" fill="url(#phoneScreen)" />
-      <rect x="12" y="6.2" width="4" height="1.2" rx="0.6" fill="#000000" />
-      <line x1="11.5" y1="21.5" x2="16.5" y2="21.5" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-// 4. 3D Soundbar / Speaker Vector Graphic
-function SpeakerIcon({ size = 26, color = '#00f0ff', isAnimated = true }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style={isAnimated ? { animation: 'speakerPulse 2.2s infinite ease-in-out' } : {}}
-    >
-      <defs>
-        <linearGradient id="speakerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="rgba(255, 255, 255, 0.35)" />
-          <stop offset="100%" stopColor="rgba(255, 255, 255, 0.12)" />
-        </linearGradient>
-      </defs>
-
-      <rect x="3.5" y="7.5" width="21" height="13" rx="3.5" fill="url(#speakerGrad)" stroke="rgba(255, 255, 255, 0.45)" strokeWidth="0.9" />
-      <circle cx="9" cy="14" r="3.5" fill="rgba(0,0,0,0.5)" stroke={color} strokeWidth="0.8" />
-      <circle cx="9" cy="14" r="1.5" fill={color} />
-      <circle cx="19" cy="14" r="3.5" fill="rgba(0,0,0,0.5)" stroke={color} strokeWidth="0.8" />
-      <circle cx="19" cy="14" r="1.5" fill={color} />
-    </svg>
-  );
-}
 
 // 5. 3D Mouse Graphic
-function MouseIcon({ size = 26, color = '#00f0ff', isAnimated = true }) {
+function MouseIcon({ size = 26, color = '#30d158', isAnimated = true }) {
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={isAnimated ? { animation: 'deviceHover 2.4s infinite ease-in-out' } : {}}
@@ -314,7 +174,7 @@ function MouseIcon({ size = 26, color = '#00f0ff', isAnimated = true }) {
 }
 
 // 6. 3D Keyboard Graphic
-function KeyboardIcon({ size = 26, color = '#00f0ff', isAnimated = true }) {
+function KeyboardIcon({ size = 26, color = '#30d158', isAnimated = true }) {
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={isAnimated ? { animation: 'deviceHover 2.4s infinite ease-in-out' } : {}}
@@ -330,7 +190,7 @@ function KeyboardIcon({ size = 26, color = '#00f0ff', isAnimated = true }) {
 }
 
 // 7. 3D Controller Graphic
-function ControllerIcon({ size = 26, color = '#00f0ff', isAnimated = true }) {
+function ControllerIcon({ size = 26, color = '#30d158', isAnimated = true }) {
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={isAnimated ? { animation: 'deviceHover 2.4s infinite ease-in-out' } : {}}
@@ -460,8 +320,9 @@ export default function BluetoothWidget({
   const chosenModelId = prefCategory ? prefs.devices[prefCategory] : null;
   const chosenStyle = prefCategory ? prefs.styles[prefCategory] : null;
 
+  // Accent follows connection status — connected is green, not decorative cyan
   let statusColor = '#30d158';
-  let accentColor = '#00f0ff';
+  let accentColor = '#30d158';
   let statusText = 'Connected';
   let subText = typeStr || 'Bluetooth Device';
 
@@ -508,7 +369,7 @@ export default function BluetoothWidget({
             isDisconnected={isDisconnected}
             deviceName={deviceName}
             colorVariant={localStorage.getItem('winland_color_variant') || 'space-grey'}
-            pulseColorHex={localStorage.getItem('winland_pulse_color') || '#00f0ff'}
+            pulseColorHex={localStorage.getItem('winland_pulse_color') || '#30d158'}
             animationStyle={prefs?.styles?.phone || 'amoled'}
           />
         );

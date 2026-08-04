@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Video, Square } from 'lucide-react';
-import { soundEngine } from '../../utils/soundEngine';
+import { Square } from 'lucide-react';
 
-export default function ScreenRecorderWidget({ isCompact, onStop }) {
+export default function ScreenRecorderWidget({ onStop }) {
   const [seconds, setSeconds] = useState(72);
 
   useEffect(() => {
@@ -27,7 +26,7 @@ export default function ScreenRecorderWidget({ isCompact, onStop }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, fontFamily: 'monospace', color: '#ef4444' }}>
+        <span style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#ff453a' }}>
           {formatTime(seconds)}
         </span>
         <div className="glass-btn btn-danger" style={{ width: 34, height: 34 }} onClick={onStop} title="Stop Screen Recording">

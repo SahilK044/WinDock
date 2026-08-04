@@ -49,7 +49,7 @@ export default function Speaker3D({ size = 44, isAnimated = true, isDisconnected
     keyLight.position.set(3.5, 5, 4);
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x00f0ff, 3.0);
+    const rimLight = new THREE.DirectionalLight(0xf5f5f7, 3.0);
     rimLight.position.set(-4, -3, -2);
     scene.add(rimLight);
 
@@ -83,7 +83,7 @@ export default function Speaker3D({ size = 44, isAnimated = true, isDisconnected
     });
 
     const ledCyanGlowMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
+      color: 0xf5f5f7,
       transparent: true,
       opacity: 0.0,
     });
@@ -160,7 +160,6 @@ export default function Speaker3D({ size = 44, isAnimated = true, isDisconnected
     const clamp = (v, min = 0, max = 1) => Math.max(min, Math.min(max, v));
     const easeOutQuint = (t) => 1 - Math.pow(1 - t, 5);
     const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    const lerp = (a, b, t) => a + (b - a) * t;
 
     const renderLoop = () => {
       const now = performance.now();

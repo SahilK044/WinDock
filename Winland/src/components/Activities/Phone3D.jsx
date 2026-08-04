@@ -18,8 +18,7 @@ export default function Phone3D({
   isDisconnected = false,
   deviceName = '',
   colorVariant = 'space-grey',
-  pulseColorHex = '#00f0ff',
-  animationStyle = 'amoled',
+  pulseColorHex = '#30d158',
 }) {
   const containerRef = useRef(null);
 
@@ -29,7 +28,6 @@ export default function Phone3D({
 
     // ── 1. Parse Archetype & Form Factor ────────────────────────────────────
     const archetype = parseDeviceArchetype(deviceName);
-    const formFactor = archetype.formFactor; // 'bar' | 'fold' | 'flip'
     const colorInfo = DEVICE_COLOR_VARIANTS[colorVariant] || DEVICE_COLOR_VARIANTS['space-grey'];
 
     const nameLower = (deviceName || '').toLowerCase();
@@ -112,7 +110,7 @@ export default function Phone3D({
     const pillBodyMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
 
     const cyanGlowMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
+      color: 0xeaf4ff,
       transparent: true,
       opacity: 0.0,
     });
@@ -406,7 +404,7 @@ export default function Phone3D({
         container.removeChild(renderer.domElement);
       }
     };
-  }, [size, isAnimated, isDisconnected, deviceName]);
+  }, [size, isAnimated, isDisconnected, deviceName, colorVariant, pulseColorHex]);
 
   return (
     <div

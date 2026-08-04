@@ -5,12 +5,8 @@ export default function VolumeOSDWidget({ volume = 50 }) {
   const isMuted = volume === 0;
   const Icon = isMuted ? VolumeX : volume < 40 ? Volume1 : Volume2;
 
-  // Color: muted = red, low = white, high = white (spotify green tint at max)
-  const barColor = isMuted
-    ? '#FF3B30'
-    : volume > 80
-    ? '#1DB954'
-    : '#ffffff';
+  // White until muted — volume level isn't a status, only muted is
+  const barColor = isMuted ? 'var(--danger)' : '#ffffff';
 
   return (
     <div style={{
@@ -22,11 +18,11 @@ export default function VolumeOSDWidget({ volume = 50 }) {
       {/* Icon */}
       <div style={{
         width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-        background: isMuted ? 'rgba(255,59,48,0.2)' : 'rgba(255,255,255,0.12)',
+        background: isMuted ? 'rgba(255,69,58,0.18)' : 'var(--surface)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: `1px solid ${isMuted ? 'rgba(255,59,48,0.35)' : 'rgba(255,255,255,0.15)'}`,
+        border: `1px solid ${isMuted ? 'rgba(255,69,58,0.35)' : 'var(--stroke)'}`,
       }}>
-        <Icon size={16} color={isMuted ? '#FF3B30' : 'rgba(255,255,255,0.9)'} />
+        <Icon size={16} color={isMuted ? '#ff453a' : 'var(--text-1)'} />
       </div>
 
       {/* Label */}
@@ -53,9 +49,10 @@ export default function VolumeOSDWidget({ volume = 50 }) {
 
       {/* Percentage */}
       <div style={{
-        fontSize: 13, fontWeight: 800,
-        color: isMuted ? '#FF3B30' : volume > 80 ? '#1DB954' : 'rgba(255,255,255,0.8)',
+        fontSize: 13, fontWeight: 700,
+        color: isMuted ? 'var(--danger)' : 'var(--text-2)',
         minWidth: 32, textAlign: 'right', flexShrink: 0,
+        fontVariantNumeric: 'tabular-nums',
       }}>
         {volume}
       </div>

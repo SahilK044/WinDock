@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Music, RefreshCw, X } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Music, RefreshCw } from 'lucide-react';
 
 const MAC_FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif';
 
@@ -73,7 +73,7 @@ function smoothScrollTo(container, targetTop, duration = 680) {
 }
 
 
-const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, durationMs, isPlaying = false, onSeek, onClose, eqColor, eqGlow }) => {
+const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, durationMs, isPlaying = false, onSeek, eqColor, eqGlow }) => {
   const [lyrics, setLyrics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [plainLyrics, setPlainLyrics] = useState('');
@@ -134,7 +134,7 @@ const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, durationMs, isP
             return true;
           }
         }
-      } catch (e) {}
+      } catch {}
       return false;
     };
 
@@ -161,7 +161,7 @@ const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, durationMs, isP
             else if (best && best.plainLyrics) setPlainLyrics(best.plainLyrics);
           }
         }
-      } catch (e) {}
+      } catch {}
       if (!cancelled) setLoading(false);
     };
 
@@ -420,7 +420,6 @@ const AlbumArt = ({ coverUrl, title, size = 28, r = 7 }) => {
 
 export default function MusicWidget({
   isCompact,
-  isExpanded,
   isSplit,
   isLyricsView,
   onToggleLyrics,
@@ -435,7 +434,7 @@ export default function MusicWidget({
   onPrev,
   onSeek,
 }) {
-  const { title, artist, album, coverUrl, isPlaying = false, progressMs = 0, durationMs = 0 } = trackInfo;
+  const { title, artist, coverUrl, isPlaying = false, progressMs = 0, durationMs = 0 } = trackInfo;
 
   const [time, setTime] = useState(new Date());
   const [isDragging, setIsDragging] = useState(false);
@@ -665,7 +664,7 @@ export default function MusicWidget({
             </MarqueeText>
           )}
           <div style={{ fontSize: 10, fontWeight: 700, marginTop: 3, color: eqColor, transition: 'color 0.8s ease' }}>
-            {isPlaying ? 'Media • Active' : 'Media • Paused'}
+            {isPlaying ? 'Now Playing' : 'Paused'}
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {
   GLB_MODEL_MAP, loadSharedModel, prepareDeviceModel, addStudioLights,
@@ -16,18 +16,19 @@ import {
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const easeOutBack = (t) => {
   const c = 1.70158;
   return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
 };
 
 /**
- * Each style gets (state, t, elapsed) and mutates `state` — a plain pose the
+ * Each style gets (state, t, elapsed) and mutates `state` â€” a plain pose the
  * caller applies to the model. `t` is 0..1 entry progress, `elapsed` is seconds
  * since mount, so styles can settle into a continuous idle once t hits 1.
  */
 const MOTION = {
-  // ── Phones ──────────────────────────────────────────────────────────────
+  // â”€â”€ Phones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   amoled: (s, t, e, loop) => {
     if (loop) {
       const cyc = e % 3.0;
@@ -100,7 +101,7 @@ const MOTION = {
     }
   },
 
-  // ── Controllers ─────────────────────────────────────────────────────────
+  // â”€â”€ Controllers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   levitate: (s, t, e, loop) => {
     const k = loop ? 1 : easeOutCubic(t);
     s.y = (loop ? 0 : -0.95 + 0.95 * k) + Math.sin(e * 1.8) * 0.15;
@@ -124,7 +125,7 @@ const MOTION = {
     }
   },
 
-  // ── Speakers ────────────────────────────────────────────────────────────
+  // â”€â”€ Speakers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   wave: (s, t, e, loop) => {
     const k = loop ? 1 : easeOutCubic(t);
     s.scale = 0.5 + 0.5 * k;
@@ -148,7 +149,7 @@ const MOTION = {
     s.rotY = Math.sin(e * 0.8) * 0.35;
   },
 
-  // ── Headphones ──────────────────────────────────────────────────────────
+  // â”€â”€ Headphones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   spin: (s, t, e, loop) => {
     const k = loop ? 1 : easeOutCubic(t);
     s.y = (loop ? 0 : -0.95 + 0.95 * k) + Math.sin(e * 1.6) * 0.10;
@@ -164,7 +165,7 @@ const MOTION = {
     s.y = (loop ? 0 : -0.8 + 0.8 * k) + Math.sin(e * 1.5) * 0.08;
   },
 
-  // ── Earbuds ─────────────────────────────────────────────────────────────
+  // â”€â”€ Earbuds â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   'case-dock': (s, t, e, loop) => {
     if (loop) {
       s.scale = 0.85;
@@ -194,10 +195,7 @@ const MOTION = {
   },
 };
 
-// Which styles want the case open with the buds out, and how fast.
-const EARBUD_OPEN = { 'case-dock': 1, float: 1 };
-
-export const DEFAULT_STYLE_BY_CATEGORY = {
+const DEFAULT_STYLE_BY_CATEGORY = {
   phone: 'amoled',
   controller: 'levitate',
   speaker: 'wave',
@@ -342,16 +340,23 @@ export default function DeviceModel3D({
             const budEase = bt < 0.5 ? 4 * bt * bt * bt : 1 - Math.pow(-2 * bt + 2, 3) / 2;
             const budPop = cfg.budsAuthoredOut ? budEase - 1 : budEase;
 
-            for (const [node, iy, iz, tilt] of [
-              [rig.budLeftNode, rig.budLeftInitialY, rig.budLeftInitialZ, 0.12],
-              [rig.budRightNode, rig.budRightInitialY, rig.budRightInitialZ, -0.12],
+            for (const [node, ix, iy, iz, tilt, spread] of [
+              [rig.budLeftNode, rig.budLeftInitialX, rig.budLeftInitialY, rig.budLeftInitialZ, 0.12, -1],
+              [rig.budRightNode, rig.budRightInitialX, rig.budRightInitialY, rig.budRightInitialZ, -0.12, 1],
             ]) {
               if (!node) continue;
               node.visible = openProgress > 0.035;
+              node.position.x = ix;
               node.position[riseKey] = (riseKey === 'y' ? iy : iz) + budPop * rig.budRise;
               node.position[secKey] =
                 (secKey === 'y' ? iy : iz) + budPop * rig.budRise * 0.25 * secSign;
-              node.rotation.z = tilt * openProgress;
+              node.rotation.set(0, 0, tilt * openProgress);
+              if (cfg.splitBuds) {
+                node.position.x = ix + spread * openProgress * 3;
+                node.position.y = iy + openProgress * 4;
+                node.position.z = iz + openProgress * 18;
+                node.rotation.set(openProgress * THREE.MathUtils.degToRad(25), spread * openProgress * THREE.MathUtils.degToRad(15), 0);
+              }
             }
           }
         } else {
@@ -465,17 +470,23 @@ export default function DeviceModel3D({
             const leftWaveY = budWaveY;
             const rightWaveY = styleKey === 'float' ? -budWaveY : budWaveY * 0.5;
 
-            for (const [node, iy, iz, tilt, waveY, spinAngle] of [
-              [rig.budLeftNode, rig.budLeftInitialY, rig.budLeftInitialZ, 0.12, leftWaveY, leftSpin],
-              [rig.budRightNode, rig.budRightInitialY, rig.budRightInitialZ, -0.12, rightWaveY, rightSpin],
+            for (const [node, ix, iy, iz, tilt, waveY, spinAngle, spread] of [
+              [rig.budLeftNode, rig.budLeftInitialX, rig.budLeftInitialY, rig.budLeftInitialZ, 0.12, leftWaveY, leftSpin, -1],
+              [rig.budRightNode, rig.budRightInitialX, rig.budRightInitialY, rig.budRightInitialZ, -0.12, rightWaveY, rightSpin, 1],
             ]) {
               if (!node) continue;
               node.visible = openProgress > 0.035;
+              node.position.x = ix;
               node.position[riseKey] = (riseKey === 'y' ? iy : iz) + budPop * rig.budRise * floatMult + waveY;
               node.position[secKey] =
                 (secKey === 'y' ? iy : iz) + budPop * rig.budRise * (styleKey === 'float' ? 0.35 : 0.05) * floatMult * secSign + budWaveZ;
-              node.rotation.z = tilt * openProgress * (styleKey === 'float' ? 1.0 : 0.2) + (styleKey === 'float' ? Math.sin(elapsed * 2.5) * 0.12 : 0);
-              if (styleKey === 'float') {
+              node.rotation.set(0, 0, tilt * openProgress * (styleKey === 'float' ? 1.0 : 0.2) + (styleKey === 'float' ? Math.sin(elapsed * 2.5) * 0.12 : 0));
+              if (cfg.splitBuds) {
+                node.position.x = ix + spread * openProgress * 3;
+                node.position.y = iy + openProgress * 4 + waveY;
+                node.position.z = iz + openProgress * 18 + budWaveZ;
+                node.rotation.set(openProgress * THREE.MathUtils.degToRad(25), spread * openProgress * THREE.MathUtils.degToRad(15) + (styleKey === 'float' ? spinAngle : 0), 0);
+              } else if (styleKey === 'float') {
                 node.rotation.y = spinAngle;
               }
             }
@@ -513,3 +524,4 @@ export default function DeviceModel3D({
     />
   );
 }
+

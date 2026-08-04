@@ -6,12 +6,10 @@ export default function BatteryWidget({ pct = 0, charging = false, minsLeft = -1
   const isCritical = pct <= 10 && !charging;
 
   const barColor = isCritical
-    ? '#FF3B30'
+    ? 'var(--danger)'
     : isLow
-    ? '#FF9F0A'
-    : charging
-    ? '#1DB954'
-    : '#34C759';
+    ? 'var(--warn)'
+    : 'var(--ok)';
 
   const label = charging
     ? pct >= 100
@@ -34,13 +32,11 @@ export default function BatteryWidget({ pct = 0, charging = false, minsLeft = -1
       {/* Icon */}
       <div style={{
         width: 36, height: 36, borderRadius: 12, flexShrink: 0,
-        background: charging
-          ? 'rgba(29,185,84,0.18)'
-          : isCritical
-          ? 'rgba(255,59,48,0.18)'
+        background: isCritical
+          ? 'rgba(255,69,58,0.16)'
           : isLow
-          ? 'rgba(255,159,10,0.18)'
-          : 'rgba(52,199,89,0.15)',
+          ? 'rgba(255,159,10,0.16)'
+          : 'rgba(48,209,88,0.14)',
         border: `1px solid ${barColor}33`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>

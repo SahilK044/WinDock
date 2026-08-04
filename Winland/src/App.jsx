@@ -17,7 +17,7 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div style={{
-          position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50)',
+          position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)',
           background: '#1a0000', border: '2px solid #ff453a', borderRadius: 16,
           padding: '12px 20px', color: '#ff6b6b', fontFamily: 'monospace', fontSize: 11,
           maxWidth: 400, zIndex: 99999,

@@ -15,7 +15,6 @@ import SystemMonitorWidget from '../Activities/SystemMonitorWidget';
 import LauncherWidget from '../Activities/LauncherWidget';
 import ScreenshotWidget from '../Activities/ScreenshotWidget';
 import BluetoothWidget from '../Activities/BluetoothWidget';
-import SettingsWidget from '../Activities/SettingsWidget';
 import { soundEngine } from '../../utils/soundEngine';
 import { fetchHDAlbumArt } from '../../utils/spotifyApi';
 
@@ -153,7 +152,7 @@ export default function DynamicIsland({
   const [volume, setVolume] = useState(50);
   const [shelvedItems, setShelvedItems] = useState([]);
   const [sysStats, setSysStats] = useState({ cpu: 22, ram: 54, gpu: 30 });
-  const [screenshotData, setScreenshotData] = useState(null);
+  const [screenshotData] = useState(null);
   const [isGhostIdle, setIsGhostIdle] = useState(false);
   const [themeMode, setThemeMode] = useState('dark');
   const [weatherConfig, setWeatherConfig] = useState({ weatherUnit: 'C' });
@@ -578,14 +577,10 @@ export default function DynamicIsland({
       'expanded-shelf':    'state-expanded-shelf',
       'expanded-sysmon':   'state-expanded-sysmon',
       'expanded-launcher': 'state-expanded-launcher',
-      'expanded-settings': 'state-expanded-settings',
       'expanded-screenshot':'state-expanded-screenshot',
       'expanded-bluetooth':'state-expanded-bluetooth',
     }[activeState] || 'state-idle';
   };
-
-  // 100% Solid Opaque background gradient (strictly #000000 when idle)
-  const pillBg = buildPillBg(accentColor, activeState === 'expanded-music', !!trackInfo.title);
 
   // ── Mouse Passthrough Management ──────────────────────────────────────────
   useEffect(() => {
@@ -664,7 +659,6 @@ export default function DynamicIsland({
 
   const handleIslandClick = (e) => {
     if (e.defaultPrevented) return;
-    if (activeState === 'expanded-settings') return;
     if (e.target && (e.target.closest('button') || e.target.closest('input') || e.target.closest('svg') || e.target.closest('.interactive-child'))) {
       return;
     }
@@ -810,12 +804,6 @@ export default function DynamicIsland({
           {activeState === 'expanded-sysmon' && <SystemMonitorWidget stats={sysStats} />}
           {activeState === 'expanded-launcher' && (
             <LauncherWidget onLaunchApp={handleLaunchApp} onClose={() => setActiveState('idle')} />
-          )}
-          {activeState === 'expanded-settings' && (
-            <SettingsWidget onClose={() => {
-              setActiveState(trackInfo.title ? 'compact-music' : 'idle');
-              if (window.electronAPI?.setIgnoreMouseEvents) window.electronAPI.setIgnoreMouseEvents(true);
-            }} />
           )}
           {activeState === 'expanded-screenshot' && (
             <ScreenshotWidget imageSrc={screenshotData} onDismiss={() => setActiveState('idle')} />

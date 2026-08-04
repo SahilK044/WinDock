@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Pause, Play, Sparkles } from 'lucide-react';
-import { soundEngine } from '../../utils/soundEngine';
+import { Mic, Square } from 'lucide-react';
 
 export default function VoiceMemoWidget({ isCompact, onStop }) {
   const [seconds, setSeconds] = useState(0);
-  const [isRecording, setIsRecording] = useState(true);
+  const [isRecording] = useState(true);
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -30,7 +29,7 @@ export default function VoiceMemoWidget({ isCompact, onStop }) {
       const mid = height / 2;
 
       ctx.beginPath();
-      ctx.strokeStyle = '#f97316';
+      ctx.strokeStyle = '#ff9f0a';
       ctx.lineWidth = 2;
 
       for (let x = 0; x < width; x += 4) {
@@ -58,10 +57,10 @@ export default function VoiceMemoWidget({ isCompact, onStop }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="pulse-dot" style={{ background: '#f97316', boxShadow: '0 0 10px #f97316' }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#f97316' }}>Recording</span>
+          <div className="pulse-dot" style={{ background: '#ff9f0a', boxShadow: '0 0 10px #ff9f0a' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#ff9f0a' }}>Recording</span>
         </div>
-        <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700 }}>{formatTime(seconds)}</span>
+        <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{formatTime(seconds)}</span>
       </div>
     );
   }
@@ -75,11 +74,11 @@ export default function VoiceMemoWidget({ isCompact, onStop }) {
               width: 36,
               height: 36,
               borderRadius: 12,
-              background: 'linear-gradient(135deg, #f97316, #ea580c)',
+              background: 'linear-gradient(135deg, #ff9f0a, #ff9f0a)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(249, 115, 22, 0.4)',
+              boxShadow: '0 4px 14px rgba(255, 159, 10, 0.3)',
             }}
           >
             <Mic size={18} color="#fff" />
@@ -90,7 +89,7 @@ export default function VoiceMemoWidget({ isCompact, onStop }) {
           </div>
         </div>
 
-        <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'monospace', color: '#f97316' }}>
+        <div style={{ fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#ff9f0a' }}>
           {formatTime(seconds)}
         </div>
       </div>

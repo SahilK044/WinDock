@@ -237,12 +237,12 @@ export default function SettingsWindow() {
                 <button
                   onClick={() => window.electronAPI?.triggerPhoneNotification && window.electronAPI.triggerPhoneNotification()}
                   style={{
-                    padding: '8px 16px', borderRadius: '12px', background: 'rgba(0, 240, 255, 0.15)',
-                    border: '1px solid rgba(0, 240, 255, 0.3)', color: '#00f0ff', cursor: 'pointer',
-                    fontSize: '12px', fontWeight: '600', backdropFilter: 'blur(10px)', transition: 'all 0.2s'
+                    padding: '8px 16px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.09)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)', color: '#f2f2f4', cursor: 'pointer',
+                    fontSize: '12px', fontWeight: '600', transition: 'background 0.15s ease'
                   }}
                 >
-                  ⚡ Test Phone Connection Popup
+                  Test connection popup
                 </button>
               </div>
               <div className="wl-grid wl-grid-3">

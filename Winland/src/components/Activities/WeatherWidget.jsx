@@ -1,25 +1,24 @@
 import React from 'react';
-import { Sun, CloudRain, Thermometer, Wind } from 'lucide-react';
+import { conditionIcon, weatherTempString } from './IdleWidget';
 
 export default function WeatherWidget({ isCompact, weatherConfig }) {
-  const unit = (weatherConfig?.weatherUnit === 'F' || weatherConfig?.weatherUnit === 'fahrenheit') ? 'F' : 'C';
-  const tempC = weatherConfig?.temperatureC ?? weatherConfig?.temperature ?? 22;
-  const tempVal = unit === 'F' ? Math.round(Number(tempC) * 9 / 5 + 32) : Math.round(Number(tempC));
-  const highTemp = unit === 'F' ? Math.round((Number(tempC) + 4) * 9 / 5 + 32) : Math.round(Number(tempC) + 4);
-  const lowTemp = unit === 'F' ? Math.round((Number(tempC) - 10) * 9 / 5 + 32) : Math.round(Number(tempC) - 10);
-  const tempDisplay = `${tempVal}°${unit}`;
+  const tempDisplay = weatherTempString(weatherConfig);
+  const condition = weatherConfig?.weatherCondition || 'Clear';
+  const ConditionGlyph = conditionIcon(condition);
 
   if (isCompact) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Sun size={13} color="#f59e0b" />
+          <ConditionGlyph size={13} color="var(--text-2)" />
           <span style={{ fontSize: 12, fontWeight: 700 }}>Weather</span>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>{tempDisplay}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>{tempDisplay}</span>
       </div>
     );
   }
+
+  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -30,32 +29,32 @@ export default function WeatherWidget({ isCompact, weatherConfig }) {
               width: 38,
               height: 38,
               borderRadius: 12,
-              background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+              background: 'linear-gradient(135deg, #0a84ff, #64d2ff)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
+              boxShadow: '0 4px 14px rgba(10, 132, 255, 0.35)',
             }}
           >
-            <Sun size={22} color="#fef08a" />
+            <ConditionGlyph size={22} color="#fff" />
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 800 }}>Weather</div>
-            <div style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.65)' }}>Mostly Sunny</div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Weather</div>
+            <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{condition}</div>
           </div>
         </div>
 
-        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: -1 }}>{tempDisplay}</div>
+        <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -1, fontVariantNumeric: 'tabular-nums' }}>{tempDisplay}</div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255, 255, 255, 0.06)', padding: '8px 12px', borderRadius: 12, fontSize: 11 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Thermometer size={13} color="rgba(255,255,255,0.7)" /> H:{highTemp}° L:{lowTemp}°
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Wind size={13} color="rgba(255,255,255,0.7)" /> 6 mph NW
-        </div>
-        <div style={{ color: '#60a5fa', fontWeight: 700 }}>AQI 24 • Good</div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        background: 'var(--surface)', border: '1px solid var(--stroke)',
+        padding: '8px 12px', borderRadius: 12, fontSize: 11,
+        color: 'var(--text-2)', fontWeight: 600,
+      }}>
+        <span>{dateStr}</span>
+        <span>{condition}</span>
       </div>
     </div>
   );

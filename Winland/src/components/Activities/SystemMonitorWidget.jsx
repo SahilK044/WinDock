@@ -12,10 +12,10 @@ export default function SystemMonitorWidget({ isCompact, stats = { cpu: 24, ram:
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Cpu size={14} color="#06b6d4" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>CPU {stats.cpu}%</span>
+          <Cpu size={14} color="var(--text-2)" />
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-1)' }}>CPU {stats.cpu}%</span>
         </div>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#06b6d4' }}>RAM {stats.ram}%</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)' }}>RAM {stats.ram}%</span>
       </div>
     );
   }
@@ -29,17 +29,23 @@ export default function SystemMonitorWidget({ isCompact, stats = { cpu: 24, ram:
     })
     .join(' ');
 
+  const metrics = [
+    { label: 'CPU', value: stats.cpu, Icon: Cpu },
+    { label: 'RAM', value: stats.ram, Icon: Gauge },
+    { label: 'GPU', value: stats.gpu, Icon: Activity },
+  ];
+
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '12px 14px', boxSizing: 'border-box' }}>
       {/* Top Row: Title */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(6, 182, 212, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Activity size={15} color="#06b6d4" />
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--stroke)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Activity size={15} color="var(--text-1)" />
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>System Status</div>
-            <div style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.55)' }}>Live Hardware Telemetry</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>System</div>
+            <div style={{ fontSize: 10, color: 'var(--text-2)' }}>Live telemetry</div>
           </div>
         </div>
 
@@ -48,8 +54,8 @@ export default function SystemMonitorWidget({ isCompact, stats = { cpu: 24, ram:
           <svg width="140" height="35" style={{ overflow: 'visible' }}>
             <polyline
               fill="none"
-              stroke="#06b6d4"
-              strokeWidth="2"
+              stroke="rgba(255, 255, 255, 0.85)"
+              strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
               points={points}
@@ -60,26 +66,14 @@ export default function SystemMonitorWidget({ isCompact, stats = { cpu: 24, ram:
 
       {/* Metrics Row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
-        <div style={{ background: 'rgba(255, 255, 255, 0.05)', borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255, 255, 255, 0.6)', fontWeight: 600 }}>
-            <Cpu size={12} color="#06b6d4" /> CPU
+        {metrics.map(({ label, value, Icon }) => (
+          <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--stroke)', borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-2)', fontWeight: 600 }}>
+              <Icon size={12} color="var(--text-2)" /> {label}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums' }}>{value}%</div>
           </div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{stats.cpu}%</div>
-        </div>
-
-        <div style={{ background: 'rgba(255, 255, 255, 0.05)', borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255, 255, 255, 0.6)', fontWeight: 600 }}>
-            <Gauge size={12} color="#3b82f6" /> RAM
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{stats.ram}%</div>
-        </div>
-
-        <div style={{ background: 'rgba(255, 255, 255, 0.05)', borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255, 255, 255, 0.6)', fontWeight: 600 }}>
-            <Activity size={12} color="#10b981" /> GPU
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{stats.gpu}%</div>
-        </div>
+        ))}
       </div>
     </div>
   );

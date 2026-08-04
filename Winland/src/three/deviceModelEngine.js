@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared device-model engine.
  *
  * Owns everything about turning a device id into a ready-to-animate Three.js
@@ -15,7 +15,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
-// ─── Real 3D GLB Asset Imports ────────────────────────────────────────────────
+// â”€â”€â”€ Real 3D GLB Asset Imports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import s24ultraGlb       from '../assets/models/s24ultra.glb?url';
 import s25ultraGlb       from '../assets/models/s25ultra.glb?url';
 import s26ultraGlb       from '../assets/models/s26ultra.glb?url';
@@ -33,6 +33,10 @@ import sonywh1000Glb     from '../assets/models/sonywh1000.glb?url';
 import airpodsproGlb     from '../assets/models/airpodspro.glb?url';
 import airpodsmaxGlb     from '../assets/models/airpodsmax.glb?url';
 import galaxybudsGlb     from '../assets/models/galaxybuds.glb?url';
+import galaxyCaseBaseGlb from '../assets/models/galaxy_case_base.glb?url';
+import galaxyCaseLidGlb  from '../assets/models/galaxy_case_lid.glb?url';
+import galaxyBudLeftGlb  from '../assets/models/galaxy_bud_left.glb?url';
+import galaxyBudRightGlb from '../assets/models/galaxy_bud_right.glb?url';
 import soundbarGlb       from '../assets/models/soundbar.glb?url';
 import ps5ControllerGlb  from '../assets/models/ps5_controller.glb?url';
 import xboxBlackGlb      from '../assets/models/xbox_black.glb?url';
@@ -64,10 +68,10 @@ export const GLB_MODEL_MAP = {
   xbox_white: xboxWhiteGlb,
 };
 
-// ─── Per-model Base Pose & Scale Configs (calibrated against the real GLBs) ───
+// â”€â”€â”€ Per-model Base Pose & Scale Configs (calibrated against the real GLBs) â”€â”€â”€
 export const MODEL_CONFIGS = {
-  // baseRot* are the FINAL on-screen rotations. (They were once applied twice —
-  // on the model and again on its parent group — so several values here are
+  // baseRot* are the FINAL on-screen rotations. (They were once applied twice â€”
+  // on the model and again on its parent group â€” so several values here are
   // half what they look like historically; the doubling is fixed.)
   s24ultra:       { baseRotY: 0,              baseRotX: 0, scaleFactor: 1.60 },
   // The s25 GLB is authored facing sideways (its thinnest axis is X, not Z like
@@ -91,18 +95,18 @@ export const MODEL_CONFIGS = {
   airpodsmax:     { baseRotY: 0,              baseRotX: 0, scaleFactor: 1.45 },
   // Earbuds. The AirPods scan is authored Y-up (matches Three's axes, baseRotX
   // 0) so its buds rise along local Y. The Galaxy GLB is authored Z-up, and
-  // baseRotX ≈ -90° rotates that local Z onto world-up — which is also why its
+  // baseRotX â‰ˆ -90Â° rotates that local Z onto world-up â€” which is also why its
   // buds must travel along local Z and nudge along local Y instead.
   //
   // budsAuthoredOut: the AirPods scan poses its earbuds ALREADY lifted clear of
   // the case, so their authored spot is the END of the animation and they must
   // be sunk into the case first. The Galaxy buds are modelled seated inside.
-  // lidAuthoredOpen: this scan poses the CASE open too — its lid node sits
+  // lidAuthoredOpen: this scan poses the CASE open too â€” its lid node sits
   // behind the body with no rotation of its own, so leaving the hinge at zero
   // (the resting state) showed a permanently open case. Like the buds, the
   // authored pose is the END of the animation, not the start.
   airpodspro:     { baseRotY: 0, baseRotX: 0, scaleFactor: 1.60, riseAxis: 'y', secondaryAxis: 'z', secondarySign: 1, riseMult: 0.55, budsAuthoredOut: true, lidAuthoredOpen: true, hingeZUseMax: true, openNudgeY: 0.10 },
-  galaxybuds:     { baseRotY: 0, baseRotX: -Math.PI / 2 - 0.15, scaleFactor: 1.60, riseAxis: 'z', secondaryAxis: 'y', secondarySign: -1, riseMult: 0.85, lidOpenAngle: 2.05, openNudgeY: 0.38 },
+  galaxybuds:     { baseRotY: 0, baseRotX: -Math.PI / 2 - 0.15, scaleFactor: 1.60, riseAxis: 'z', secondaryAxis: 'y', secondarySign: -1, riseMult: 0.85, lidOpenAngle: Math.PI / 2, openNudgeY: 0.38, preRiggedLid: true, splitBuds: true },
   soundbar:       { baseRotY: Math.PI,        baseRotX: 0, scaleFactor: 1.35 },
   // The DualSense GLB is authored back-on, so it needs a half turn to show its
   // face; the Xbox GLBs are already authored face-on.
@@ -122,22 +126,26 @@ export const OPEN_TILT_X = -0.20;
 
 const EARBUD_NODES = {
   airpodspro: { lid: 'uzpdkgqkIIWTYxJ', left: 'DprZyuuKYVGeqRc', right: 'RTZiZFLcZlxaClC' },
-  galaxybuds: { lid: 'Case_Lid', left: 'Earbud_Left', right: 'Earbud_Right' },
+  galaxybuds: { lid: 'Case_Lid_Pivot', left: 'Earbud_Left', right: 'Earbud_Right' },
 };
+
+const GALAXY_HINGE = new THREE.Vector3(0, 25.0, 14.06840991973877);
+const GALAXY_LEFT_REST = new THREE.Vector3(-7.5, 1.5, 7.5);
+const GALAXY_RIGHT_REST = new THREE.Vector3(7.5, 1.5, 7.5);
 
 function boxVolume(box) {
   const s = box.getSize(new THREE.Vector3());
   return Math.max(s.x, 0) * Math.max(s.y, 0) * Math.max(s.z, 0);
 }
 
-// ── Ghost-Mesh Deduplication ───────────────────────────────────────────────
+// â”€â”€ Ghost-Mesh Deduplication â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Some source scans ship true duplicate "overlay" meshes: siblings sharing a
-// parent that nearly — not exactly — occupy the same bounding box.
+// parent that nearly â€” not exactly â€” occupy the same bounding box.
 //
 // A ghost is a near-DUPLICATE, so all three tests below must pass. A plain
 // containment test is not enough and actively broke both earbud models: it
 // deleted 29 of the AirPods scan's 48 meshes (stripping the detailed white
-// shells, leaving dark low-poly ones — the "black earbuds") and deleted the
+// shells, leaving dark low-poly ones â€” the "black earbuds") and deleted the
 // Galaxy case's entire Case_Base, because the buds nested inside it counted as
 // containing it (the ratio was taken against the smaller box, so any small part
 // swallowed its own parent shell).
@@ -184,11 +192,11 @@ export function dedupeOverlappingMeshes(root) {
   return removed;
 }
 
-// ── Ghost-Bud Removal ──────────────────────────────────────────────────────
+// â”€â”€ Ghost-Bud Removal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The AirPods scan also ships a single low-poly stand-in covering BOTH earbuds.
 // It lives under a different parent than the two real bud nodes, so the
 // sibling-scoped dedupe cannot see it and the per-node animation never touches
-// it — it just sat there as a dark pair of buds poking out of the closed case.
+// it â€” it just sat there as a dark pair of buds poking out of the closed case.
 // Identified structurally, never by name: a mesh outside both buds that sits
 // almost entirely inside the space they occupy while carrying a fraction of
 // their detail. Models without one are untouched.
@@ -224,10 +232,10 @@ export function removeGhostBudMeshes(root, leftBud, rightBud) {
   return doomed.length;
 }
 
-// ── Shared model cache ─────────────────────────────────────────────────────
+// â”€â”€ Shared model cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Each asset is fetched and parsed at most once per session; callers take a
 // lightweight clone. Clones share geometry and materials with the cached
-// master, so consumers must NOT dispose those on teardown — doing so would
+// master, so consumers must NOT dispose those on teardown â€” doing so would
 // leave the cache pointing at freed GPU buffers.
 const MODEL_CACHE = new Map();
 
@@ -237,8 +245,44 @@ export function loadSharedModel(modelId) {
   if (!MODEL_CACHE.has(modelId)) {
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
-    MODEL_CACHE.set(modelId, loader.loadAsync(url).catch((err) => {
-      MODEL_CACHE.delete(modelId); // let a later mount retry
+    const loadPromise = modelId === 'galaxybuds'
+      ? Promise.all([
+          loader.loadAsync(galaxyCaseBaseGlb),
+          loader.loadAsync(galaxyCaseLidGlb),
+          loader.loadAsync(galaxyBudLeftGlb),
+          loader.loadAsync(galaxyBudRightGlb),
+        ]).then(([base, lid, leftBud, rightBud]) => {
+          const scene = new THREE.Group();
+          scene.name = 'GalaxyBudsSplitRig';
+
+          const baseGroup = new THREE.Group();
+          baseGroup.name = 'Case_Base';
+          baseGroup.add(base.scene);
+
+          const lidPivot = new THREE.Group();
+          lidPivot.name = 'Case_Lid_Pivot';
+          lidPivot.position.copy(GALAXY_HINGE);
+          lid.scene.name = 'Case_Lid';
+          lid.scene.position.copy(GALAXY_HINGE).multiplyScalar(-1);
+          lidPivot.add(lid.scene);
+
+          const leftGroup = new THREE.Group();
+          leftGroup.name = 'Earbud_Left';
+          leftGroup.position.copy(GALAXY_LEFT_REST);
+          leftGroup.add(leftBud.scene);
+
+          const rightGroup = new THREE.Group();
+          rightGroup.name = 'Earbud_Right';
+          rightGroup.position.copy(GALAXY_RIGHT_REST);
+          rightGroup.add(rightBud.scene);
+
+          scene.add(baseGroup, lidPivot, leftGroup, rightGroup);
+          return { scene };
+        })
+      : loader.loadAsync(url);
+
+    MODEL_CACHE.set(modelId, loadPromise.catch((err) => {
+      MODEL_CACHE.delete(modelId);
       throw err;
     }));
   }
@@ -258,7 +302,7 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
 
   if (category === 'earbud') dedupeOverlappingMeshes(root);
 
-  // AirPods Max ships flat/broken scan materials — give it a clean finish.
+  // AirPods Max ships flat/broken scan materials â€” give it a clean finish.
   // Everything else keeps its authored PBR for realism.
   if (modelId === 'airpodsmax') {
     const whiteAppleMat = new THREE.MeshPhysicalMaterial({
@@ -278,7 +322,7 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
 
   // The Galaxy GLB is authored graphite; WinLand shows the silver finish.
   //
-  // A flat white repaint left it reading as a featureless blob — with almost no
+  // A flat white repaint left it reading as a featureless blob â€” with almost no
   // texture detail in this asset, a diffuse-only material gives the eye nothing
   // to catch. A polished metal is what makes the form legible instead: metalness
   // carries the environment, low roughness gives it a sharp highlight along the
@@ -299,7 +343,7 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
   }
 
   // Hardware finish. The picker used to be inert because nothing consumed the
-  // colour — the models simply kept their authored materials. Tint the body
+  // colour â€” the models simply kept their authored materials. Tint the body
   // panels toward the chosen finish while leaving the dark parts (screens,
   // grilles, rubber) alone, otherwise a phone turns into a solid slab of
   // colour with no screen. Materials are cloned first: they are shared with
@@ -311,7 +355,7 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
       if (!child.isMesh || !child.material || Array.isArray(child.material)) return;
       const src = child.material;
       if (!src.color) return;
-      // Skip near-black surfaces — those read as screen/trim, not bodywork.
+      // Skip near-black surfaces â€” those read as screen/trim, not bodywork.
       const luma = 0.2126 * src.color.r + 0.7152 * src.color.g + 0.0722 * src.color.b;
       if (luma < 0.16) return;
       let cloned = seen.get(src.uuid);
@@ -326,7 +370,8 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
   }
 
   let lidNode = null, budLeftNode = null, budRightNode = null;
-  let budLeftInitialY = 0, budLeftInitialZ = 0, budRightInitialY = 0, budRightInitialZ = 0;
+  let budLeftInitialX = 0, budLeftInitialY = 0, budLeftInitialZ = 0;
+  let budRightInitialX = 0, budRightInitialY = 0, budRightInitialZ = 0;
 
   if (category === 'earbud') {
     const names = EARBUD_NODES[modelId];
@@ -335,8 +380,18 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
       budLeftNode = root.getObjectByName(names.left);
       budRightNode = root.getObjectByName(names.right);
       removeGhostBudMeshes(root, budLeftNode, budRightNode);
-      if (budLeftNode)  { budLeftInitialY  = budLeftNode.position.y;  budLeftInitialZ  = budLeftNode.position.z;  budLeftNode.visible = false; }
-      if (budRightNode) { budRightInitialY = budRightNode.position.y; budRightInitialZ = budRightNode.position.z; budRightNode.visible = false; }
+      if (budLeftNode) {
+        budLeftInitialX = budLeftNode.position.x;
+        budLeftInitialY = budLeftNode.position.y;
+        budLeftInitialZ = budLeftNode.position.z;
+        budLeftNode.visible = false;
+      }
+      if (budRightNode) {
+        budRightInitialX = budRightNode.position.x;
+        budRightInitialY = budRightNode.position.y;
+        budRightInitialZ = budRightNode.position.z;
+        budRightNode.visible = false;
+      }
     }
   }
 
@@ -364,8 +419,8 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
     root.position.sub(new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3()));
     initialYPos = root.position.y;
 
-    // Bud travel is chosen in WORLD units — a fraction of the case's on-screen
-    // height — then converted into the bud nodes' own units. That conversion
+    // Bud travel is chosen in WORLD units â€” a fraction of the case's on-screen
+    // height â€” then converted into the bud nodes' own units. That conversion
     // matters: the Galaxy buds hang off the root, but the AirPods buds sit deep
     // under parents carrying their own scale, so a distance measured in root
     // units moved them about a seventh as far as intended.
@@ -378,7 +433,7 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
     (budLeftNode?.parent || root).getWorldScale(budParentScale);
     budRise = targetWorldRise / (Math.abs(budParentScale[riseAxisKey]) || 1);
 
-    if (lidNode) {
+    if (lidNode && !config.preRiggedLid) {
       // Re-parent the lid into a pivot at its back-bottom edge so it swings
       // around the real hinge instead of the model origin.
       root.updateWorldMatrix(true, true);
@@ -446,7 +501,8 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
   return {
     root, config, initialYPos, budRise, targetWorldRise,
     lidNode, budLeftNode, budRightNode,
-    budLeftInitialY, budLeftInitialZ, budRightInitialY, budRightInitialZ,
+    budLeftInitialX, budLeftInitialY, budLeftInitialZ,
+    budRightInitialX, budRightInitialY, budRightInitialZ,
     lidOpenSign: config.lidOpenSign ?? -1,
     lidOpenAngle: config.lidOpenAngle ?? 1.22,
     lidAuthoredOpen: !!config.lidAuthoredOpen,
@@ -466,7 +522,7 @@ export function prepareDeviceModel(gltf, { modelId, category, tintHex }) {
  * Pass the renderer to also install an environment map. Metals reflect their
  * surroundings rather than responding to lights, so a metallic material in a
  * scene with no environment renders almost black no matter how many lights are
- * added — the polished cases and chrome trim need this to read as metal at all.
+ * added â€” the polished cases and chrome trim need this to read as metal at all.
  */
 export function addStudioLights(scene, renderer) {
   scene.add(new THREE.AmbientLight(0xffffff, 2.4));
@@ -493,3 +549,5 @@ export function addStudioLights(scene, renderer) {
   }
   return () => {};
 }
+
+

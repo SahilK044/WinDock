@@ -1,6 +1,6 @@
 // WinLand Data-Driven Device Catalog & Data Model
 export const DEVICE_COLOR_VARIANTS = {
-  'space-grey': { name: 'Space Grey', hex: '#3a3a3c', bodyHex: '#2c2c2e', metalHex: '#636366', accentHex: '#00f0ff' },
+  'space-grey': { name: 'Space Grey', hex: '#3a3a3c', bodyHex: '#2c2c2e', metalHex: '#636366', accentHex: '#f5f5f7' },
   'white':      { name: 'Ceramic White', hex: '#f2f2f7', bodyHex: '#e5e5ea', metalHex: '#d1d1d6', accentHex: '#007aff' },
   'black':      { name: 'Onyx Black', hex: '#1c1c1e', bodyHex: '#121212', metalHex: '#3a3a3c', accentHex: '#30d158' },
 };

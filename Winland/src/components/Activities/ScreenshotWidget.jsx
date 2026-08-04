@@ -1,7 +1,7 @@
 import React from 'react';
 import { Camera, Copy, Check } from 'lucide-react';
 
-export default function ScreenshotWidget({ isCompact, imageSrc, onDismiss }) {
+export default function ScreenshotWidget({ isCompact, imageSrc }) {
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = (e) => {
@@ -14,7 +14,7 @@ export default function ScreenshotWidget({ isCompact, imageSrc, onDismiss }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Camera size={14} color="#10b981" />
+          <Camera size={14} color="#30d158" />
           <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>Screenshot Captured</span>
         </div>
       </div>
@@ -31,8 +31,8 @@ export default function ScreenshotWidget({ isCompact, imageSrc, onDismiss }) {
             style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }}
           />
         ) : (
-          <div style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Camera size={20} color="#10b981" />
+          <div style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(48, 209, 88, 0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Camera size={20} color="#30d158" />
           </div>
         )}
         <div style={{ minWidth: 0 }}>
@@ -44,7 +44,7 @@ export default function ScreenshotWidget({ isCompact, imageSrc, onDismiss }) {
       <button
         onClick={handleCopy}
         style={{
-          background: copied ? '#10b981' : 'rgba(255, 255, 255, 0.12)',
+          background: copied ? '#30d158' : 'rgba(255, 255, 255, 0.12)',
           border: 'none',
           borderRadius: 8,
           padding: '6px 12px',

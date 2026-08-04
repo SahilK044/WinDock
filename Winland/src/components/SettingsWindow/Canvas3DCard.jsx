@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {
   GLB_MODEL_MAP, MODEL_CONFIGS, SPIN_MODELS,
@@ -25,14 +25,19 @@ export default function Canvas3DCard({
   const hoverRef     = useRef(isHovered);
   const selectRef    = useRef(isSelected);
   const activateRef  = useRef(isActivated);
+  const invalidateRef = useRef(null);
   hoverRef.current   = isHovered;
   selectRef.current  = isSelected;
   activateRef.current = isActivated;
 
+  useEffect(() => {
+    invalidateRef.current?.();
+  }, [isHovered, isSelected, isActivated]);
+
   // Don't build a WebGL scene or fetch an asset until the card is actually on
   // screen. A tab like Smartphones holds a dozen cards, and eagerly starting
   // all of them meant a dozen contexts and a dozen model decodes competing the
-  // instant Settings opened — the stall when the window appeared.
+  // instant Settings opened â€” the stall when the window appeared.
   const [isVisible, setIsVisible] = useState(false);
   useEffect(() => {
     const el = containerRef.current;
@@ -55,7 +60,7 @@ export default function Canvas3DCard({
     const container = containerRef.current;
     if (!container || !isVisible) return;
 
-    // ── 1. WebGL Scene & Camera ─────────────────────────────────────────────
+    // â”€â”€ 1. WebGL Scene & Camera â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const scene  = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
     camera.position.set(0, 0, 3.8);
@@ -79,7 +84,7 @@ export default function Canvas3DCard({
     canvas.style.display = 'block';
     container.appendChild(canvas);
 
-    // ── 2. Natural Studio Lighting Rig ──────────────────────────────────────
+    // â”€â”€ 2. Natural Studio Lighting Rig â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const disposeEnv = addStudioLights(scene, renderer);
 
     const masterGroup = new THREE.Group();
@@ -89,39 +94,42 @@ export default function Canvas3DCard({
     let isDisposed = false;
     const isSpin = SPIN_MODELS.has(modelId);
 
-    // Spin offset applied to masterGroup — starts at 0 because loadedModel
+    // Spin offset applied to masterGroup â€” starts at 0 because loadedModel
     // already holds baseRotY (see the delta-only note in the render loop).
     let spinY = 0;
     const glbUrl = GLB_MODEL_MAP[modelId];
 
     let loadedModel = null;
+    let loadFailed = false;
     let initialYPos = 0;
 
     // Sub-node references for GLB earbud animations
     let lidNode = null;
     let budLeftNode = null;
     let budRightNode = null;
+    let budLeftInitialX = 0;
     let budLeftInitialY = 0;
-    let budRightInitialY = 0;
     let budLeftInitialZ = 0;
+    let budRightInitialX = 0;
+    let budRightInitialY = 0;
     let budRightInitialZ = 0;
     let budRise = 1;        // proportional bud emergence (set after auto-fit)
     let openNudgeY = 0;     // per-model framing offset for the open pose
     let lidClosedAngle = 0; // solved hinge angle that shuts an authored-open case
     // The lid is hinged at its back-bottom edge, so a NEGATIVE rotation lifts
-    // the front edge up and swings it backwards — the direction a real case
+    // the front edge up and swings it backwards â€” the direction a real case
     // opens. (A positive one drives the front edge down through the base, which
     // reads as the whole cap flipping under the case.)
     //
     // How FAR it swings is per-model, because it has to clear the earbuds as
-    // they rise: 70° leaves the Galaxy lid standing upright directly in front
+    // they rise: 70Â° leaves the Galaxy lid standing upright directly in front
     // of its buds, so that case opens past vertical to lean back out of the way.
     const lidOpenSign = config.lidOpenSign ?? -1;
     const lidOpenAngle = config.lidOpenAngle ?? 1.22;
     const lidAuthoredOpen = !!config.lidAuthoredOpen;
 
     // Earbud cases (AirPods Pro & Galaxy Buds) are loaded as single real GLBs
-    // whose named lid/bud nodes are animated directly — see the loader callback
+    // whose named lid/bud nodes are animated directly â€” see the loader callback
     // below (no procedural/placeholder geometry is used).
 
     if (glbUrl) {
@@ -142,31 +150,51 @@ export default function Canvas3DCard({
           lidNode       = rig.lidNode;
           budLeftNode   = rig.budLeftNode;
           budRightNode  = rig.budRightNode;
+          budLeftInitialX  = rig.budLeftInitialX;
           budLeftInitialY  = rig.budLeftInitialY;
           budLeftInitialZ  = rig.budLeftInitialZ;
+          budRightInitialX = rig.budRightInitialX;
           budRightInitialY = rig.budRightInitialY;
           budRightInitialZ = rig.budRightInitialZ;
           masterGroup.add(loadedModel);
         },
-        (err) => console.warn('GLB load failed:', modelId, err)
+        (err) => {
+          loadFailed = true;
+          console.warn('GLB load failed:', modelId, err);
+        }
       );
     }
 
-    // ── 3. Smooth Continuous Physics Loop ───────────────────────────────────
-    let animId;
+    // â”€â”€ 3. Smooth Continuous Physics Loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    let animId = null;
     const clock = new THREE.Clock();
     let hoverProgress = 0;
     let openProgress = 0;
+    let hasRenderedLoadedModel = false;
+
+    const needsMoreFrames = () => {
+      if (!loadedModel) return !loadFailed;
+      if (!hasRenderedLoadedModel) return true;
+      if (hoverRef.current || activateRef.current) return true;
+      if (Math.abs(hoverProgress) > 0.002 || Math.abs(openProgress) > 0.002) return true;
+      if (Math.abs(masterGroup.position.y) > 0.002) return true;
+      if (Math.abs(masterGroup.rotation.x) > 0.002 || Math.abs(masterGroup.rotation.y) > 0.002) return true;
+      return false;
+    };
+
+    const requestRender = () => {
+      if (animId == null) animId = requestAnimationFrame(renderLoop);
+    };
 
     const renderLoop = () => {
-      animId = requestAnimationFrame(renderLoop);
+      animId = null;
       const dt = clock.getDelta();
       const isHov = hoverRef.current;
       const isActive = activateRef.current;
       // NOTE: masterGroup is the PARENT of loadedModel, and loadedModel already
       // carries this model's base rotation (baseRotX/baseRotY, applied once
       // after auto-fit). Anything set on masterGroup STACKS on top of that, so
-      // every branch below must contribute only the animated *delta* — never
+      // every branch below must contribute only the animated *delta* â€” never
       // baseX/baseY again, which would double the base rotation.
       if (isSpin) {
         if (isHov) {
@@ -179,14 +207,14 @@ export default function Canvas3DCard({
           0.06
         );
       } else if (category === 'earbud') {
-        // ── State Machine: ──────────────────────────────────────────────────
+        // â”€â”€ State Machine: â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // 1. Hover only: the closed case levitates.
         // 2. Click while hovered: the lid opens and both earbuds rise together.
         // 3. Pointer leaves: the buds dock and the case closes, ready for the next hover.
         const targetHover = isHov ? 1.0 : 0.0;
         const targetOpen = isHov && isActive ? 1.0 : 0.0;
 
-        // Clamp the smoothing factor to [0,1]. dt is unbounded — a dropped
+        // Clamp the smoothing factor to [0,1]. dt is unbounded â€” a dropped
         // frame, GC pause, or a backgrounded/offscreen window makes dt*5 exceed
         // 1, and lerp() with t > 1 EXTRAPOLATES instead of easing, so a single
         // slow frame sent these progress values far past 1 (measured ~44) and
@@ -230,36 +258,50 @@ export default function Canvas3DCard({
         // are never simply switched on at their final spot.
         const budPop = config.budsAuthoredOut ? budEase - 1 : budEase;
         // Which local axis is "up" (rise) vs the small forward/back nudge
-        // differs per GLB's own authoring convention — see MODEL_CONFIGS.
+        // differs per GLB's own authoring convention â€” see MODEL_CONFIGS.
         const riseAxisKey = config.riseAxis || 'y';
         const secondaryAxisKey = config.secondaryAxis || 'z';
         const secondarySign = config.secondarySign ?? 1;
 
         if (budLeftNode) {
           budLeftNode.visible = openProgress > 0.035;
+          budLeftNode.position.x = budLeftInitialX;
           const leftRiseBase = riseAxisKey === 'y' ? budLeftInitialY : budLeftInitialZ;
           const leftSecondaryBase = secondaryAxisKey === 'y' ? budLeftInitialY : budLeftInitialZ;
           budLeftNode.position[riseAxisKey] = leftRiseBase + budPop * budRise;
           budLeftNode.position[secondaryAxisKey] = leftSecondaryBase + budPop * budRise * 0.25 * secondarySign;
-          budLeftNode.rotation.z = THREE.MathUtils.lerp(0, 0.12, openProgress);
+          budLeftNode.rotation.set(0, 0, THREE.MathUtils.lerp(0, 0.12, openProgress));
+          if (config.splitBuds) {
+            budLeftNode.position.x = budLeftInitialX - openProgress * 3;
+            budLeftNode.position.y = budLeftInitialY + openProgress * 4;
+            budLeftNode.position.z = budLeftInitialZ + openProgress * 18;
+            budLeftNode.rotation.set(openProgress * THREE.MathUtils.degToRad(25), -openProgress * THREE.MathUtils.degToRad(15), 0);
+          }
         }
         if (budRightNode) {
           budRightNode.visible = openProgress > 0.035;
+          budRightNode.position.x = budRightInitialX;
           const rightRiseBase = riseAxisKey === 'y' ? budRightInitialY : budRightInitialZ;
           const rightSecondaryBase = secondaryAxisKey === 'y' ? budRightInitialY : budRightInitialZ;
           budRightNode.position[riseAxisKey] = rightRiseBase + budPop * budRise;
           budRightNode.position[secondaryAxisKey] = rightSecondaryBase + budPop * budRise * 0.25 * secondarySign;
-          budRightNode.rotation.z = THREE.MathUtils.lerp(0, -0.12, openProgress);
+          budRightNode.rotation.set(0, 0, THREE.MathUtils.lerp(0, -0.12, openProgress));
+          if (config.splitBuds) {
+            budRightNode.position.x = budRightInitialX + openProgress * 3;
+            budRightNode.position.y = budRightInitialY + openProgress * 4;
+            budRightNode.position.z = budRightInitialZ + openProgress * 18;
+            budRightNode.rotation.set(openProgress * THREE.MathUtils.degToRad(25), openProgress * THREE.MathUtils.degToRad(15), 0);
+          }
         }
 
         // Whole 3D Model Floating Motion (Floats on Hover, Perspective Tilt on Select)
         // NOTE: loadedModel already carries the model's base rotation (baseRotX/
         // baseRotY, set once after auto-fit). masterGroup is its PARENT, so any
         // rotation put here STACKS on top of that base. It must therefore hold
-        // only the animated *delta* (hover wobble + select tilt) — never baseX/
+        // only the animated *delta* (hover wobble + select tilt) â€” never baseX/
         // baseY again. Re-adding the base here double-rotated the model: for
         // AirPods (baseRotX 0) that was invisibly harmless, but for the Z-up
-        // Galaxy Buds (baseRotX ≈ -90°) it flipped the whole case ~180°, so the
+        // Galaxy Buds (baseRotX â‰ˆ -90Â°) it flipped the whole case ~180Â°, so the
         // lid hinged downward out of frame and the buds "rose" downward instead
         // of popping up.
         if (loadedModel) {
@@ -279,7 +321,7 @@ export default function Canvas3DCard({
           masterGroup.rotation.y = THREE.MathUtils.lerp(masterGroup.rotation.y, targetRotY, 0.08);
         }
       } else {
-        // Gamepads, Headphones, Speakers — delta-only (see note above).
+        // Gamepads, Headphones, Speakers â€” delta-only (see note above).
         if (isHov) {
           masterGroup.rotation.y = THREE.MathUtils.lerp(masterGroup.rotation.y, Math.sin(clock.elapsedTime * 1.6) * 0.25, 0.08);
           masterGroup.rotation.x = THREE.MathUtils.lerp(masterGroup.rotation.x, Math.cos(clock.elapsedTime * 1.2) * 0.10, 0.08);
@@ -290,13 +332,17 @@ export default function Canvas3DCard({
       }
 
       renderer.render(scene, camera);
+      if (loadedModel) hasRenderedLoadedModel = true;
+      if (needsMoreFrames()) requestRender();
     };
 
-    renderLoop();
+    invalidateRef.current = requestRender;
+    requestRender();
 
     return () => {
       isDisposed = true;
-      cancelAnimationFrame(animId);
+      invalidateRef.current = null;
+      if (animId != null) cancelAnimationFrame(animId);
       scene.traverse((child) => {
         if (child.isMesh && child.material && child.material.__isCloned) {
           child.material.dispose();
@@ -323,3 +369,5 @@ export default function Canvas3DCard({
     />
   );
 }
+
+

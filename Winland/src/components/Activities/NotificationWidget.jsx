@@ -19,7 +19,7 @@ export default function NotificationWidget({ notification, onClose }) {
         );
       default:
         return (
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: '#007AFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: '#0a84ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Mail size={16} color="#fff" />
           </div>
         );

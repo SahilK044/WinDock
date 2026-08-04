@@ -46,10 +46,10 @@ export default function CallWidget({ isExpanded, isCompact, onEndCall }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="pulse-dot" style={{ background: '#22c55e', boxShadow: '0 0 10px #22c55e' }} />
+          <div className="pulse-dot" style={{ background: '#30d158', boxShadow: '0 0 10px #30d158' }} />
           <span style={{ fontSize: 12, fontWeight: 700 }}>Sarah Connor</span>
         </div>
-        <span style={{ fontSize: 11, color: '#22c55e', fontFamily: 'monospace', fontWeight: 700 }}>
+        <span style={{ fontSize: 11, color: '#30d158', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
           {formatDuration(duration)}
         </span>
       </div>
@@ -65,14 +65,14 @@ export default function CallWidget({ isExpanded, isCompact, onEndCall }) {
             width: 44,
             height: 44,
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            background: 'linear-gradient(135deg, #3a3a40, #232328)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontWeight: 800,
             fontSize: 16,
             color: '#fff',
-            boxShadow: '0 0 15px rgba(59, 130, 246, 0.5)',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.45)',
             border: '2px solid rgba(255, 255, 255, 0.3)',
           }}
         >
@@ -80,7 +80,7 @@ export default function CallWidget({ isExpanded, isCompact, onEndCall }) {
         </div>
         <div>
           <div style={{ fontSize: 14, fontWeight: 800 }}>Sarah Connor</div>
-          <div style={{ fontSize: 11, color: callState === 'active' ? '#22c55e' : 'rgba(255, 255, 255, 0.65)', fontWeight: 600 }}>
+          <div style={{ fontSize: 11, color: callState === 'active' ? '#30d158' : 'rgba(255, 255, 255, 0.65)', fontWeight: 600 }}>
             {callState === 'incoming' ? 'FaceTime Audio...' : `FaceTime HD • ${formatDuration(duration)}`}
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function CallWidget({ isExpanded, isCompact, onEndCall }) {
             <div className="glass-btn btn-danger" style={{ width: 40, height: 40 }} onClick={endCallHandler} title="Decline">
               <PhoneOff size={18} />
             </div>
-            <div className="glass-btn" style={{ width: 40, height: 40, background: '#22c55e' }} onClick={acceptCall} title="Accept">
+            <div className="glass-btn" style={{ width: 40, height: 40, background: '#30d158' }} onClick={acceptCall} title="Accept">
               <PhoneCall size={18} />
             </div>
           </>

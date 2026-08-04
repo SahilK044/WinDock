@@ -6,10 +6,19 @@
   --pill-bg: #000000;
   --glass-border: rgba(255, 255, 255, 0.12);
   --glass-border-hover: rgba(255, 255, 255, 0.22);
-  --accent-blue: #007aff;
-  --accent-green: #34c759;
-  --accent-orange: #ff9500;
-  --accent-red: #ff3b30;
+
+  /* One graphite world: colour only ever means status, everything else is
+     white-on-black type. Same direction as the settings window. */
+  --text-1: rgba(255, 255, 255, 0.92);
+  --text-2: rgba(255, 255, 255, 0.55);
+  --text-3: rgba(255, 255, 255, 0.38);
+  --surface: rgba(255, 255, 255, 0.07);
+  --surface-hover: rgba(255, 255, 255, 0.13);
+  --stroke: rgba(255, 255, 255, 0.10);
+  --ok: #30d158;
+  --warn: #ff9f0a;
+  --danger: #ff453a;
+  --info: #0a84ff;
 }
 
 * {
@@ -46,7 +55,7 @@ button {
 }
 
 button:active {
-  transform: scale(0.88) !important;
+  transform: scale(0.93) !important;
   transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
 
@@ -85,6 +94,8 @@ button:active {
   outline: none !important;
   pointer-events: auto;
   cursor: pointer;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transform-origin: top center;
   will-change: width, height, border-radius, transform;
   overflow: hidden;
@@ -120,10 +131,11 @@ button:active {
   box-shadow:
     /* a single hairline of top light, so the pill still has an edge on dark
        wallpapers without reading as an outlined box */
-    inset 0 1px 0 rgba(255, 255, 255, 0.055),
-    0 12px 30px rgba(0, 0, 0, 0.62),
-    0 3px 10px rgba(0, 0, 0, 0.48),
-    0 0 0 0.5px rgba(0, 0, 0, 0.9);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 18px 46px rgba(0, 0, 0, 0.66),
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 0 0 0.5px rgba(0, 0, 0, 0.92),
+    0 0 34px rgba(0, 0, 0, 0.38);
   z-index: -1;
   pointer-events: none;
   transition: box-shadow 0.42s ease;
@@ -132,10 +144,10 @@ button:active {
 /* Hover lifts it very slightly off the desktop rather than lightening it. */
 .island-capsule:hover::before {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.075),
-    0 18px 40px rgba(0, 0, 0, 0.7),
-    0 4px 14px rgba(0, 0, 0, 0.55),
-    0 0 0 0.5px rgba(0, 0, 0, 0.9);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 24px 56px rgba(0, 0, 0, 0.74),
+    0 6px 16px rgba(0, 0, 0, 0.55),
+    0 0 0 0.5px rgba(0, 0, 0, 0.92);
 }
 
 /* A whisper of specular along the very top edge — the only surface treatment. */
@@ -153,7 +165,7 @@ button:active {
    Dark is the default theme, so this is the base rule; the light-theme
    override below already assumes this class dims text on its own. */
 .widget-subtitle {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-2);
 }
 
 /* Light Theme Mode Reactivity */
@@ -255,7 +267,8 @@ button:active {
 }
 
 .island-capsule:hover {
-  transform: scale(1.02);
+  /* Apple's island stays put on hover — only its shadow breathes. */
+  transform: translateY(-1px);
 }
 
 /* macOS Tahoe Auto-Hide Spring Animation (Fullscreen Apps) */
@@ -304,21 +317,6 @@ button:active {
     opacity: 1;
     transform: scale(1);
   }
-}
-
-/* Active Mic/Camera Hardware Indicator Dot */
-.mic-hardware-dot {
-  position: absolute;
-  top: 13px;
-  left: 38px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #ff9500;
-  z-index: 50;
-  pointer-events: none;
-  box-shadow: 0 0 8px rgba(255, 149, 0, 0.8);
-  transition: opacity 0.3s ease;
 }
 
 /* Active State Dimensions */
@@ -386,12 +384,6 @@ button:active {
   width: 360px;
   height: 180px;
   border-radius: 32px;
-}
-
-.state-expanded-settings {
-  width: 440px;
-  height: 310px;
-  border-radius: 36px;
 }
 
 .state-expanded-screenshot {
@@ -521,6 +513,7 @@ button:active {
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .glass-pill {
@@ -528,6 +521,70 @@ button:active {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Circular action button used by the activity widgets (call, timer, recorder).
+   Neutral graphite by default; .btn-danger / .btn-accent are the two solid
+   variants (end-call red, selection-as-light white). */
+.glass-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-font-smoothing: antialiased;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s var(--apple-spring-bouncy);
+}
+.glass-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--glass-border-hover);
+}
+.glass-btn:active { transform: scale(0.92); }
+
+.btn-danger {
+  background: var(--danger);
+  border-color: transparent;
+  color: #fff;
+}
+.btn-danger:hover { background: #ff6157; }
+
+.btn-accent {
+  background: #f2f2f4;
+  border-color: transparent;
+  color: #121215;
+}
+.btn-accent:hover { background: #ffffff; }
+
+/* Shared progress meter (timer, airdrop, voice memo) */
+.progress-track {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* Live recording / activity indicator dot */
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(255, 69, 58, 0.8);
+  animation: applePulse 1.6s ease-in-out infinite;
 }
 
 /* Apple Pulse Glow effect */
