@@ -475,18 +475,17 @@ export default function DynamicIsland({
 
     const cleanBT = window.electronAPI.onBluetoothUpdate
       ? window.electronAPI.onBluetoothUpdate((data) => {
+          if (!data || !data.deviceName) return;
           setBluetoothData(data);
-          if (data && data.deviceName && !data.isInitial) {
-            soundEngine.playChime();
-            setActiveState((prev) => {
-              if (!isOverlayState(prev)) preOverlayStateRef.current = prev;
-              return 'expanded-bluetooth';
-            });
-            clearTimeout(bluetoothDismiss.current);
-            bluetoothDismiss.current = setTimeout(() => {
-              setActiveState((prev) => prev === 'expanded-bluetooth' ? resumeFromOverlay() : prev);
-            }, 6200);
-          }
+          soundEngine.playChime();
+          setActiveState((prev) => {
+            if (!isOverlayState(prev)) preOverlayStateRef.current = prev;
+            return 'expanded-bluetooth';
+          });
+          clearTimeout(bluetoothDismiss.current);
+          bluetoothDismiss.current = setTimeout(() => {
+            setActiveState((prev) => prev === 'expanded-bluetooth' ? resumeFromOverlay() : prev);
+          }, 6200);
         })
       : () => {};
 

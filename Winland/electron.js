@@ -616,8 +616,21 @@ function pollBluetooth() {
     const raw = parseBluetoothOutput(stdout);
 
     if (lastBluetoothDevices === null) {
-      // Startup initial scan: populate confirmed devices silently without firing popup notifications
+      // Initial scan: populate confirmed devices and notify renderer of primary connected device
       lastBluetoothDevices = new Map(raw);
+      if (raw.size > 0) {
+        const [, firstDev] = Array.from(raw.entries())[0];
+        mainWindow.webContents.send('bluetooth-update', {
+          deviceName: firstDev.name,
+          batteryPct: firstDev.battery,
+          isCharging: false,
+          leftPct: null,
+          rightPct: null,
+          typeStr: firstDev.typeStr || 'phone',
+          connectionState: 'connected',
+          isInitial: false,
+        });
+      }
       return;
     }
 
