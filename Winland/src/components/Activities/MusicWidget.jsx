@@ -111,19 +111,19 @@ const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, durationMs, isP
     setLyrics([]);
     setPlainLyrics('');
 
-    const cleanTitle = title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').split('-')[0].trim();
+    const cleanTitle = (title || '').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').split('-')[0].trim();
     const cleanArtist = artist ? artist.split(',')[0].trim() : '';
 
-    const fetchDirect = async () => {
+    const fetchDirect = async (tStr, aStr) => {
       try {
-        const query = cleanArtist
-          ? `track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`
-          : `track_name=${encodeURIComponent(cleanTitle)}`;
+        const query = aStr
+          ? `track_name=${encodeURIComponent(tStr)}&artist_name=${encodeURIComponent(aStr)}`
+          : `track_name=${encodeURIComponent(tStr)}`;
         const res = await fetch(`https://lrclib.net/api/get?${query}`);
         if (res.ok) {
           const data = await res.json();
           if (cancelled) return true;
-          if (data.syncedLyrics && (data.duration > 20 || !data.duration)) {
+          if (data.syncedLyrics) {
             setLyrics(parseLrc(data.syncedLyrics));
             setLoading(false);
             return true;
@@ -134,38 +134,57 @@ const SyncedLyricsView = ({ title, artist, coverUrl, progressMs, durationMs, isP
             return true;
           }
         }
-      } catch {}
+      } catch (e) {}
       return false;
     };
 
-    const fetchSearch = async () => {
+    const fetchSearch = async (tStr, aStr) => {
       try {
-        const q = `${cleanTitle} ${cleanArtist}`.trim();
+        const q = `${tStr} ${aStr}`.trim();
         const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(q)}`);
         if (res.ok) {
           const results = await res.json();
-          if (cancelled) return;
+          if (cancelled) return true;
           if (Array.isArray(results) && results.length > 0) {
-            const valid = results.filter((r) => r.syncedLyrics && (r.duration > 20 || !r.duration));
+            const syncedHits = results.filter((r) => r.syncedLyrics);
             const targetDurSec = (durationMs && durationMs > 0) ? durationMs / 1000 : 0;
 
             let best = null;
-            if (targetDurSec > 0 && valid.length > 0) {
-              best = valid.find((r) => Math.abs(r.duration - targetDurSec) <= 6);
+            if (syncedHits.length > 0) {
+              if (targetDurSec > 0) {
+                best = syncedHits.find((r) => Math.abs((r.duration || 0) - targetDurSec) <= 12);
+              }
+              if (!best) {
+                best = syncedHits.find((r) => aStr && r.artistName && r.artistName.toLowerCase().includes(aStr.toLowerCase())) || syncedHits[0];
+              }
             }
             if (!best) {
-              best = valid.find((r) => r.artistName && r.artistName.toLowerCase().includes(cleanArtist.toLowerCase())) || valid[0] || results[0];
+              best = results.find((r) => r.plainLyrics) || results[0];
             }
 
-            if (best && best.syncedLyrics) setLyrics(parseLrc(best.syncedLyrics));
-            else if (best && best.plainLyrics) setPlainLyrics(best.plainLyrics);
+            if (best && best.syncedLyrics) {
+              setLyrics(parseLrc(best.syncedLyrics));
+              setLoading(false);
+              return true;
+            } else if (best && best.plainLyrics) {
+              setPlainLyrics(best.plainLyrics);
+              setLoading(false);
+              return true;
+            }
           }
         }
-      } catch {}
-      if (!cancelled) setLoading(false);
+      } catch (e) {}
+      return false;
     };
 
-    fetchDirect().then((ok) => { if (!ok && !cancelled) fetchSearch(); });
+    (async () => {
+      let ok = await fetchDirect(cleanTitle, cleanArtist);
+      if (!ok && !cancelled) ok = await fetchSearch(cleanTitle, cleanArtist);
+      if (!ok && !cancelled && cleanTitle !== title) ok = await fetchDirect(title, artist);
+      if (!ok && !cancelled && cleanTitle !== title) ok = await fetchSearch(title, artist);
+      if (!cancelled) setLoading(false);
+    })();
+
     return () => { cancelled = true; };
   }, [title, artist, durationMs]);
 

@@ -232,9 +232,9 @@ export default function DynamicIsland({
     return () => clearTimeout(ghostTimerRef.current);
   }, [activeState]);
 
-  // ── Auto-collapse expanded-music / expanded-lyrics after 8s idle ──────────
+  // ── Auto-collapse expanded-music after 8s idle (expanded-lyrics stays open) ──
   useEffect(() => {
-    if (activeState === 'expanded-music' || activeState === 'expanded-lyrics') {
+    if (activeState === 'expanded-music') {
       const collapseTimer = setTimeout(() => {
         setActiveState(trackInfoRef.current.title ? 'compact-music' : 'idle');
       }, 8000);
@@ -665,7 +665,7 @@ export default function DynamicIsland({
     e.stopPropagation();
     if (activeState.startsWith('expanded-') || activeState === 'volume-osd') {
       setActiveState(trackInfo.title ? 'compact-music' : 'idle');
-    } else if (trackInfo.title) {
+    } else {
       setActiveState('expanded-music');
     }
   };
