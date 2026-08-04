@@ -42,7 +42,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('volume-update', handler);
   },
 
-  // Bluetooth connect/disconnect updates
+  // Bluetooth connect/disconnect updates & test triggers
+  getBluetoothState: () => ipcRenderer.invoke('get-bluetooth-state'),
+  requestBluetoothStatus: () => ipcRenderer.send('request-bluetooth-status'),
+  triggerPhoneNotification: () => ipcRenderer.send('trigger-phone-notification'),
   onBluetoothUpdate: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('bluetooth-update', handler);
@@ -52,6 +55,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Settings persistence
   readSettings: () => ipcRenderer.invoke('read-settings'),
   writeSettings: (data) => ipcRenderer.send('write-settings', data),
+
+  // Chosen devices / animation styles, relayed from Settings to the island
+  sendDevicePrefs: (prefs) => ipcRenderer.send('device-prefs-changed', prefs),
+  onDevicePrefsUpdate: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('device-prefs-update', handler);
+    return () => ipcRenderer.removeListener('device-prefs-update', handler);
+  },
 
   // WinDock config sync (theme, weather, island preferences)
   getInitialConfig: () => ipcRenderer.invoke('get-initial-config'),
@@ -69,4 +80,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App launching & file opening
   launchApp: (cmd) => ipcRenderer.send('launch-app', cmd),
   openPath: (filePath) => ipcRenderer.send('open-path', filePath),
+  openSettingsWindow: () => ipcRenderer.send('open-settings-window'),
+  closeSettingsWindow: () => ipcRenderer.send('close-settings-window'),
 });

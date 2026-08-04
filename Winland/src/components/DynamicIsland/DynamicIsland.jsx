@@ -489,6 +489,10 @@ export default function DynamicIsland({
         })
       : () => {};
 
+    if (window.electronAPI.requestBluetoothStatus) {
+      window.electronAPI.requestBluetoothStatus();
+    }
+
     return () => { cleanSpotify(); cleanBattery(); cleanVolume(); cleanBT(); clearTimeout(bluetoothDismiss.current); };
   }, []);
 

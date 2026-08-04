@@ -650,6 +650,25 @@ function pollBluetooth() {
   });
 }
 
+ipcMain.on('request-bluetooth-status', () => {
+  if (!mainWindow || !mainWindow.webContents) return;
+  if (lastBluetoothDevices && lastBluetoothDevices.size > 0) {
+    const [, firstDev] = Array.from(lastBluetoothDevices.entries())[0];
+    mainWindow.webContents.send('bluetooth-update', {
+      deviceName: firstDev.name,
+      batteryPct: firstDev.battery,
+      isCharging: false,
+      leftPct: null,
+      rightPct: null,
+      typeStr: firstDev.typeStr || 'phone',
+      connectionState: 'connected',
+      isInitial: false,
+    });
+  } else {
+    pollBluetooth();
+  }
+});
+
 ipcMain.on('trigger-phone-notification', () => {
   if (!mainWindow || !mainWindow.webContents) return;
   mainWindow.webContents.send('bluetooth-update', {
