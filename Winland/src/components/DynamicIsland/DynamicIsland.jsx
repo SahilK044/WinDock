@@ -327,18 +327,18 @@ export default function DynamicIsland({
     return () => cancelAnimationFrame(rafId);
   }, [accentColor]);
 
-  // ── Automatic smooth state morphing when Spotify starts/stops ─────────────
+  // ── Automatic smooth state morphing when Spotify / media starts/stops ─────
   useEffect(() => {
-    if (trackInfo.title) {
+    if (trackInfo.title && trackInfo.isPlaying) {
       if (activeState === 'idle') {
         setActiveState('compact-music');
       }
     } else if (!trackInfo.title) {
-      if (activeState === 'compact-music' || activeState === 'expanded-music') {
+      if (activeState === 'compact-music' || activeState === 'expanded-music' || activeState === 'expanded-lyrics') {
         setActiveState('idle');
       }
     }
-  }, [trackInfo.title]);
+  }, [trackInfo.title, trackInfo.isPlaying, activeState]);
 
   // ── Monotonic Media Progress Tracker ─────────────────────────────────────
 

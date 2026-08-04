@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, ipcMain, globalShortcut, nativeTheme, shell } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, globalShortcut, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec, execFile } from 'child_process';
@@ -8,9 +8,8 @@ import os from 'os';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
-app.commandLine.appendSwitch('disable-http-cache');
-app.commandLine.appendSwitch('no-sandbox');
+// NOTE: no-sandbox / disable-http-cache were removed — the sandbox stays on and
+// Chromium's HTTP cache makes album-art fetches cheap.
 
 let mainWindow;
 let isQuitting = false; // set when the user chooses Exit, so window-all-closed lets us go
@@ -68,12 +67,24 @@ function readSettings() {
 
 function writeSettings(data) {
   try {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return;
     fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(data, null, 2), 'utf8');
+    // Merge over defaults so the renderer can only ever persist known keys.
+    const clean = {};
+    for (const key of Object.keys(DEFAULT_SETTINGS)) {
+      if (key in data) clean[key] = data[key];
+    }
+    fs.writeFileSync(SETTINGS_PATH, JSON.stringify({ ...DEFAULT_SETTINGS, ...clean }, null, 2), 'utf8');
   } catch (e) {
     console.error('Failed to write settings:', e);
   }
 }
+
+// Helper scripts are written under userData (ACL'd to this user) instead of the
+// world-writable shared temp dir, so another process can't swap them out from
+// under us between launches.
+const SCRIPT_DIR = path.join(app.getPath('userData'), 'scripts');
+fs.mkdirSync(SCRIPT_DIR, { recursive: true });
 
 // ── WinDock config bridge (theme / weather / island prefs) ─────────────────
 // WinDock (the .NET host) writes this file every time it refreshes the
@@ -85,7 +96,7 @@ function readWinlandConfig() {
   try {
     if (!fs.existsSync(WINLAND_THEME_PATH)) return null;
     return JSON.parse(fs.readFileSync(WINLAND_THEME_PATH, 'utf8'));
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -117,15 +128,14 @@ function getSpotifyExePath() {
   return path.join(__dirname, 'scripts', 'spotify_info.exe');
 }
 
-const PS1_SPOTIFY = path.join(os.tmpdir(), 'winland_spotify_poll.ps1');
+const PS1_SPOTIFY = path.join(SCRIPT_DIR, 'winland_spotify_poll.ps1');
 fs.writeFileSync(PS1_SPOTIFY, [
   '$procs = Get-Process -Name Spotify -ErrorAction SilentlyContinue',
   '$main = $procs | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object -First 1',
   'if ($main) { Write-Output $main.MainWindowTitle }',
 ].join('\n'), 'utf8');
 
-const PS_SPOTIFY_CMD = `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${PS1_SPOTIFY}"`;
-const PS1_BATTERY = path.join(os.tmpdir(), 'winland_battery_poll.ps1');
+const PS1_BATTERY = path.join(SCRIPT_DIR, 'winland_battery_poll.ps1');
 fs.writeFileSync(PS1_BATTERY, [
   '$b = Get-WmiObject Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1',
   'if ($b) {',
@@ -143,8 +153,6 @@ fs.writeFileSync(PS1_BATTERY, [
   '  Write-Output "$pct|$charging|$mins"',
   '}',
 ].join('\n'), 'utf8');
-
-const PS_BATTERY_CMD = `powershell.exe -WindowStyle Hidden -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${PS1_BATTERY}"`;
 
 // ── Window ─────────────────────────────────────────────────────────────────
 function createWindow() {
@@ -175,6 +183,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Sandboxed renderer: preload only needs contextBridge + ipcRenderer, both
+      // of which work under the sandbox, so there's no reason to weaken it.
+      sandbox: true,
       // This overlay is always-on-top and never focused, so Chromium's default
       // background throttling can cap its animation loops well below the
       // display's refresh rate. Disabling it lets the island, visualizer and
@@ -184,6 +195,11 @@ function createWindow() {
       backgroundThrottling: false,
     },
   });
+
+  // The island only ever displays its own local bundle — block any attempt to
+  // navigate away or pop a new window (defense-in-depth behind the CSP).
+  mainWindow.webContents.on('will-navigate', (e) => e.preventDefault());
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   mainWindow.setAlwaysOnTop(true, 'screen-saver');
 
@@ -198,12 +214,23 @@ function createWindow() {
 
   mainWindow.on('closed', () => { mainWindow = null; });
 
-  // Log ALL renderer console messages to file for crash debugging
+  // Log renderer console messages to file for crash debugging. Batched + async:
+  // appendFileSync per message blocked the main process on every renderer log.
   const logPath = path.join(os.tmpdir(), 'winland_renderer.log');
   fs.writeFileSync(logPath, `=== WinLand Renderer Log ${new Date().toISOString()} ===\n`);
+  let logBuffer = [];
+  let logFlushTimer = null;
+  const flushLog = () => {
+    logFlushTimer = null;
+    if (logBuffer.length === 0) return;
+    const chunk = logBuffer.join('');
+    logBuffer = [];
+    fs.appendFile(logPath, chunk, () => {});
+  };
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     const prefix = ['LOG', 'WARN', 'ERROR'][level] || 'LOG';
-    fs.appendFileSync(logPath, `[${prefix}] ${message} (${sourceId}:${line})\n`);
+    logBuffer.push(`[${prefix}] ${message} (${sourceId}:${line})\n`);
+    if (!logFlushTimer) logFlushTimer = setTimeout(flushLog, 1000);
   });
 
   mainWindow.webContents.on('render-process-gone', (event, details) => {
@@ -275,8 +302,12 @@ function createSettingsWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
+
+  settingsWindow.webContents.on('will-navigate', (e) => e.preventDefault());
+  settingsWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   settingsWindow.setAlwaysOnTop(true, 'screen-saver');
 
@@ -300,23 +331,23 @@ function createSettingsWindow() {
 function pollSpotifyTitle() {
   if (!mainWindow || !mainWindow.webContents || isPollingSpotify) return;
   isPollingSpotify = true;
-  const done = () => { isPollingSpotify = false; };
+  let doneCalled = false;
+  const done = () => {
+    if (!doneCalled) {
+      doneCalled = true;
+      isPollingSpotify = false;
+    }
+  };
+  const safetyTimer = setTimeout(done, 8500);
 
   const exePath = getSpotifyExePath();
 
   if (fs.existsSync(exePath)) {
-    // The GSMTC helper reliably takes ~3.3s to return (measured), so a 3000ms
-    // timeout killed EVERY poll before it produced output — the position path
-    // never ran and playback fell back to title-only, freezing progress at
-    // whatever the last lucky poll caught. Give it comfortable margin. The
-    // in-flight guard (isPollingSpotify) already prevents these from stacking,
-    // so a slow exe just means the effective poll cadence is the exe's own
     // runtime; client-side extrapolation smooths the bar between snapshots.
     exec(`"${exePath}"`, { timeout: 8000 }, (err, stdout) => {
       if (!mainWindow || !mainWindow.webContents) { done(); return; }
       const raw = (stdout || '').trim();
       if (raw) {
-        let title = raw;
         let posMs = 0;
         let endMs = 0;
         let isPlaying = true;
@@ -339,7 +370,7 @@ function pollSpotifyTitle() {
                 const mime = isPng ? 'image/png' : (isWebp ? 'image/webp' : 'image/jpeg');
                 coverUrl = `data:${mime};base64,${buf.toString('base64')}`;
               }
-            } catch (e) {}
+            } catch {}
           }
 
           const hasTrack = gTitle.length > 0 && gTitle !== 'Spotify' && gTitle !== 'Spotify Free' && gTitle !== 'Spotify Premium';
@@ -494,7 +525,7 @@ function startBatteryPoller() {
 // and check DEVPKEY_Device_IsConnected ({83DA63EC-97A6-4640-9453-A630571B6028} 15)
 // to accurately detect real-time connect/disconnect states.
 // Real-time AudioEndpoint Bluetooth Device & Battery Level Detector.
-const PS1_BLUETOOTH = path.join(os.tmpdir(), 'winland_bluetooth_poll.ps1');
+const PS1_BLUETOOTH = path.join(SCRIPT_DIR, 'winland_bluetooth_poll.ps1');
 fs.writeFileSync(PS1_BLUETOOTH, [
   '$connected = @{}',
   '# 1. USB Connected Phones (Class WPD)',
@@ -549,8 +580,6 @@ fs.writeFileSync(PS1_BLUETOOTH, [
   '  Write-Output "$($item.id)|$($item.name)|$($item.bat)|$($item.type)"',
   '}',
 ].join('\n'), 'utf8');
-
-const PS_BLUETOOTH_CMD = `powershell.exe -WindowStyle Hidden -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${PS1_BLUETOOTH}"`;
 
 function parseBluetoothOutput(stdout) {
   const devices = new Map();
