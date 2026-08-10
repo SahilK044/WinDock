@@ -58,6 +58,7 @@ namespace WinDockSetup.Steps
             bool isUninstall = mainWindow.IsUninstallMode;
             
             TitleText.Text = isUninstall ? "Removing WinDock" : "Installing WinDock";
+            RetryBtn.Content = isUninstall ? "Retry Uninstall" : "Retry Installation";
             
             try
             {
@@ -152,34 +153,15 @@ namespace WinDockSetup.Steps
                 {
                     if (key != null)
                     {
-                        key.SetValue("WinDock", $"\"{Path.Combine(installPath, "WinDock.exe")}\"");
+                        key.SetValue("WinDock", Path.Combine(installPath, "WinDock.exe"));
                     }
                 }
                 await Task.Delay(400);
             }
 
-            // Step 6: Writing default configuration
-            UpdateStatus("Writing default configuration...", "CONFIG", "90% · Settings", 90, mainWindow);
-            string configExample = Path.Combine(installPath, "config.example.json");
-            string configTarget = Path.Combine(installPath, "config.json");
-            if (File.Exists(configExample) && !File.Exists(configTarget))
-            {
-                File.Copy(configExample, configTarget);
-            }
-            await Task.Delay(400);
-
-            // Step 7: Copying uninstaller
-            UpdateStatus("Copying uninstaller...", "UNINSTALLER", "95% · Finalizing", 95, mainWindow);
-            string currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
-            string uninstallExe = Path.Combine(installPath, "Uninstall.exe");
-            if (File.Exists(currentExe) && !string.Equals(currentExe, uninstallExe, StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    File.Copy(currentExe, uninstallExe, true);
-                }
-                catch { }
-            }
+            // Step 6: Writing uninstaller entry to Windows Add/Remove Programs
+            UpdateStatus("Registering uninstaller...", "UNINSTALLER", "95% · Registry", 95, mainWindow);
+            RegisterUninstaller(installPath);
             await Task.Delay(400);
 
             UpdateStatus("Installation complete.", "COMPLETE", "100% · Done", 100, mainWindow);
@@ -244,7 +226,7 @@ namespace WinDockSetup.Steps
                 bool keepConfig = mainWindow.KeepConfig;
                 string currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
 
-                // Force clear attributes & delete all files including inside subdirectories (Winland, Weather, etc.)
+                // Force clear attributes & delete all files safely
                 ForceDeleteDirectoryTree(installPath, keepConfig, currentExe);
             }
             await Task.Delay(400);
@@ -254,74 +236,83 @@ namespace WinDockSetup.Steps
 
         private void ForceDeleteDirectoryTree(string rootPath, bool keepConfig, string currentExe)
         {
-            if (!Directory.Exists(rootPath)) return;
+            if (string.IsNullOrEmpty(rootPath) || !Directory.Exists(rootPath)) return;
 
-            // Delete all files in root and subdirectories
-            foreach (string file in Directory.GetFiles(rootPath, "*", SearchOption.AllDirectories))
+            string pathRoot = Path.GetPathRoot(rootPath);
+            bool isDriveRoot = !string.IsNullOrEmpty(pathRoot) && string.Equals(Path.GetFullPath(rootPath).TrimEnd('\\'), pathRoot.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+
+            SafeDeleteRecursive(rootPath, keepConfig, currentExe, isDriveRoot);
+        }
+
+        private void SafeDeleteRecursive(string currentDir, bool keepConfig, string currentExe, bool isDriveRoot)
+        {
+            if (string.IsNullOrEmpty(currentDir) || !Directory.Exists(currentDir)) return;
+
+            string dirName = Path.GetFileName(currentDir);
+            if (dirName.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase) ||
+                dirName.Equals("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase) ||
+                dirName.Equals("Recovery", StringComparison.OrdinalIgnoreCase) ||
+                dirName.Equals("Config.Msi", StringComparison.OrdinalIgnoreCase))
             {
-                string name = Path.GetFileName(file);
-                if (keepConfig && name.Equals("config.json", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue; // Preserve config.json
-                }
-                if (!string.IsNullOrEmpty(currentExe) && string.Equals(file, currentExe, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue; // Skip running uninstaller executable
-                }
-
-                try
-                {
-                    File.SetAttributes(file, FileAttributes.Normal);
-                    File.Delete(file);
-                }
-                catch
-                {
-                    try
-                    {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = "cmd.exe",
-                            Arguments = $"/c del /f /q /a \"{file}\"",
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        })?.WaitForExit(500);
-                    }
-                    catch { }
-                }
+                return;
             }
 
-            // Delete all empty subdirectories (Winland, Weather, Track, etc.)
-            foreach (string dir in Directory.GetDirectories(rootPath, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
+            try
             {
-                try
+                string[] files = Directory.GetFiles(currentDir);
+                foreach (string file in files)
                 {
-                    File.SetAttributes(dir, FileAttributes.Normal);
-                    Directory.Delete(dir, true);
-                }
-                catch
-                {
+                    string name = Path.GetFileName(file);
+                    if (keepConfig && name.Equals("config.json", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    if (!string.IsNullOrEmpty(currentExe) && string.Equals(file, currentExe, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     try
                     {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = "cmd.exe",
-                            Arguments = $"/c rmdir /s /q \"{dir}\"",
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        })?.WaitForExit(500);
+                        File.SetAttributes(file, FileAttributes.Normal);
+                        File.Delete(file);
                     }
-                    catch { }
+                    catch
+                    {
+                        try
+                        {
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "cmd.exe",
+                                Arguments = $"/c del /f /q /a \"{file}\"",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            })?.WaitForExit(500);
+                        }
+                        catch { }
+                    }
                 }
             }
+            catch { }
 
-            // Delete root directory if config is not preserved and uninstaller isn't running inside it
-            if (!keepConfig || !File.Exists(Path.Combine(rootPath, "config.json")))
+            try
+            {
+                string[] subDirs = Directory.GetDirectories(currentDir);
+                foreach (string subDir in subDirs)
+                {
+                    SafeDeleteRecursive(subDir, keepConfig, currentExe, false);
+                }
+            }
+            catch { }
+
+            if (!isDriveRoot)
             {
                 try
                 {
-                    if (string.IsNullOrEmpty(currentExe) || !currentExe.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+                    if (Directory.GetFileSystemEntries(currentDir).Length == 0)
                     {
-                        Directory.Delete(rootPath, true);
+                        File.SetAttributes(currentDir, FileAttributes.Normal);
+                        Directory.Delete(currentDir, false);
                     }
                 }
                 catch { }
@@ -457,6 +448,37 @@ namespace WinDockSetup.Steps
                 StatusText.Text = "Cancelling...";
                 Log("Operation cancelled by user.");
             }
+        }
+
+        private void RegisterUninstaller(string installPath)
+        {
+            try
+            {
+                string currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+                string uninstallExe = Path.Combine(installPath, "Uninstall.exe");
+                if (File.Exists(currentExe) && !string.Equals(currentExe, uninstallExe, StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        File.Copy(currentExe, uninstallExe, true);
+                    }
+                    catch { }
+                }
+
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\WinDock"))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue("DisplayName", "WinDock");
+                        key.SetValue("UninstallString", $"\"{uninstallExe}\" /uninstall");
+                        key.SetValue("DisplayIcon", Path.Combine(installPath, "WinDock.exe"));
+                        key.SetValue("Publisher", "SahilK044");
+                        key.SetValue("DisplayVersion", "2.0.0");
+                        key.SetValue("InstallLocation", installPath);
+                    }
+                }
+            }
+            catch { }
         }
 
         private async void RetryBtn_Click(object sender, RoutedEventArgs e)
