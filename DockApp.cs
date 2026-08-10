@@ -3617,6 +3617,9 @@ namespace MacStyleDock
 			try {
 				if (targetItem == null || PresentationSource.FromVisual (targetItem) == null) return;
 				lastMediaOverlayTarget = targetItem;
+				if (mediaOverlay != null) {
+					mediaOverlay.ResetToCompactMode ();
+				}
 				System.Windows.Point point = GetLogicalScreenPoint (targetItem);
 
 				if (settings.Position == "Left") {
@@ -3989,22 +3992,11 @@ namespace MacStyleDock
 				// synchronously here blocked the UI thread right as the window was created,
 				// which is what caused the brutal multi-second system-wide stutter on launch.
 				// Now it runs entirely on a background thread pool thread instead.
-				ThreadPool.QueueUserWorkItem (delegate {
-					try {
-						ManageWinlandState ();
-					} catch { }
-				});
+
 			};
 
 			base.Closed += delegate {
 				_isPresentationSourceValid = false;
-				try {
-					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("winland").Concat(System.Diagnostics.Process.GetProcessesByName ("WinLand"))) {
-						using (proc) {
-							try { KillProcessAndChildren (proc.Id); } catch { }
-						}
-					}
-				} catch { }
 			};
 
 			base.AllowsTransparency = true;
@@ -12440,48 +12432,6 @@ namespace MacStyleDock
 
 		public void ManageWinlandState ()
 		{
-			try {
-				CleanOrphanedMediaProcesses ();
-				if (settings.EnableDynamicIsland) {
-					string winlandDir = System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Winland");
-					string winlandExe = System.IO.Path.Combine (winlandDir, "WinLand.exe");
-					if (!System.IO.File.Exists (winlandExe)) {
-						winlandExe = System.IO.Path.Combine (winlandDir, "winland.exe");
-					}
-					if (System.IO.File.Exists (winlandExe)) {
-						bool isRunning = false;
-						foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("winland").Concat(System.Diagnostics.Process.GetProcessesByName ("WinLand"))) {
-							isRunning = true;
-							break;
-						}
-						if (!isRunning) {
-							// Perf fix: give the dock's own startup a moment to finish laying out
-							// and rendering before we cold-start the ~200MB Chromium-based Winland
-							// helper. Launching both heavy processes at the exact same instant was
-							// the main cause of the multi-second system-wide stutter on startup.
-							// We're already on a background thread here, so sleeping is safe.
-							Thread.Sleep (2500);
-							try {
-								var winlandProcess = System.Diagnostics.Process.Start (new System.Diagnostics.ProcessStartInfo (winlandExe) {
-									WorkingDirectory = winlandDir,
-									UseShellExecute = true
-								});
-								// Keep Winland's own cold-start (Chromium/GPU init) from competing
-								// for CPU with the desktop compositor and other apps.
-								if (winlandProcess != null) {
-									winlandProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
-									ChildProcessTracker.Track (winlandProcess);
-								}
-							} catch { }
-						}
-						SetWinlandVisibility (true);
-					}
-				} else {
-					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("winland").Concat(System.Diagnostics.Process.GetProcessesByName ("WinLand"))) {
-						try { KillProcessAndChildren (proc.Id); } catch { }
-					}
-				}
-			} catch { }
 		}
 
 		[DllImport ("user32.dll", EntryPoint = "GetWindowLong")]
@@ -12502,30 +12452,6 @@ namespace MacStyleDock
 
 		private void SetWinlandVisibility (bool visible)
 		{
-			// Winland runs as a separate process/window (frameless, skipTaskbar), so it can't
-			// be shown/hidden the way the dock's own WPF window is - it needs a real Win32
-			// ShowWindow call against its hwnd. This was previously a no-op, so HideOnFullscreen
-			// never actually hid/restored the Winland window at the OS level (Winland's own
-			// fullscreen poller fades it out via CSS independently, which is why the symptom
-			// was easy to miss, but the window itself - and its compositor/GPU cost - stayed alive).
-			try {
-				IntPtr winlandHwnd = FindWindow (null, "WinLand");
-				if (winlandHwnd == IntPtr.Zero) {
-					foreach (var proc in System.Diagnostics.Process.GetProcessesByName ("winland").Concat (System.Diagnostics.Process.GetProcessesByName ("WinLand"))) {
-						using (proc) {
-							if (proc.MainWindowHandle != IntPtr.Zero) {
-								winlandHwnd = proc.MainWindowHandle;
-								break;
-							}
-						}
-					}
-				}
-				if (winlandHwnd != IntPtr.Zero) {
-					// SW_HIDE = 0, SW_SHOWNOACTIVATE = 4 (restores visibility without stealing
-					// focus from whatever the user is currently working in).
-					ShowWindow (winlandHwnd, visible ? 4 : 0);
-				}
-			} catch { }
 		}
 	}
 
@@ -19503,42 +19429,23 @@ namespace MacStyleDock
 
 
 
-		public void SyncSizeAndVisibilityFromSettings ()
-
+		public void ResetToCompactMode ()
 		{
-
-			if (base.Owner is DockWindow dockWindow) {
-
-				bool flag = (isEnlarged = dockWindow.settings.ShowLyricsOnFullscreen);
-
-				base.Width = (flag ? 380 : 300);
-
-				base.Height = (flag ? 350 : 145);
-
-				if (flag) {
-
-					lyricsScroll.Visibility = Visibility.Visible;
-
-					lyricsRowDef.Height = new GridLength (1.0, GridUnitType.Star);
-
-				} else {
-
-					lyricsScroll.Visibility = Visibility.Collapsed;
-
-					lyricsRowDef.Height = new GridLength (0.0, GridUnitType.Pixel);
-
-				}
-
-				if (lyricsBtn != null) {
-
-					System.Windows.Media.Color color = ((dockWindow.GetEffectiveTheme () == "light") ? System.Windows.Media.Color.FromRgb (30, 30, 30) : Colors.White);
-
-					lyricsBtn.Foreground = new SolidColorBrush (flag ? System.Windows.Media.Color.FromRgb (30, 215, 96) : color);
-
-				}
-
+			isEnlarged = false;
+			base.Width = 300.0;
+			base.Height = 145.0;
+			if (lyricsScroll != null) lyricsScroll.Visibility = Visibility.Collapsed;
+			if (lyricsRowDef != null) lyricsRowDef.Height = new GridLength (0.0, GridUnitType.Pixel);
+			if (lyricsBtn != null && Owner is DockWindow dw) {
+				dw.settings.ShowLyricsOnFullscreen = false;
+				System.Windows.Media.Color color = ((dw.GetEffectiveTheme () == "light") ? System.Windows.Media.Color.FromRgb (30, 30, 30) : Colors.White);
+				lyricsBtn.Foreground = new SolidColorBrush (color);
 			}
+		}
 
+		public void SyncSizeAndVisibilityFromSettings ()
+		{
+			ResetToCompactMode ();
 		}
 
 
