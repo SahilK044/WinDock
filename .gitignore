@@ -25,6 +25,9 @@ ilspy/
 ilspy7/
 ilspy.zip
 ilspy7.zip
+Weather/
+Winland/
+
 
 # Installer packaging content
 PackageContent/
@@ -155,9 +158,9 @@ test.exe
 test_exec.exe
 test_intents.exe
 
-# Extracted third-party app bundles. Keep packaged runtime assets instead.
-Winland/resources/app_extracted/
-Weather/resources/app_extracted/
+# External app bundles (not part of WinDock)
+Weather/
+Winland/
 
 # Dev tools
 replace.ps1

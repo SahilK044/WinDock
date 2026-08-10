@@ -518,11 +518,7 @@
                                             <TextBlock Text="Enable Control Center" Style="{StaticResource CardText}"/>
                                             <CheckBox x:Name="ControlCenter" Template="{StaticResource MacToggle}"/>
                                         </Grid>
-                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
-                                        <Grid Margin="15,10">
-                                            <TextBlock Text="Enable Winland (Dynamic Island)" Style="{StaticResource CardText}"/>
-                                            <CheckBox x:Name="DynamicIsland" Template="{StaticResource MacToggle}"/>
-                                        </Grid>
+
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
                                             <TextBlock Text="Enable Dynamic Icon Download Progress Rings" Style="{StaticResource CardText}"/>
@@ -583,24 +579,7 @@
                                             <TextBlock Text="Performance Mode (Disable heavy graphics)" Style="{StaticResource CardText}"/>
                                             <CheckBox x:Name="PerformanceMode" Template="{StaticResource MacToggle}"/>
                                         </Grid>
-                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
-                                        <Grid Margin="15,10">
-                                            <TextBlock Text="Enable Voice Commands" Style="{StaticResource CardText}"/>
-                                            <CheckBox x:Name="EnableCommandCenter" Template="{StaticResource MacToggle}"/>
-                                        </Grid>
-                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
-                                        <Grid Margin="15,10">
-                                            <TextBlock Text="Local Voice Training Data" Style="{StaticResource CardText}"/>
-                                            <Button x:Name="BtnEditIntents" Content="Edit Training Data" Width="130" Height="24" HorizontalAlignment="Right" Foreground="White" BorderThickness="0">
-                                                <Button.Template>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border Background="#333333" CornerRadius="6">
-                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                        </Border>
-                                                    </ControlTemplate>
-                                                </Button.Template>
-                                            </Button>
-                                        </Grid>
+
                                         <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
                                         <Grid Margin="15,10">
                                             <TextBlock Text="Target FPS" Style="{StaticResource CardText}"/>
