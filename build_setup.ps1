@@ -36,6 +36,7 @@ Copy-Item -Path "WinDock.exe" -Destination $tempPayloadDir -Force
 Copy-Item -Path "WinDock.pdb" -Destination $tempPayloadDir -Force
 if (Test-Path "MacSettings.txt") { Copy-Item -Path "MacSettings.txt" -Destination $tempPayloadDir -Force }
 if (Test-Path "windock.ico") { Copy-Item -Path "windock.ico" -Destination $tempPayloadDir -Force }
+if (Test-Path "f1_logo.png") { Copy-Item -Path "f1_logo.png" -Destination $tempPayloadDir -Force; Copy-Item -Path "f1_logo.png" -Destination "bin\Release\net48\f1_logo.png" -Force }
 if (Test-Path "f1_logo_white.png") { Copy-Item -Path "f1_logo_white.png" -Destination $tempPayloadDir -Force }
 if (Test-Path "f1_logo_black.png") { Copy-Item -Path "f1_logo_black.png" -Destination $tempPayloadDir -Force }
 

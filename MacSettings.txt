@@ -588,25 +588,7 @@
                                     </StackPanel>
                                 </Border>
 
-                                <TextBlock Text="Audio" Foreground="#8E8E93" FontSize="12" Margin="15,15,0,5" FontFamily="{StaticResource MacFont}"/>
-                                <Border Style="{StaticResource MacCard}">
-                                    <StackPanel>
-                                        <Grid Margin="15,10">
-                                            <TextBlock Text="Enable Micro Sounds" Style="{StaticResource CardText}"/>
-                                            <CheckBox x:Name="MicroSounds" Template="{StaticResource MacToggle}"/>
-                                        </Grid>
-                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
-                                        <Grid Margin="15,10">
-                                            <TextBlock Text="Mute Sounds" Style="{StaticResource CardText}"/>
-                                            <CheckBox x:Name="MuteSounds" Template="{StaticResource MacToggle}"/>
-                                        </Grid>
-                                        <Rectangle Height="1" Fill="#2C2C2E" Margin="15,0"/>
-                                        <Grid Margin="15,10">
-                                            <TextBlock Text="Sound Volume" Style="{StaticResource CardText}"/>
-                                            <Slider x:Name="Volume" Minimum="0.0" Maximum="1.0" Width="150" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
+
                                 
                                 <Grid Margin="15,20">
                                     <Button x:Name="BtnClose" Content="Close Settings" Width="150" Height="30" HorizontalAlignment="Right" Foreground="White" BorderThickness="0">

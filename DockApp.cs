@@ -137,11 +137,11 @@ namespace MacStyleDock
 
 	{
 
-		private static bool _isEnabled = true;
+		private static bool _isEnabled = false;
 
 
 
-		private static bool _isMuted = false;
+		private static bool _isMuted = true;
 
 
 
@@ -283,20 +283,6 @@ namespace MacStyleDock
 
 		{
 
-			if (!_isEnabled || _isMuted || _hoverPlayer == null) {
-
-				return;
-
-			}
-
-			try {
-
-				_hoverPlayer.Play ();
-
-			} catch {
-
-			}
-
 		}
 
 
@@ -305,20 +291,6 @@ namespace MacStyleDock
 
 		{
 
-			if (!_isEnabled || _isMuted || _poofPlayer == null) {
-
-				return;
-
-			}
-
-			try {
-
-				_poofPlayer.Play ();
-
-			} catch {
-
-			}
-
 		}
 
 
@@ -326,20 +298,6 @@ namespace MacStyleDock
 		public static void PlaySwoosh ()
 
 		{
-
-			if (!_isEnabled || _isMuted || _swooshPlayer == null) {
-
-				return;
-
-			}
-
-			try {
-
-				_swooshPlayer.Play ();
-
-			} catch {
-
-			}
 
 		}
 
@@ -913,9 +871,9 @@ namespace MacStyleDock
 
 			EnableIconEffects = true;
 
-			EnableMicroSounds = true;
+			EnableMicroSounds = false;
 
-			SoundsMuted = false;
+			SoundsMuted = true;
 
 			SoundVolume = 1.0;
 
@@ -5008,7 +4966,7 @@ namespace MacStyleDock
 
 						if (!text.Contains ("EnableMicroSounds")) {
 
-							settings.EnableMicroSounds = true;
+							settings.EnableMicroSounds = false;
 
 							flag = true;
 
@@ -5033,7 +4991,7 @@ namespace MacStyleDock
 
 						if (!text.Contains ("SoundsMuted")) {
 
-							settings.SoundsMuted = false;
+							settings.SoundsMuted = true;
 
 							flag = true;
 
@@ -15947,6 +15905,10 @@ namespace MacStyleDock
 				drawingContext.DrawEllipse (System.Windows.Media.Brushes.White, null, new System.Windows.Point (48.0, 84.0), 6.5, 6.5);
 
 			}
+
+			renderTargetBitmap.Render (drawingVisual);
+
+			renderTargetBitmap.Freeze ();
 
 			return renderTargetBitmap;
 
