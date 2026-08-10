@@ -19155,39 +19155,49 @@ namespace MacStyleDock
 
 			expandBtn.PreviewMouseLeftButtonDown += delegate(object s, MouseButtonEventArgs ev) {
 
-				isEnlarged = !isEnlarged;
+				if (base.Owner is DockWindow dockWindow3) {
 
-				DockWindow dockWindow3 = base.Owner as DockWindow;
+					dockWindow3.settings.ShowLyricsOnFullscreen = !dockWindow3.settings.ShowLyricsOnFullscreen;
 
-				bool flag = dockWindow3?.settings.ShowLyricsOnFullscreen ?? false;
+					dockWindow3.SaveSettings ();
 
-				double num5 = (isEnlarged ? 380 : 300);
+					isEnlarged = dockWindow3.settings.ShowLyricsOnFullscreen;
 
-				double num6 = ((!isEnlarged) ? 145 : (flag ? 350 : 190));
+					if (isEnlarged) {
 
-				if (isEnlarged && flag) {
+						lastLyricsTrackKey = "";
 
-					lyricsScroll.Visibility = Visibility.Visible;
+						FetchAndDisplayLyrics (artistText.Text, titleText.Text);
 
-					lyricsRowDef.Height = new GridLength (1.0, GridUnitType.Star);
+						lyricsScroll.Visibility = Visibility.Visible;
 
-				} else {
+						lyricsRowDef.Height = new GridLength (1.0, GridUnitType.Star);
 
-					lyricsScroll.Visibility = Visibility.Collapsed;
+					} else {
 
-					lyricsRowDef.Height = new GridLength (0.0, GridUnitType.Pixel);
+						lyricsScroll.Visibility = Visibility.Collapsed;
 
-				}
+						lyricsRowDef.Height = new GridLength (0.0, GridUnitType.Pixel);
 
-				double num7 = num5 - base.Width;
+					}
 
-				double num8 = num6 - base.Height;
+					System.Windows.Media.Color color = ((dockWindow3.GetEffectiveTheme () == "light") ? System.Windows.Media.Color.FromRgb (30, 30, 30) : Colors.White);
 
-				double num9 = base.Left;
+					if (lyricsBtn != null) lyricsBtn.Foreground = new SolidColorBrush (isEnlarged ? System.Windows.Media.Color.FromRgb (30, 215, 96) : color);
 
-				double num10 = base.Top;
+					if (expandBtn != null) expandBtn.Foreground = new SolidColorBrush (isEnlarged ? System.Windows.Media.Color.FromRgb (30, 215, 96) : color);
 
-				if (dockWindow3 != null) {
+					double num5 = (isEnlarged ? 380 : 300);
+
+					double num6 = (isEnlarged ? 350 : 145);
+
+					double num7 = num5 - base.Width;
+
+					double num8 = num6 - base.Height;
+
+					double num9 = base.Left;
+
+					double num10 = base.Top;
 
 					switch (dockWindow3.settings.Position) {
 
@@ -19221,65 +19231,59 @@ namespace MacStyleDock
 
 					}
 
+					DoubleAnimation animation = new DoubleAnimation (num5, TimeSpan.FromMilliseconds (250.0)) {
+
+						EasingFunction = new CubicEase {
+
+							EasingMode = EasingMode.EaseInOut
+
+						}
+
+					};
+
+					DoubleAnimation animation2 = new DoubleAnimation (num6, TimeSpan.FromMilliseconds (250.0)) {
+
+						EasingFunction = new CubicEase {
+
+							EasingMode = EasingMode.EaseInOut
+
+						}
+
+					};
+
+					DoubleAnimation animation3 = new DoubleAnimation (num9, TimeSpan.FromMilliseconds (250.0)) {
+
+						EasingFunction = new CubicEase {
+
+							EasingMode = EasingMode.EaseInOut
+
+						}
+
+					};
+
+					DoubleAnimation animation4 = new DoubleAnimation (num10, TimeSpan.FromMilliseconds (250.0)) {
+
+						EasingFunction = new CubicEase {
+
+							EasingMode = EasingMode.EaseInOut
+
+						}
+
+					};
+
+					BeginAnimation (FrameworkElement.WidthProperty, animation);
+
+					BeginAnimation (FrameworkElement.HeightProperty, animation2);
+
+					BeginAnimation (Window.LeftProperty, animation3);
+
+					BeginAnimation (Window.TopProperty, animation4);
+
 				}
-
-				DoubleAnimation animation = new DoubleAnimation (num5, TimeSpan.FromMilliseconds (250.0)) {
-
-					EasingFunction = new CubicEase {
-
-						EasingMode = EasingMode.EaseInOut
-
-					}
-
-				};
-
-				DoubleAnimation animation2 = new DoubleAnimation (num6, TimeSpan.FromMilliseconds (250.0)) {
-
-					EasingFunction = new CubicEase {
-
-						EasingMode = EasingMode.EaseInOut
-
-					}
-
-				};
-
-				DoubleAnimation animation3 = new DoubleAnimation (num9, TimeSpan.FromMilliseconds (250.0)) {
-
-					EasingFunction = new CubicEase {
-
-						EasingMode = EasingMode.EaseInOut
-
-					}
-
-				};
-
-				DoubleAnimation animation4 = new DoubleAnimation (num10, TimeSpan.FromMilliseconds (250.0)) {
-
-					EasingFunction = new CubicEase {
-
-						EasingMode = EasingMode.EaseInOut
-
-					}
-
-				};
-
-				BeginAnimation (FrameworkElement.WidthProperty, animation);
-
-				BeginAnimation (FrameworkElement.HeightProperty, animation2);
-
-				BeginAnimation (Window.LeftProperty, animation3);
-
-				BeginAnimation (Window.TopProperty, animation4);
 
 				ev.Handled = true;
 
 			};
-
-			stackPanel4.Children.Add (button4);
-
-			stackPanel4.Children.Add (speakerBtn);
-
-			stackPanel4.Children.Add (volGrid);
 
 			stackPanel4.Children.Add (expandBtn);
 
