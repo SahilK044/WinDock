@@ -33,7 +33,7 @@
 
             <!-- Title -->
             <TextBlock x:Name="TitleText"
-                       Text="WinDock Suite is Ready" 
+                       Text="WinDock is Ready" 
                        FontFamily="{DynamicResource DisplayFontFamily}" 
                        FontSize="26" FontWeight="Bold"
                        Foreground="#0F172A" 
@@ -43,7 +43,7 @@
 
             <!-- Subtitle -->
             <TextBlock x:Name="SubtitleText"
-                       Text="WinDock, Winland, and WinCast installed successfully." 
+                       Text="WinDock installed successfully." 
                        FontFamily="{DynamicResource BodyFontFamily}" 
                        FontSize="14" 
                        Foreground="#475569" 
@@ -53,7 +53,7 @@
 
             <!-- CheckBox -->
             <CheckBox x:Name="LaunchCheckBox"
-                      Content="Launch WinDock Suite now"
+                       Content="Launch WinDock now"
                       IsChecked="True"
                       Style="{StaticResource CyanCheckBoxStyle}"
                       HorizontalAlignment="Center"

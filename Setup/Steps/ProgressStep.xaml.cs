@@ -192,7 +192,7 @@ namespace WinDockSetup.Steps
             // Kill all running suite processes (WinDock, Winland, WinCast, Weather)
             try
             {
-                string[] procsToKill = new[] { "WinDock", "WinDockConsole", "winland", "WinLand", "wincast", "WinCast", "weather", "Weather", "node", "electron" };
+                string[] procsToKill = new[] { "WinDock", "WinDockConsole" };
                 foreach (string procName in procsToKill)
                 {
                     try

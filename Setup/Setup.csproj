@@ -10,13 +10,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="..\windock_logo.png" Link="windock_logo.png" />
-    <Resource Include="..\winland_logo.png" Link="winland_logo.png" />
-    <Resource Include="..\wincast_logo.png" Link="wincast_logo.png" />
     <Compile Include="..\NativeBlur.cs" Link="NativeBlur.cs" />
   </ItemGroup>
-  <ItemGroup Condition="Exists('..\app_payload_part1.dat')">
-    <EmbeddedResource Include="..\app_payload_part1.dat" Link="app_payload_part1.dat" />
-    <EmbeddedResource Include="..\app_payload_part2.dat" Link="app_payload_part2.dat" />
+  <ItemGroup Condition="Exists('..\app_payload.zip')">
+    <EmbeddedResource Include="..\app_payload.zip" Link="app_payload.zip" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />

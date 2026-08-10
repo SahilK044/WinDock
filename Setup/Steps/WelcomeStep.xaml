@@ -17,66 +17,33 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Suite Badge -->
+        <!-- App Badge -->
         <Border Grid.Row="0" HorizontalAlignment="Center" Margin="0,4,0,14" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="12" Padding="14,5">
-            <TextBlock Text="WINDOCK SUITE v2.0  ·  ALL-IN-ONE EDITION" FontFamily="{StaticResource MonoFontFamily}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TelemetryCyanBrush}"/>
+            <TextBlock Text="WINDOCK v2.0  ·  OFFICIAL EDITION" FontFamily="{StaticResource MonoFontFamily}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TelemetryCyanBrush}"/>
         </Border>
 
         <!-- Title -->
-        <TextBlock x:Name="TitleText" Grid.Row="1" Text="Welcome to WinDock Suite" 
+        <TextBlock x:Name="TitleText" Grid.Row="1" Text="Welcome to WinDock" 
                    FontFamily="{StaticResource DisplayFontFamily}" FontSize="28" FontWeight="Bold"
                    Foreground="{StaticResource FogWhiteBrush}" 
                    HorizontalAlignment="Center" Margin="0,0,0,8" Opacity="0"/>
 
         <!-- Subtitle -->
-        <TextBlock x:Name="SubtitleText" Grid.Row="2" Text="An integrated macOS Dock, Dynamic Island, and Live Weather experience for Windows." 
+        <TextBlock x:Name="SubtitleText" Grid.Row="2" Text="A high-performance macOS Dock experience for Windows 10 and 11." 
                    FontFamily="{StaticResource BodyFontFamily}" FontSize="14" 
                    Foreground="{StaticResource FogWhite70Brush}" 
                    HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Opacity="0"/>
 
-        <!-- High-tech Integrated Apps Cards -->
-        <Grid x:Name="SpecPanel" Grid.Row="3" Margin="0,20,0,20" VerticalAlignment="Center" Opacity="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="14"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="14"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Card 1: WinDock -->
-            <Border Grid.Column="0" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="16,20">
+        <!-- WinDock App Card -->
+        <Grid x:Name="SpecPanel" Grid.Row="3" Margin="0,20,0,20" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0">
+            <Border Width="380" Background="#FFFFFF" BorderBrush="#2563EB" BorderThickness="1.5" CornerRadius="14" Padding="24,20">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.06" Color="#000000"/>
+                    <DropShadowEffect BlurRadius="24" ShadowDepth="3" Opacity="0.08" Color="#2563EB"/>
                 </Border.Effect>
                 <StackPanel HorizontalAlignment="Center">
-                    <Image Source="pack://application:,,,/windock_logo.png" Width="38" Height="38" HorizontalAlignment="Center" Margin="0,0,0,8" RenderOptions.BitmapScalingMode="HighQuality"/>
-                    <TextBlock Text="WinDock" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="macOS Dock &amp; Spotlight" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Card 2: Winland -->
-            <Border Grid.Column="2" Background="#FFFFFF" BorderBrush="#93C5FD" BorderThickness="1.5" CornerRadius="12" Padding="16,20">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="20" ShadowDepth="3" Opacity="0.08" Color="#2563EB"/>
-                </Border.Effect>
-                <StackPanel HorizontalAlignment="Center">
-                    <Image Source="pack://application:,,,/winland_logo.png" Width="38" Height="38" HorizontalAlignment="Center" Margin="0,0,0,8" RenderOptions.BitmapScalingMode="HighQuality"/>
-                    <TextBlock Text="Winland" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#2563EB" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="Dynamic Island &amp; Media" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Card 3: WinCast -->
-            <Border Grid.Column="4" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="16,20">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.06" Color="#000000"/>
-                </Border.Effect>
-                <StackPanel HorizontalAlignment="Center">
-                    <Image Source="pack://application:,,,/wincast_logo.png" Width="38" Height="38" HorizontalAlignment="Center" Margin="0,0,0,8" RenderOptions.BitmapScalingMode="HighQuality"/>
-                    <TextBlock Text="WinCast" FontFamily="{StaticResource DisplayFontFamily}" FontSize="15" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="Live Forecast &amp; Weather" FontFamily="{StaticResource BodyFontFamily}" FontSize="11.5" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
+                    <Image Source="pack://application:,,,/windock_logo.png" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,10" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="WinDock" FontFamily="{StaticResource DisplayFontFamily}" FontSize="18" FontWeight="Bold" Foreground="#2563EB" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="macOS Dock · F1 Race Center · AirDrop File Sharing" FontFamily="{StaticResource BodyFontFamily}" FontSize="12" Foreground="#64748B" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </StackPanel>
             </Border>
         </Grid>

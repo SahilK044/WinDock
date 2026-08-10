@@ -34,7 +34,7 @@
                 </StackPanel>
 
                 <!-- Centered Title -->
-                <TextBlock Text="WinDock Suite Installer" 
+                <TextBlock Text="WinDock Installer" 
                            FontFamily="{StaticResource DisplayFontFamily}" 
                            FontSize="12" 
                            FontWeight="SemiBold"
