@@ -1617,6 +1617,10 @@ namespace MacStyleDock
 
 		private string _cachedWallpaperPath;
 
+		private DateTime _lastWallpaperAccentCheckUtc = DateTime.MinValue;
+
+		private bool _wallpaperAccentChecked;
+
 
 
 		private static Random _particleRand = new Random ();
@@ -8023,6 +8027,18 @@ namespace MacStyleDock
 
 			try {
 
+				DateTime utcNow = DateTime.UtcNow;
+
+				if (_wallpaperAccentChecked && (utcNow - _lastWallpaperAccentCheckUtc).TotalSeconds < 5.0) {
+
+					return _cachedWallpaperAccent;
+
+				}
+
+				_lastWallpaperAccentCheckUtc = utcNow;
+
+				_wallpaperAccentChecked = true;
+
 				string text = null;
 
 				using (RegistryKey registryKey = Registry.CurrentUser.OpenSubKey ("Control Panel\\Desktop", writable: false)) {
@@ -8036,6 +8052,10 @@ namespace MacStyleDock
 				}
 
 				if (string.IsNullOrEmpty (text) || !File.Exists (text)) {
+
+					_cachedWallpaperPath = null;
+
+					_cachedWallpaperAccent = null;
 
 					return null;
 
@@ -8912,7 +8932,11 @@ namespace MacStyleDock
 
 			}
 
+			if (isDockHidden) {
 
+				return;
+
+			}
 
 			System.Windows.Point mousePosInWindow = Mouse.GetPosition (this);
 
@@ -17527,6 +17551,18 @@ namespace MacStyleDock
 
 		private DispatcherTimer updateTimer;
 
+		private System.Windows.Media.LinearGradientBrush _progressWaveFillBrush;
+
+		private int _lastShownProgressSec = -1;
+
+		private System.Windows.Media.SolidColorBrush _lyricActiveBrush;
+
+		private System.Windows.Media.SolidColorBrush _lyricInactiveBrush;
+
+		private string _accentColorCacheStr;
+
+		private System.Windows.Media.Color _accentColorCacheVal;
+
 
 
 		private string lastQueryKey;
@@ -22202,7 +22238,15 @@ namespace MacStyleDock
 
 			if (timeCurrentText != null && !isSeeking) {
 
-				timeCurrentText.Text = FormatTime ((int)Math.Round (smoothProgressPosition));
+				int progressSec = (int)Math.Round (smoothProgressPosition);
+
+				if (progressSec != _lastShownProgressSec) {
+
+					_lastShownProgressSec = progressSec;
+
+					timeCurrentText.Text = FormatTime (progressSec);
+
+				}
 
 			}
 
@@ -22266,13 +22310,21 @@ namespace MacStyleDock
 
 				} else if (!string.IsNullOrEmpty (dockWindow.settings.AccentColor)) {
 
-					try {
+					if (dockWindow.settings.AccentColor != _accentColorCacheStr) {
 
-						color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString (dockWindow.settings.AccentColor);
+						try {
 
-					} catch {
+							_accentColorCacheVal = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString (dockWindow.settings.AccentColor);
+
+							_accentColorCacheStr = dockWindow.settings.AccentColor;
+
+						} catch {
+
+						}
 
 					}
+
+					color = _accentColorCacheVal;
 
 				}
 
@@ -22286,13 +22338,43 @@ namespace MacStyleDock
 
 			if (progressWavePath != null) {
 
-				LinearGradientBrush fill = new LinearGradientBrush (displayC, displayC2, new System.Windows.Point (0.0, 0.0), new System.Windows.Point (1.0, 0.0));
+				if (_progressWaveFillBrush == null) {
 
-				progressWavePath.Fill = fill;
+					_progressWaveFillBrush = new LinearGradientBrush ();
+
+					_progressWaveFillBrush.StartPoint = new System.Windows.Point (0.0, 0.0);
+
+					_progressWaveFillBrush.EndPoint = new System.Windows.Point (1.0, 0.0);
+
+					_progressWaveFillBrush.GradientStops.Add (new GradientStop (displayC, 0.0));
+
+					_progressWaveFillBrush.GradientStops.Add (new GradientStop (displayC2, 1.0));
+
+					progressWavePath.Fill = _progressWaveFillBrush;
+
+				} else if (_progressWaveFillBrush.GradientStops.Count >= 2) {
+
+					if (_progressWaveFillBrush.GradientStops [0].Color != displayC) {
+
+						_progressWaveFillBrush.GradientStops [0].Color = displayC;
+
+					}
+
+					if (_progressWaveFillBrush.GradientStops [1].Color != displayC2) {
+
+						_progressWaveFillBrush.GradientStops [1].Color = displayC2;
+
+					}
+
+				}
 
 				if (progressWavePath.Effect is DropShadowEffect dropShadowEffect) {
 
-					dropShadowEffect.Color = displayC;
+					if (dropShadowEffect.Color != displayC) {
+
+						dropShadowEffect.Color = displayC;
+
+					}
 
 				}
 
@@ -22458,6 +22540,18 @@ namespace MacStyleDock
 
 			}
 
+			if (_lyricActiveBrush == null || _lyricActiveBrush.Color != lyricActiveColor || _lyricInactiveBrush == null || _lyricInactiveBrush.Color != lyricInactiveColor) {
+
+				_lyricActiveBrush = new SolidColorBrush (lyricActiveColor);
+
+				_lyricActiveBrush.Freeze ();
+
+				_lyricInactiveBrush = new SolidColorBrush (lyricInactiveColor);
+
+				_lyricInactiveBrush.Freeze ();
+
+			}
+
 			for (int i = 0; i < parsedLyrics.Count; i++) {
 
 				TextBlock textBlock2 = parsedLyrics [i].TextBlock;
@@ -22466,7 +22560,13 @@ namespace MacStyleDock
 
 					bool flag2 = i == num11;
 
-					textBlock2.Foreground = new SolidColorBrush (flag2 ? lyricActiveColor : lyricInactiveColor);
+					System.Windows.Media.Brush targetBrush = (flag2 ? _lyricActiveBrush : _lyricInactiveBrush);
+
+					if (textBlock2.Foreground != targetBrush) {
+
+						textBlock2.Foreground = targetBrush;
+
+					}
 
 					double num13 = (flag2 ? 1.0 : 0.5);
 
@@ -22484,7 +22584,11 @@ namespace MacStyleDock
 
 					if (textBlock2.Effect is DropShadowEffect dropShadowEffect2) {
 
-						dropShadowEffect2.Color = lyricActiveColor;
+						if (dropShadowEffect2.Color != lyricActiveColor) {
+
+							dropShadowEffect2.Color = lyricActiveColor;
+
+						}
 
 						double num15 = (flag2 ? 0.8 : 0.0);
 
